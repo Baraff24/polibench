@@ -1,7 +1,7 @@
-# Fastapi-React-Mongodb-Docker
+# Polibench
 
-![Tests](https://github.com/jonasrenault/fastapi-react-mongodb-docker/actions/workflows/test.yml/badge.svg)
-![Build](https://github.com/jonasrenault/fastapi-react-mongodb-docker/actions/workflows/build.yml/badge.svg)
+![Tests](https://github.com/baraff/polibench/actions/workflows/test.yml/badge.svg)
+![Build](https://github.com/baraff/polibench/actions/workflows/build.yml/badge.svg)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 ![python_version](https://img.shields.io/badge/Python-%3E=3.12-blue)
 
@@ -11,11 +11,11 @@ This is a template application for a FARM stack. FARM stands for FastAPI, React,
 
 ### Clean design with minimal dependencies
 
-[![API docs](frontend/public/farmd-1.png)](https://github.com/jonasrenault/fastapi-react-mongodb-docker)
+[![API docs](frontend/public/farmd-1.png)](https://github.com/baraff/polibench)
 
 ### Basic user management with OAuth2 SSO
 
-[![API docs](frontend/public/farmd-2.png)](https://github.com/jonasrenault/fastapi-react-mongodb-docker)
+[![API docs](frontend/public/farmd-2.png)](https://github.com/baraff/polibench)
 
 ## Project structure
 

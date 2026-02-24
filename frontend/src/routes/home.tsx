@@ -87,7 +87,7 @@ const FEATURES: Array<Feature> = [
  */
 export async function loader() {
   const today = new Date().toDateString()
-  const cacheValue = localStorage.getItem('farmd-features')
+  const cacheValue = localStorage.getItem('polibench-features')
   if (cacheValue !== null) {
     const cache = JSON.parse(cacheValue) as FeaturesCache
     if ('date' in cache && cache.date === today) return { features: cache.features }
@@ -101,7 +101,7 @@ export async function loader() {
     ...feature,
     stars: results[idx].stargazers_count,
   }))
-  localStorage.setItem('farmd-features', JSON.stringify({ date: today, features }))
+  localStorage.setItem('polibench-features', JSON.stringify({ date: today, features }))
 
   return { features }
 }
@@ -185,14 +185,14 @@ export default function Home() {
             </Link>
           </Box>
           <Typography variant='h3' align='center' color='text.secondary' sx={{ mt: 5 }}>
-            = FARMD
+            = Polibench
           </Typography>
         </Container>
       </Box>
       <Container sx={{ py: 8 }} maxWidth='md'>
         <Box sx={{ mb: 4 }}>
           <Typography variant='body1'>
-            FARMD is a minimalist starter template for a FARM application stack ready to run with
+            Polibench is a minimalist starter template for a FARM application stack ready to run with
             docker. It offers basic user management, with options for OAuth2 support via Google, so
             that you can get started straight away. It is built with a clean design & minimal
             dependencies in mind, keeping only the essentials.

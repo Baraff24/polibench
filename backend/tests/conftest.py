@@ -11,7 +11,7 @@ from app.main import app
 
 from .utils import get_user_auth_headers
 
-MONGO_TEST_DB = "farmdtest"
+MONGO_TEST_DB = "polibenchtest"
 
 
 @pytest.fixture

@@ -1,4 +1,4 @@
-# FARM-docker backend API
+# Polibench backend API
 
 This directory contains the backend API app. It is built with [FastAPI](https://fastapi.tiangolo.com/).
 

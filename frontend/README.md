@@ -1,4 +1,4 @@
-# FARM-docker web app
+# Polibench web app
 
 This directory contains the frontend application. It is built with [React](https://reactjs.org/) and [Vite](https://vitejs.dev/).
 

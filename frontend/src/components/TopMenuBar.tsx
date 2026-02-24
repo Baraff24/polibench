@@ -41,7 +41,7 @@ export default function TopMenuBar() {
       <Toolbar>
         <Typography component='h1' variant='h6' color='inherit' noWrap sx={{ flexGrow: 1 }}>
           <Link component={NavLink} to='/' color='inherit' underline='none'>
-            FARMD
+            Polibench
           </Link>
         </Typography>
 

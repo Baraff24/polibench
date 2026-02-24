@@ -6,13 +6,13 @@ build-backend = "hatchling.build"
 packages = ["app"]
 
 [project]
-name = "farm-docker"
+name = "polibench"
 version = "1.3.0"
-description = "Backend API for farm-docker"
+description = "Backend API for polibench"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-    {name = "Jonas Renault", email = "jonasrenault@gmail.com"},
+    {name = "baraff", email = "baraff@users.noreply.github.com"},
 ]
 requires-python = ">=3.12"
 dependencies = [
@@ -33,8 +33,8 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/jonasrenault/fastapi-react-mongodb-docker#readme"
-"Repository" = "https://github.com/jonasrenault/fastapi-react-mongodb-docker"
+"Homepage" = "https://github.com/baraff/polibench#readme"
+"Repository" = "https://github.com/baraff/polibench"
 
 [dependency-groups]
 dev = [

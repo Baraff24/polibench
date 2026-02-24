@@ -9,4 +9,4 @@ api_router.include_router(users.router, prefix="/users", tags=["users"])
 
 @api_router.get("/")
 async def root():
-    return {"message": "Backend API for FARM-docker operational !"}
+    return {"message": "Backend API for Polibench operational !"}
