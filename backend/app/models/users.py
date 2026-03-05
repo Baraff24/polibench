@@ -14,7 +14,7 @@ class UserRole(str, Enum):
 
 
 class User(Document):
-    uuid: Annotated[UUID, Field(default_factory=uuid4), Indexed(unique=True)]
+    uuid: Annotated[UUID, Indexed(unique=True)] = Field(default_factory=uuid4)
     email: Annotated[EmailStr, Indexed(unique=True)]
     first_name: str | None = None
     last_name: str | None = None

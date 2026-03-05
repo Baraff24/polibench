@@ -27,7 +27,7 @@ class Artifacts(BaseModel):
 
 
 class Experiment(Document):
-    uuid: Annotated[UUID, Field(default_factory=uuid4), Indexed(unique=True)]
+    uuid: Annotated[UUID, Indexed(unique=True)] = Field(default_factory=uuid4)
     dataset_id: Annotated[PydanticObjectId, Indexed()]
     model_id: Annotated[PydanticObjectId, Indexed()]
     submitted_by_user_id: Annotated[PydanticObjectId, Indexed()]

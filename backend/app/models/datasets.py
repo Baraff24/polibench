@@ -24,7 +24,7 @@ class Splits(BaseModel):
 
 
 class Dataset(Document):
-    uuid: Annotated[UUID, Field(default_factory=uuid4), Indexed(unique=True)]
+    uuid: Annotated[UUID, Indexed(unique=True)] = Field(default_factory=uuid4)
     name: str
     version: str
     task: TaskType

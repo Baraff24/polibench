@@ -7,7 +7,7 @@ from pydantic import Field
 
 
 class Team(Document):
-    uuid: Annotated[UUID, Field(default_factory=uuid4), Indexed(unique=True)]
+    uuid: Annotated[UUID, Indexed(unique=True)] = Field(default_factory=uuid4)
     name: Annotated[str, Indexed(unique=True)]
     description: str | None = None
 

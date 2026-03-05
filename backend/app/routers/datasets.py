@@ -14,12 +14,10 @@ from app.models.users import User
 from app.schemas.datasets import DatasetCreate, DatasetPublic, DatasetSummary
 from app.schemas.ml_models import MLModelCreate, MLModelPublic, MLModelSummary
 from app.services.datasets import (
-    _dataset_to_public,
-    _model_to_public,
     create_dataset,
     create_ml_model,
-    get_dataset_by_uuid,
-    get_ml_model_by_uuid,
+    get_dataset_public,
+    get_ml_model_public_by_uuid,
     list_datasets,
     list_ml_models,
 )
@@ -53,9 +51,8 @@ async def list_datasets_endpoint() -> list[DatasetSummary]:
     tags=["datasets"],
 )
 async def get_dataset_endpoint(dataset_uuid: UUID) -> DatasetPublic:
-    """Dettaglio di un singolo Dataset per UUID."""
-    dataset = await get_dataset_by_uuid(dataset_uuid)
-    return _dataset_to_public(dataset)
+    """Dettaglio di un singolo Dataset per UUID. Risolve team_id → team.uuid."""
+    return await get_dataset_public(dataset_uuid)
 
 
 # ---------------------------------------------------------------------------
@@ -85,5 +82,4 @@ async def list_ml_models_endpoint() -> list[MLModelSummary]:
 )
 async def get_ml_model_endpoint(model_uuid: UUID) -> MLModelPublic:
     """Dettaglio di un singolo MLModel per UUID."""
-    model = await get_ml_model_by_uuid(model_uuid)
-    return _model_to_public(model)
+    return await get_ml_model_public_by_uuid(model_uuid)

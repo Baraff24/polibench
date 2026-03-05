@@ -18,7 +18,7 @@ class Direction(str, Enum):
 
 
 class Metric(Document):
-    uuid: Annotated[UUID, Field(default_factory=uuid4), Indexed(unique=True)]
+    uuid: Annotated[UUID, Indexed(unique=True)] = Field(default_factory=uuid4)
 
     # Link to the run
     experiment_id: Annotated[PydanticObjectId, Indexed()]
