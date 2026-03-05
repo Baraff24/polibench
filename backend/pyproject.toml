@@ -12,7 +12,7 @@ description = "Backend API for polibench"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-    {name = "baraff", email = "baraff@users.noreply.github.com"},
+    { name = "baraff", email = "baraff@users.noreply.github.com" },
 ]
 requires-python = ">=3.12"
 dependencies = [
@@ -41,6 +41,7 @@ dev = [
     "asgi-lifespan>=2.1.0",
     "black>=25.1.0",
     "httpx>=0.28.1",
+    "mongomock-motor>=0.0.34",
     "mypy>=1.15.0",
     "pre-commit>=4.2.0",
     "pytest>=8.3.5",
