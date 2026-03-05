@@ -1,0 +1,182 @@
+@startuml
+hide circle
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+
+' =================================================================
+' NOTA ARCHITETTURALE — DB layer vs API layer
+' =================================================================
+' Questo diagramma rappresenta il DB layer (MongoDB/Beanie).
+'
+' API layer (HTTP) — principio UUID-first:
+'   - path params:  sempre UUID  (GET /datasets/{uuid})
+'   - body input:   sempre UUID  (dataset_uuid, model_uuid, ...)
+'   - response:     solo uuid    (_id mai esposto al client)
+'
+' Il router è il solo punto che risolve UUID → ObjectId internamente.
+' =================================================================
+
+' =========================
+' Core entities
+' =========================
+
+class User {
+  +_id: ObjectId
+  +uuid: UUID <<unique>>
+  +email: EmailStr <<unique>>
+  +first_name: string?
+  +last_name: string?
+  +hashed_password: string?
+  +provider: string?
+  +picture: string?
+  +role: UserRole
+  +team_uuid: UUID?
+  +is_active: bool
+  +is_superuser: bool
+  +created_at: datetime
+  +last_login_at: datetime?
+}
+
+note right of User
+  role enum: admin | researcher | viewer
+  hashed_password is None for SSO users.
+  team_uuid references Team.uuid (not _id):
+  cross-entity refs on User use UUID.
+end note
+
+class Team {
+  +_id: ObjectId
+  +uuid: UUID <<unique>>
+  +name: string <<unique>>
+  +description: string?
+  +owner_user_uuid: UUID?
+  +created_at: datetime
+}
+
+note right of Team
+  Membership: User.team_uuid → Team.uuid
+  (no member_user_ids array on Team)
+end note
+
+class Dataset {
+  +_id: ObjectId
+  +uuid: UUID <<unique>>
+  +name: string
+  +version: string
+  +task: TaskType
+  +description: string?
+  +splits: Splits?
+  +visibility: Visibility
+  +team_id: ObjectId? <<indexed>>
+  +created_by_user_id: ObjectId? <<indexed>>
+  +created_at: datetime
+}
+
+note right of Dataset
+  task enum: ranking | rating_prediction
+  visibility enum: public | private
+  splits: { train: int?, test: int?, validation: int? }
+  Unique identity: {name, version}
+end note
+
+class MLModel {
+  +_id: ObjectId
+  +uuid: UUID <<unique>>
+  +name: string <<unique>>
+  +family: string?
+  +paper_url: string?
+  +implementation: string?
+  +hyperparams: object?
+  +created_by_user_id: ObjectId? <<indexed>>
+  +created_at: datetime
+}
+
+note right of MLModel
+  Represents an algorithm (e.g. BPR-MF, LightGCN),
+  not a trained instance.
+  hyperparams: default/typical params for this algorithm.
+  Run-specific hyperparams live on Experiment.
+end note
+
+class Experiment {
+  +_id: ObjectId
+  +uuid: UUID <<unique>>
+  +dataset_id: ObjectId <<indexed>>
+  +model_id: ObjectId <<indexed>>
+  +submitted_by_user_id: ObjectId <<indexed>>
+  +team_id: ObjectId? <<indexed>>
+  +run_name: string?
+  +status: Status
+  +hyperparams: object?
+  +training_config: object?
+  +seed: int?
+  +notes: string?
+  +code: CodeInfo?
+  +artifacts: Artifacts?
+  +created_at: datetime
+  +finished_at: datetime?
+}
+
+note bottom of Experiment
+  status enum: queued | running | finished | failed
+
+  CodeInfo: { git_commit, repo_url, docker_image }
+  Artifacts: { logs_url, model_path, predictions_path }
+
+  Useful indexes:
+  - {dataset_id, model_id, created_at:-1}
+  - {submitted_by_user_id, created_at:-1}
+  - {team_id, created_at:-1}
+  - {status, created_at:-1}
+end note
+
+class Metric {
+  +_id: ObjectId
+  +uuid: UUID <<unique>>
+  +experiment_id: ObjectId <<indexed>>
+  +dataset_id: ObjectId <<indexed>>
+  +model_id: ObjectId <<indexed>>
+  +submitted_by_user_id: ObjectId? <<indexed>>
+  +team_id: ObjectId? <<indexed>>
+  +split: Split
+  +metric: string <<indexed>>
+  +k: int?
+  +value: float
+  +direction: Direction
+  +computed_at: datetime
+}
+
+note right of Metric
+  split enum: validation | test
+  direction enum: max | min
+
+  Denormalization:
+  dataset_id, model_id, submitted_by_user_id, team_id
+  are copied from Experiment at write time.
+  Purpose: leaderboard queries are index-only (no $lookup).
+
+  Key indexes:
+  - {dataset_id, split, metric, value:-1}
+  - {team_id, dataset_id, split, metric, value:-1}
+  - {submitted_by_user_id, dataset_id, split, metric}
+  - {experiment_id}
+end note
+
+' =========================
+' Relationships
+' =========================
+
+User "1" -- "0..*" Dataset       : creates >
+User "1" -- "0..*" MLModel       : creates >
+User "1" -- "0..*" Experiment    : submits >
+User "0..*" -- "0..1" Team       : belongs to >
+
+Team "1" -- "0..*" Dataset       : owns/private >
+Team "1" -- "0..*" Experiment    : owns >
+
+Dataset "1" -- "0..*" Experiment : evaluated on >
+MLModel "1" -- "0..*" Experiment : runs >
+Experiment "1" -- "1..*" Metric  : produces >
+
+@enduml
+

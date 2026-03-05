@@ -1,5 +1,9 @@
 # Modelli Dati
 
+> Il diagramma UML completo si trova in [`docs/backend/domain_model.puml`](./domain_model.puml).
+> Rappresenta il **DB layer** (MongoDB/Beanie). Il principio UUID-first si applica all'**API layer**:
+> `_id` e gli ObjectId interni non vengono mai esposti al client.
+
 I modelli dati si trovano in `backend/app/models/`. Ogni file definisce una o più classi che estendono
 `beanie.Document`, ciascuna corrispondente a una collezione MongoDB. Tutti i modelli sono registrati in
 `models/__init__.py` tramite la lista `DOCUMENT_MODELS`, che viene passata a `init_beanie()` all'avvio dell'
@@ -162,22 +166,23 @@ appartengono all'`Experiment`.
 Rappresenta una **run sperimentale**: l'esecuzione di un algoritmo su un dataset con una configurazione specifica. È
 l'entità centrale del sistema.
 
-| Campo                  | Tipo                       | Indice | Note                            |
-|------------------------|----------------------------|--------|---------------------------------|
-| `uuid`                 | `UUID`                     | unique | Identificatore pubblico         |
-| `dataset_id`           | `PydanticObjectId`         | sì     | FK verso Dataset                |
-| `model_id`             | `PydanticObjectId`         | sì     | FK verso MLModel                |
-| `submitted_by_user_id` | `PydanticObjectId`         | sì     | FK verso User                   |
-| `team_id`              | `PydanticObjectId \| None` | sì     | FK verso Team (opzionale)       |
-| `run_name`             | `str \| None`              | —      | Nome descrittivo della run      |
-| `status`               | `Status`                   | —      | Stato della run                 |
-| `training_config`      | `dict[str, Any] \| None`   | —      | Configurazione training         |
-| `seed`                 | `int \| None`              | —      | Seed per riproducibilità        |
-| `notes`                | `str \| None`              | —      | Note libere                     |
-| `code`                 | `CodeInfo \| None`         | —      | Informazioni sul codice         |
-| `artifacts`            | `Artifacts \| None`        | —      | Path a log, modello, predizioni |
-| `created_at`           | `datetime`                 | —      | Timestamp creazione             |
-| `finished_at`          | `datetime \| None`         | —      | Timestamp completamento         |
+| Campo                  | Tipo                       | Indice | Note                              |
+|------------------------|----------------------------|--------|-----------------------------------|
+| `uuid`                 | `UUID`                     | unique | Identificatore pubblico           |
+| `dataset_id`           | `PydanticObjectId`         | sì     | FK verso Dataset                  |
+| `model_id`             | `PydanticObjectId`         | sì     | FK verso MLModel                  |
+| `submitted_by_user_id` | `PydanticObjectId`         | sì     | FK verso User                     |
+| `team_id`              | `PydanticObjectId \| None` | sì     | FK verso Team (opzionale)         |
+| `run_name`             | `str \| None`              | —      | Nome descrittivo della run        |
+| `status`               | `Status`                   | —      | Stato della run                   |
+| `hyperparams`          | `dict[str, Any] \| None`   | —      | Iperparametri specifici della run |
+| `training_config`      | `dict[str, Any] \| None`   | —      | Configurazione training           |
+| `seed`                 | `int \| None`              | —      | Seed per riproducibilità          |
+| `notes`                | `str \| None`              | —      | Note libere                       |
+| `code`                 | `CodeInfo \| None`         | —      | Informazioni sul codice           |
+| `artifacts`            | `Artifacts \| None`        | —      | Path a log, modello, predizioni   |
+| `created_at`           | `datetime`                 | —      | Timestamp creazione               |
+| `finished_at`          | `datetime \| None`         | —      | Timestamp completamento           |
 
 **Enumerazione `Status`**: `queued` | `running` | `finished` | `failed`
 
