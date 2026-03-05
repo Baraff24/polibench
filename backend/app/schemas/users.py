@@ -1,7 +1,6 @@
 from uuid import UUID
 
-from beanie import PydanticObjectId
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr
 
 
 class UserBase(BaseModel):
@@ -38,11 +37,8 @@ class UserUpdate(UserBase):
 
 class User(PrivateUserBase):
     """
-    User properties returned by API. Contains private
-    user information such as email, is_active, auth provider.
-
-    Should only be returned to admins or self.
+    User properties returned by API.
+    uuid è l'unico identificatore esposto: niente _id MongoDB.
     """
 
-    id: PydanticObjectId = Field()
     uuid: UUID

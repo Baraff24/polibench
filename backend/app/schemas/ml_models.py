@@ -8,18 +8,19 @@ schemas/ml_models.py
 
     MLModelSummary    FUORI dalla gerarchia — versione ridotta per liste.
 
-Nota su hyperparams (C):
+Principio UUID-first:
+    Le response usano uuid come identificatore primario, mai _id MongoDB.
+    created_by_user_uuid è UUID, non ObjectId.
+
+Nota su hyperparams:
     MLModel = algoritmo (es. LightGCN, BPR-MF).
-    Gli hyperparams variano per ogni run, non per algoritmo.
-    Appartengono a Experiment, non a MLModel.
-    Rimosso da MLModelBase per evitare confusione semantica.
+    Gli hyperparams variano per ogni run → appartengono a Experiment.
 """
 
 from datetime import datetime
 from uuid import UUID
 
-from beanie import PydanticObjectId
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class MLModelBase(BaseModel):
@@ -34,30 +35,30 @@ class MLModelBase(BaseModel):
 class MLModelCreate(MLModelBase):
     """
     Quello che il client manda per registrare un nuovo algoritmo.
-    Il server calcola: uuid, created_at, created_by_user_id.
+    Il server calcola: uuid, created_at, created_by_user_uuid.
     """
 
     pass
 
 
 class MLModelPublic(MLModelBase):
-    """Risposta completa per un singolo MLModel."""
+    """
+    Risposta completa per un singolo MLModel.
+    uuid è l'identificatore pubblico: niente _id MongoDB.
+    """
 
-    id: PydanticObjectId = Field(alias="_id")
     uuid: UUID
-    created_by_user_id: PydanticObjectId | None = None
+    created_by_user_uuid: UUID | None = None
     created_at: datetime
-
-    model_config = {"populate_by_name": True}
 
 
 class MLModelSummary(BaseModel):
-    """Versione compatta per liste e leaderboard."""
+    """
+    Versione compatta per liste e leaderboard.
+    uuid è l'identificatore pubblico: niente _id MongoDB.
+    """
 
-    id: PydanticObjectId = Field(alias="_id")
     uuid: UUID
     name: str
     family: str | None = None
     paper_url: str | None = None
-
-    model_config = {"populate_by_name": True}
