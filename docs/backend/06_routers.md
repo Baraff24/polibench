@@ -24,6 +24,20 @@ L'endpoint `GET /api/v1/` è un health check che non richiede autenticazione.
 
 ---
 
+## Principio: router sottili
+
+I router non contengono logica di business. Il loro unico compito è:
+
+1. ricevere la richiesta HTTP e validare il body con Pydantic
+2. estrarre l'utente corrente dal JWT (quando richiesto)
+3. delegare al **service layer** (`app/services/`)
+4. restituire la risposta
+
+Tutta la logica (risoluzione UUID→ObjectId, denormalizzazione, query, aggregazioni) vive nei service.
+Vedi [09_services.md](./09_services.md) per i dettagli.
+
+---
+
 ## login.py — Autenticazione
 
 Prefisso: `/api/v1/login`
@@ -111,49 +125,132 @@ DELETE /api/v1/users/{userid}
 
 ---
 
-## Router da implementare
+## datasets.py — Dataset e MLModel
 
-I seguenti router sono progettati negli schemi ma non ancora implementati al momento della stesura di questo documento (
-marzo 2026):
+**File**: `routers/datasets.py` — delegato a `services/datasets.py`
 
-### datasets (da fare)
+Contiene gli endpoint sia per `Dataset` che per `MLModel` (entità di "catalogo" con pattern identico).
 
-Prefisso previsto: `/api/v1/datasets`
+### Dataset
 
-| Endpoint  | Metodo | Auth               | Input/Output                      | Note                                    |
-|-----------|--------|--------------------|-----------------------------------|-----------------------------------------|
-| `/`       | POST   | utente attivo      | `DatasetCreate` → `DatasetPublic` | Il server risolve `team_uuid → team_id` |
-| `/`       | GET    | pubblico           | — → `list[DatasetSummary]`        | Lista con filtri                        |
-| `/{uuid}` | GET    | pubblico           | — → `DatasetPublic`               | Dettaglio                               |
-| `/{uuid}` | PATCH  | proprietario/admin | `DatasetCreate` → `DatasetPublic` |                                         |
-| `/{uuid}` | DELETE | proprietario/admin | — → `DatasetPublic`               |                                         |
+| Endpoint                          | Metodo | Auth          | Input / Output                    | Note                                    |
+|-----------------------------------|--------|---------------|-----------------------------------|-----------------------------------------|
+| `/api/v1/datasets`                | POST   | utente attivo | `DatasetCreate` → `DatasetPublic` | Il server risolve `team_uuid → team_id` |
+| `/api/v1/datasets`                | GET    | pubblico      | — → `list[DatasetSummary]`        | Lista completa (senza filtri per ora)   |
+| `/api/v1/datasets/{dataset_uuid}` | GET    | pubblico      | — → `DatasetPublic`               | Dettaglio con risoluzione UUID          |
 
-### ml-models (da fare)
+**Flusso POST `/datasets`**:
 
-Prefisso previsto: `/api/v1/ml-models`
+1. `DatasetCreate` viene validato da Pydantic (task e visibility sono enum)
+2. Se `team_uuid` è presente, il service risolve `team_uuid → Team` (404 se non esiste)
+3. Viene creato il Document `Dataset` con `team_id` (ObjectId interno) e `created_by_user_id` dall'utente JWT
+4. La risposta `DatasetPublic` contiene solo UUID: `team_uuid` e `created_by_user_uuid`
 
-| Endpoint  | Metodo | Auth          | Input/Output                      | Note |
-|-----------|--------|---------------|-----------------------------------|------|
-| `/`       | POST   | utente attivo | `MLModelCreate` → `MLModelPublic` |      |
-| `/`       | GET    | pubblico      | — → `list[MLModelSummary]`        |      |
-| `/{uuid}` | GET    | pubblico      | — → `MLModelPublic`               |      |
+**Flusso GET `/datasets/{dataset_uuid}`**:
 
-### experiments (da fare)
+1. Il service risolve `dataset_uuid → Dataset` (404 se non esiste)
+2. Risolve `team_id → Team → team.uuid` e `created_by_user_id → User → user.uuid`
+3. Ritorna `DatasetPublic` con tutti i campi UUID
 
-Prefisso previsto: `/api/v1/experiments`
+### MLModel
 
-| Endpoint          | Metodo | Auth          | Input/Output                                | Note                                                                                                                  |
-|-------------------|--------|---------------|---------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
-| `/`               | POST   | utente attivo | `ExperimentCreate` → `ExperimentPublic`     | Risolve `dataset_uuid`, `model_uuid` → ObjectId internamente; setta `submitted_by_user_uuid` dal JWT; `status=QUEUED` |
-| `/{uuid}`         | GET    | utente attivo | — → `ExperimentPublic`                      |                                                                                                                       |
-| `/{uuid}/metrics` | POST   | utente attivo | `MetricsBatchCreate` → `list[MetricPublic]` | Denormalizza `dataset_id`, `model_id` dall'Experiment                                                                 |
-| `/{uuid}/metrics` | GET    | pubblico      | — → `ExperimentMetrics`                     | Raggruppato per split                                                                                                 |
+| Endpoint                         | Metodo | Auth          | Input / Output                    | Note |
+|----------------------------------|--------|---------------|-----------------------------------|------|
+| `/api/v1/ml-models`              | POST   | utente attivo | `MLModelCreate` → `MLModelPublic` |      |
+| `/api/v1/ml-models`              | GET    | pubblico      | — → `list[MLModelSummary]`        |      |
+| `/api/v1/ml-models/{model_uuid}` | GET    | pubblico      | — → `MLModelPublic`               |      |
 
-### leaderboard (da fare)
+`MLModelSummary` espone solo `uuid`, `name`, `family`, `paper_url` (versione ridotta per le liste).
+`MLModelPublic` include anche `hyperparams` (configurazione canonica dell'algoritmo), `implementation`,
+`created_by_user_uuid`, `created_at`.
 
-Prefisso previsto: `/api/v1/leaderboard`
+---
 
-| Endpoint | Metodo | Auth     | Query params                                  | Note                                                                                       |
-|----------|--------|----------|-----------------------------------------------|--------------------------------------------------------------------------------------------|
-| `/`      | GET    | pubblico | `dataset_uuid`, `split`, `metric`, `limit=10` | Ritorna `list[LeaderboardEntry]`; arricchisce con `model_name` da MLModel; aggiunge `rank` |
+## experiments.py — Experiment, Metric e Leaderboard
 
+**File**: `routers/experiments.py` — delegato a `services/experiments.py`, `services/metrics.py`,
+`services/leaderboard.py`
+
+### Experiments
+
+| Endpoint                     | Metodo | Auth          | Input / Output                          | Note                                         |
+|------------------------------|--------|---------------|-----------------------------------------|----------------------------------------------|
+| `/api/v1/experiments`        | POST   | utente attivo | `ExperimentCreate` → `ExperimentPublic` | Risolve UUID → ObjectId; status parte QUEUED |
+| `/api/v1/experiments/{uuid}` | GET    | utente attivo | — → `ExperimentPublic`                  | Risolve tutti gli ObjectId interni in UUID   |
+
+**Flusso POST `/experiments`**:
+
+1. `ExperimentCreate` contiene `dataset_uuid` e `model_uuid` (UUID pubblici)
+2. Il service risolve `dataset_uuid → Dataset` e `model_uuid → MLModel` (404 se non esistono)
+3. Crea il Document `Experiment` con ObjectId interni: `dataset_id`, `model_id`, `submitted_by_user_id`
+4. `submitted_by_user_id` viene estratto dal token JWT — il client non lo invia mai
+5. `status` viene impostato a `QUEUED` lato server — il client non lo invia mai
+6. La risposta `ExperimentPublic` risolve tutti gli ObjectId in UUID
+
+**Campi gestiti esclusivamente dal server** (mai nel body del client):
+
+- `submitted_by_user_uuid`: estratto dal JWT
+- `status`: inizialmente `QUEUED`
+- `created_at`: timestamp server
+
+### Metrics (submission batch)
+
+| Endpoint                             | Metodo | Auth          | Input / Output                             | Note                                             |
+|--------------------------------------|--------|---------------|--------------------------------------------|--------------------------------------------------|
+| `/api/v1/experiments/{uuid}/metrics` | POST   | utente attivo | `MetricsBatchCreate` → `ExperimentMetrics` | Denormalizza dataset_id/model_id dall'Experiment |
+| `/api/v1/experiments/{uuid}/metrics` | GET    | pubblico      | — → `ExperimentMetrics`                    | Raggruppato per split                            |
+
+**Flusso POST `/experiments/{uuid}/metrics`**:
+
+1. Il router impone `data.experiment_uuid = experiment_uuid` (path param ha precedenza sul body)
+2. Il service risolve `experiment_uuid → Experiment`
+3. Per ogni `MetricCreate` crea un Document `Metric` copiando `dataset_id`, `model_id`, `submitted_by_user_id`,
+   `team_id` dall'Experiment (denormalizzazione server-side)
+4. Inserisce tutti i Document in bulk con `insert_many`
+5. Ritorna le metriche raggruppate per split (`ExperimentMetrics`)
+
+### Leaderboard
+
+| Endpoint              | Metodo | Auth     | Query params                                  | Output                   |
+|-----------------------|--------|----------|-----------------------------------------------|--------------------------|
+| `/api/v1/leaderboard` | GET    | pubblico | `dataset_uuid`, `metric`, `split`, `top_n=10` | `list[LeaderboardEntry]` |
+
+**Flusso GET `/leaderboard`**:
+
+1. Risolve `dataset_uuid → Dataset` (404 se non esiste)
+2. Query su `Metric` per `(dataset_id, metric, split)`, ordinata per `value DESC`, limitata a `top_n`
+3. Batch fetch degli `MLModel` e degli `Experiment` distinti per risolvere `model_id → model.uuid / model.name`
+   e `experiment_id → experiment.uuid`
+4. Assembla `LeaderboardEntry` con `rank` progressivo (1-based)
+
+**Ottimizzazione**: le query sul leaderboard non fanno `$lookup` — `dataset_id` è denormalizzato in `Metric`,
+quindi la query è un semplice `find()` su indice composto `{dataset_id, metric, split, value: -1}`.
+
+---
+
+## Riepilogo completo endpoint
+
+| Endpoint                                  | Metodo | Auth      | Descrizione                        |
+|-------------------------------------------|--------|-----------|------------------------------------|
+| `GET  /api/v1/`                           | GET    | no        | Health check                       |
+| `POST /api/v1/login/access-token`         | POST   | no        | Login email/password               |
+| `GET  /api/v1/login/test-token`           | GET    | JWT       | Verifica token                     |
+| `POST /api/v1/users`                      | POST   | no        | Registrazione utente               |
+| `GET  /api/v1/users`                      | GET    | superuser | Lista utenti                       |
+| `GET  /api/v1/users/me`                   | GET    | attivo    | Profilo corrente                   |
+| `PATCH /api/v1/users/me`                  | PATCH  | attivo    | Aggiorna profilo corrente          |
+| `DELETE /api/v1/users/me`                 | DELETE | attivo    | Cancella account                   |
+| `GET  /api/v1/users/{uuid}`               | GET    | superuser | Profilo utente per UUID            |
+| `PATCH /api/v1/users/{uuid}`              | PATCH  | superuser | Aggiorna utente                    |
+| `DELETE /api/v1/users/{uuid}`             | DELETE | superuser | Cancella utente                    |
+| `POST /api/v1/datasets`                   | POST   | attivo    | Crea Dataset                       |
+| `GET  /api/v1/datasets`                   | GET    | no        | Lista Dataset                      |
+| `GET  /api/v1/datasets/{uuid}`            | GET    | no        | Dettaglio Dataset                  |
+| `POST /api/v1/ml-models`                  | POST   | attivo    | Registra MLModel                   |
+| `GET  /api/v1/ml-models`                  | GET    | no        | Lista MLModel                      |
+| `GET  /api/v1/ml-models/{uuid}`           | GET    | no        | Dettaglio MLModel                  |
+| `POST /api/v1/experiments`                | POST   | attivo    | Sottomette Experiment (UUID input) |
+| `GET  /api/v1/experiments/{uuid}`         | GET    | attivo    | Dettaglio Experiment               |
+| `POST /api/v1/experiments/{uuid}/metrics` | POST   | attivo    | Sottomette metriche batch          |
+| `GET  /api/v1/experiments/{uuid}/metrics` | GET    | no        | Metriche raggruppate per split     |
+| `GET  /api/v1/leaderboard`                | GET    | no        | Top-N per (dataset, metric, split) |

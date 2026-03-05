@@ -7,14 +7,17 @@ distinte:
 
 ```
 tests/
-├── conftest.py          ← fixture condivise da tutti i test
-├── db/                  ← smoke test di database (in-memory)
+├── conftest.py                  ← fixture condivise da tutti i test
+├── db/                          ← smoke test di database (in-memory)
 │   ├── test_create_entities.py
 │   ├── test_leaderboard.py
 │   └── test_experiment_detail.py
-└── routers/             ← test HTTP degli endpoint
+└── routers/                     ← test HTTP degli endpoint
     ├── test_login.py
-    └── test_users.py
+    ├── test_users.py
+    ├── test_datasets.py         ← Dataset e MLModel (POST/GET)
+    ├── test_experiments.py      ← Experiment + batch metrics (vertical slice)
+    └── test_leaderboard.py      ← leaderboard (sort, filter by split, empty)
 ```
 
 ---
@@ -177,7 +180,7 @@ restituisca esattamente 4 metriche (solo quelle dell'experiment target, non le 2
 ## Test HTTP dei router (`tests/routers/`)
 
 I test dei router testano il comportamento degli endpoint HTTP usando il client `httpx.AsyncClient` configurato dalla
-fixture `client`. Questi test richiedono un MongoDB reale attivo (normalmente tramite Docker Compose).
+fixture `client`. Tutti i test girano **in-memory** grazie a `mongomock-motor`: non è necessario Docker attivo.
 
 ### test_login.py
 
@@ -191,20 +194,57 @@ fixture `client`. Questi test richiedono un MongoDB reale attivo (normalmente tr
 Testa il CRUD completo degli utenti: registrazione, lettura profilo, aggiornamento, cancellazione, operazioni admin. Usa
 la fixture `superuser_token_headers` per le operazioni che richiedono privilegi elevati.
 
+### test_datasets.py
+
+Testa gli endpoint Dataset e MLModel.
+
+- **`test_create_dataset_requires_auth`**: `POST /datasets` senza token → 401 (verifica autenticazione)
+- **`test_create_and_list_dataset`**: crea un Dataset, verifica che la risposta contenga `uuid` e non `_id`
+  (UUID-first), poi verifica che `GET /datasets` includa il dataset appena creato
+- **`test_get_dataset_by_uuid`**: `POST /datasets` poi `GET /datasets/{uuid}` → stesso oggetto, stesso UUID
+- **`test_get_dataset_not_found`**: UUID inesistente → 404
+- Test analoghi per `ml-models`: creazione, listing, dettaglio per UUID
+
+### test_experiments.py
+
+Testa la vertical slice completa della submission.
+
+- **`test_submit_experiment_and_metrics_then_get_detail`**: test principale end-to-end:
+    1. crea Dataset e MLModel via HTTP
+    2. `POST /experiments` con `dataset_uuid` e `model_uuid` → verifica schema UUID-first, `status=queued`
+    3. `POST /experiments/{uuid}/metrics` con lista di `MetricCreate` → verifica `ExperimentMetrics` con
+       `metrics_by_split` correttamente popolato (2 test, 1 validation)
+    4. `GET /experiments/{uuid}/metrics` → stesso risultato
+- **`test_get_experiment_public`**: `POST` poi `GET /experiments/{uuid}` → verifica che `dataset_uuid` e `model_uuid`
+  siano quelli inviati (risoluzione UUID→ObjectId→UUID andata e ritorno)
+- **`test_submit_experiment_invalid_dataset_uuid`**: `dataset_uuid` inesistente → 404
+- **`test_submit_experiment_requires_auth`**: senza token → 401
+
+### test_leaderboard.py
+
+Testa l'endpoint `GET /leaderboard` replicando i test DB ma passando per HTTP.
+
+- **`test_leaderboard_top_n_sorted`**: crea 3 modelli con punteggi fuori ordine (`iALS=0.3990`, `EASE=0.4512`,
+  `MultiVAE=0.4801`), verifica che la risposta sia ordinata per `value DESC` (`MultiVAE → EASE → iALS`) e che `rank`
+  sia progressivo (1, 2, 3)
+- **`test_leaderboard_filters_by_split`**: verifica che le metriche `validation` non compaiano nella query filtrata
+  per `test` — isola i dati tra split diversi
+- **`test_leaderboard_empty_for_unknown_metric`**: metrica inesistente → lista vuota `[]` (non errore 404)
+
 ---
 
 ## Esecuzione dei test
 
 ```bash
-# Solo gli smoke test di database (non richiede Docker)
+# Solo gli smoke test di database (in-memory)
 cd backend
 uv run pytest tests/db/ -v
 
-# Solo i test dei router (richiede MongoDB attivo)
+# Solo i test dei router (in-memory, non richiede Docker)
 cd backend
 uv run pytest tests/routers/ -v
 
-# Tutti i test
+# Tutti i test (db + routers)
 cd backend
 uv run pytest -v
 
@@ -212,6 +252,9 @@ uv run pytest -v
 cd backend
 uv run pytest --cov=app --cov-report=html
 ```
+
+**Nessun Docker necessario**: l'intera suite (sia `tests/db/` che `tests/routers/`) usa `mongomock-motor`
+e gira completamente in-memory.
 
 ---
 

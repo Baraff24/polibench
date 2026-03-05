@@ -26,15 +26,23 @@ backend/
     ├── routers/
     │   ├── api.py          ← router radice, aggrega tutti i sotto-router
     │   ├── login.py        ← endpoint autenticazione e SSO
-    │   └── users.py        ← CRUD utenti
-    └── schemas/
-        ├── __init__.py     ← esporta tutti gli schemi pubblici
-        ├── datasets.py
-        ├── experiments.py
-        ├── metrics.py
-        ├── ml_models.py
-        ├── tokens.py
-        └── users.py
+    │   ├── users.py        ← CRUD utenti
+    │   ├── datasets.py     ← Dataset + MLModel (catalogo)
+    │   └── experiments.py  ← Experiment, Metric batch, Leaderboard
+    ├── schemas/
+    │   ├── __init__.py     ← esporta tutti gli schemi pubblici
+    │   ├── datasets.py
+    │   ├── experiments.py
+    │   ├── metrics.py
+    │   ├── ml_models.py
+    │   ├── tokens.py
+    │   └── users.py
+    └── services/
+        ├── __init__.py
+        ├── datasets.py     ← logica Dataset + MLModel (risoluzione, creazione)
+        ├── experiments.py  ← logica Experiment (risoluzione UUID, creazione)
+        ├── metrics.py      ← inserimento batch, raggruppamento per split
+        └── leaderboard.py  ← query top-N con batch fetch ottimizzato
 ```
 
 ---
@@ -138,18 +146,39 @@ principale (`api.py`) include i sotto-router:
 
 ```
 /api/v1/
-├── /              ← health check (GET)
+├── /                          ← health check (GET)
 ├── /login/
-│   ├── /access-token    ← POST: login con email/password
-│   ├── /test-token      ← GET: verifica token
-│   ├── /refresh-token   ← GET: rinnovo token (da cookie)
-│   ├── /google          ← GET: redirect a Google OAuth2
-│   └── /google/callback ← GET: callback SSO
-└── /users/
-    ├── /           ← POST: registrazione, GET: lista (admin)
-    ├── /me         ← GET/PATCH/DELETE: profilo corrente
-    └── /{userid}   ← GET/PATCH/DELETE: utente specifico (admin)
+│   ├── /access-token          ← POST: login con email/password
+│   ├── /test-token            ← GET: verifica token
+│   ├── /refresh-token         ← GET: rinnovo token (da cookie)
+│   ├── /google                ← GET: redirect a Google OAuth2
+│   └── /google/callback       ← GET: callback SSO
+├── /users/
+│   ├── /                      ← POST: registrazione, GET: lista (admin)
+│   ├── /me                    ← GET/PATCH/DELETE: profilo corrente
+│   └── /{uuid}                ← GET/PATCH/DELETE: utente specifico (admin)
+├── /datasets/
+│   ├── /                      ← POST: crea Dataset, GET: lista
+│   └── /{dataset_uuid}        ← GET: dettaglio Dataset
+├── /ml-models/
+│   ├── /                      ← POST: registra MLModel, GET: lista
+│   └── /{model_uuid}          ← GET: dettaglio MLModel
+├── /experiments/
+│   ├── /                      ← POST: sottometti Experiment (UUID input)
+│   ├── /{uuid}                ← GET: dettaglio Experiment
+│   ├── /{uuid}/metrics        ← POST: batch metriche, GET: metriche per split
+└── /leaderboard/
+    └── /                      ← GET: top-N per (dataset, metric, split)
 ```
+
+Ogni gruppo di endpoint delega al service layer corrispondente:
+
+- `/datasets` e `/ml-models` → `services/datasets.py`
+- `/experiments` e `/{uuid}/metrics` → `services/experiments.py` + `services/metrics.py`
+- `/leaderboard` → `services/leaderboard.py`
+
+Vedi [06_routers.md](./06_routers.md) per la documentazione dettagliata di ogni endpoint
+e [09_services.md](./09_services.md) per la logica di business.
 
 ---
 

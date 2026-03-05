@@ -28,7 +28,7 @@ API ben definito.
 
 ## Struttura del backend
 
-Il backend è un'applicazione **FastAPI** che espone una REST API. Si compone di cinque strati distinti:
+Il backend è un'applicazione **FastAPI** che espone una REST API. Si compone di sei strati distinti:
 
 ```
 ┌─────────────────────────────────────────┐
@@ -36,7 +36,9 @@ Il backend è un'applicazione **FastAPI** che espone una REST API. Si compone di
 ├─────────────────────────────────────────┤
 │          Schemi API (Pydantic)           │  ← schemas/
 ├─────────────────────────────────────────┤
-│         Logica applicativa               │  ← auth/, routers/
+│         Service Layer (logica)           │  ← services/
+├─────────────────────────────────────────┤
+│          Autenticazione (JWT)            │  ← auth/
 ├─────────────────────────────────────────┤
 │       Modelli dati (Beanie/ODM)          │  ← models/
 ├─────────────────────────────────────────┤
@@ -45,6 +47,8 @@ Il backend è un'applicazione **FastAPI** che espone una REST API. Si compone di
 ```
 
 Ogni strato ha una responsabilità precisa e non conosce i dettagli degli strati al di sotto del successivo.
+I **router** sono volutamente sottili: ricevono la richiesta HTTP, delegano al **service layer** e restituiscono
+la risposta. Tutta la logica (risoluzione UUID→ObjectId, denormalizzazione, query) vive nei service.
 
 ## Entità principali
 
