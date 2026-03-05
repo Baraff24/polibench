@@ -34,7 +34,6 @@ class Experiment(Document):
     team_id: Annotated[PydanticObjectId | None, Indexed()] = None
     run_name: str | None = None
     status: Status = Status.QUEUED
-    hyperparams: dict[str, Any] | None = None
     training_config: dict[str, Any] | None = None
     seed: int | None = None
     notes: str | None = None
