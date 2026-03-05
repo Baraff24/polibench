@@ -13,23 +13,29 @@ Principio UUID-first:
     created_by_user_uuid è UUID, non ObjectId.
 
 Nota su hyperparams:
-    MLModel = algoritmo (es. LightGCN, BPR-MF).
-    Gli hyperparams variano per ogni run → appartengono a Experiment.
+    hyperparams appartiene a MLModel, non a Experiment.
+    MLModel rappresenta un algoritmo con la sua configurazione canonica
+    (es. BPR-MF con factors=64, lr=0.01 come da paper).
+    training_config su Experiment cattura variazioni run-specific
+    (es. seed diverso, batch size diverso per ablation study).
 """
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel
 
 
 class MLModelBase(BaseModel):
-    """Campi condivisi tra Create e Public. Niente hyperparams: vanno su Experiment."""
+    """Campi condivisi tra Create e Public."""
 
     name: str
     family: str | None = None
     paper_url: str | None = None
     implementation: str | None = None
+    # Configurazione canonica dell'algoritmo (es. dal paper di riferimento)
+    hyperparams: dict[str, Any] | None = None
 
 
 class MLModelCreate(MLModelBase):

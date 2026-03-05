@@ -94,8 +94,9 @@ class MLModel {
 note right of MLModel
   Represents an algorithm (e.g. BPR-MF, LightGCN),
   not a trained instance.
-  hyperparams: default/typical params for this algorithm.
-  Run-specific hyperparams live on Experiment.
+  hyperparams: canonical config for this algorithm
+  (e.g. default values from the paper).
+  Run-specific variations go in Experiment.training_config.
 end note
 
 class Experiment {
@@ -107,7 +108,6 @@ class Experiment {
   +team_id: ObjectId? <<indexed>>
   +run_name: string?
   +status: Status
-  +hyperparams: object?
   +training_config: object?
   +seed: int?
   +notes: string?
@@ -122,6 +122,10 @@ note bottom of Experiment
 
   CodeInfo: { git_commit, repo_url, docker_image }
   Artifacts: { logs_url, model_path, predictions_path }
+
+  training_config: run-specific variations
+  (seed, batch_size, scheduler...).
+  Canonical hyperparams → on MLModel, not here.
 
   Useful indexes:
   - {dataset_id, model_id, created_at:-1}

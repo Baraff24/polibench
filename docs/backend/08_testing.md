@@ -40,27 +40,36 @@ perché FastAPI e Beanie sono basati su asyncio.
 ```python
 @pytest.fixture()
 async def client() -> AsyncGenerator[AsyncClient, None]:
-    with patch("app.config.config.settings.MONGO_DB", MONGO_TEST_DB):
-        async with LifespanManager(app):
-            async with AsyncClient(
-                    transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                try:
-                    yield client
-                finally:
-                    await clear_database(app)
+    @asynccontextmanager
+    async def mock_lifespan(app: FastAPI):
+        await _bootstrap_mock_db(app)
+        yield
+        # teardown: svuota le collezioni dopo ogni test
+        db = app.state.client[MONGO_TEST_DB]
+        for col in await db.list_collection_names():
+            await db[col].delete_many({})
+
+    test_app = FastAPI(lifespan=mock_lifespan, ...)
+    test_app.include_router(api_router, prefix=settings.API_V1_STR)
+
+    async with LifespanManager(test_app):
+        async with AsyncClient(transport=ASGITransport(app=test_app), ...) as ac:
+            yield ac
 ```
 
-Questa fixture:
+Questa fixture costruisce una **`test_app` FastAPI separata** (non l'app globale di `main.py`) con un lifespan mock.
+Questo è fondamentale: il lifespan di `main.py` usa `AsyncIOMotorClient` che tenta una connessione TCP a MongoDB.
+Senza Docker attivo, va in timeout dopo 5 secondi — bloccando tutti i test.
 
-1. Sostituisce `MONGO_DB` con `polibenchtest` (database di test separato da quello di produzione) tramite
-   `unittest.mock.patch`
-2. Avvia il lifespan dell'applicazione FastAPI tramite `LifespanManager` (che include la connessione a MongoDB e
-   l'inizializzazione di Beanie)
-3. Crea un client HTTP asincrono `httpx.AsyncClient` collegato all'app ASGI senza avviare un server reale
-4. Dopo il test, svuota tutte le collezioni del database di test tramite `clear_database()`
+Il lifespan mock (`mock_lifespan`) chiama `_bootstrap_mock_db` che:
 
-Questa fixture richiede un **MongoDB reale** (avviato tramite Docker Compose).
+1. Crea un `AsyncMongoMockClient()` (MongoDB completamente in-memory)
+2. Inizializza Beanie su quel client
+3. Crea il superuser di test se non esiste
+
+Nel teardown (dopo `yield`), svuota tutte le collezioni per isolare il test successivo.
+
+**Nessun Docker necessario**: tutta la suite gira in-memory, sia per i test DB che per i test router.
 
 ### Fixture `superuser_token_headers`
 
@@ -90,10 +99,13 @@ async def db():
 ```
 
 Questa fixture crea un database **MongoDB completamente in-memory** usando `mongomock-motor`. Non richiede alcun server
-MongoDB attivo. È usata esclusivamente dagli smoke test di database.
+MongoDB attivo. È usata esclusivamente dagli smoke test di database (`tests/db/`).
 
 Il pattern `yield` è il teardown di pytest: tutto ciò che viene dopo `yield` viene eseguito dopo il test. In questo
 caso, il database in-memory viene cancellato, garantendo isolamento tra i test.
+
+**Differenza con `client`**: `db` non avvia alcun server HTTP — è solo Beanie in-memory. Usala quando vuoi testare
+query di database direttamente senza passare dal layer HTTP.
 
 ---
 

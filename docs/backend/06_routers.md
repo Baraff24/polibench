@@ -11,6 +11,8 @@ Tutti i router sono aggregati in `api.py` e montati con prefisso `/api/v1`.
 api_router = APIRouter()
 api_router.include_router(login.router, prefix="/login", tags=["login"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
+api_router.include_router(datasets.router, tags=["datasets"])
+api_router.include_router(experiments.router, tags=["experiments"])
 
 
 @api_router.get("/")

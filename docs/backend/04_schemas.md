@@ -113,25 +113,26 @@ Tutti i riferimenti a entità esterne usano UUID: `team_uuid` nell'input, `creat
 
 ### ml_models.py
 
-| Schema                       | Direzione      | Campi principali                                |
-|------------------------------|----------------|-------------------------------------------------|
-| `MLModelBase`                | —              | `name`, `family`, `paper_url`, `implementation` |
-| `MLModelCreate(MLModelBase)` | → input        | (eredita tutto da Base)                         |
-| `MLModelPublic(MLModelBase)` | ← output       | `+ uuid`, `created_by_user_uuid`, `created_at`  |
-| `MLModelSummary`             | ← output lista | `uuid`, `name`, `family`, `paper_url`           |
+| Schema                       | Direzione      | Campi principali                                               |
+|------------------------------|----------------|----------------------------------------------------------------|
+| `MLModelBase`                | —              | `name`, `family`, `paper_url`, `implementation`, `hyperparams` |
+| `MLModelCreate(MLModelBase)` | → input        | (eredita tutto da Base)                                        |
+| `MLModelPublic(MLModelBase)` | ← output       | `+ uuid`, `created_by_user_uuid`, `created_at`                 |
+| `MLModelSummary`             | ← output lista | `uuid`, `name`, `family`, `paper_url`                          |
 
-`hyperparams` è assente: appartiene a `Experiment` (iperparametri di una run specifica), non all'algoritmo.
+`hyperparams` appartiene a `MLModel` (configurazione canonica dell'algoritmo, es. i valori di default del paper).
+`Experiment` usa `training_config` per variazioni run-specific (seed, batch size, scheduler).
 
 ---
 
 ### experiments.py
 
-| Schema                             | Direzione      | Campi principali                                                                                                 |
-|------------------------------------|----------------|------------------------------------------------------------------------------------------------------------------|
-| `ExperimentBase`                   | —              | `dataset_uuid`, `model_uuid`, `team_uuid`, `run_name`, `seed`, `notes`, `hyperparams`, `training_config`, `code` |
-| `ExperimentCreate(ExperimentBase)` | → input        | (eredita tutto da Base)                                                                                          |
-| `ExperimentPublic(ExperimentBase)` | ← output       | `+ uuid`, `submitted_by_user_uuid`, `status`, `artifacts`, `created_at`, `finished_at`                           |
-| `ExperimentSummary`                | ← output lista | `uuid`, `dataset_uuid`, `model_uuid`, `run_name`, `status`, `created_at`                                         |
+| Schema                             | Direzione      | Campi principali                                                                                  |
+|------------------------------------|----------------|---------------------------------------------------------------------------------------------------|
+| `ExperimentBase`                   | —              | `dataset_uuid`, `model_uuid`, `team_uuid`, `run_name`, `seed`, `notes`, `training_config`, `code` |
+| `ExperimentCreate(ExperimentBase)` | → input        | (eredita tutto da Base)                                                                           |
+| `ExperimentPublic(ExperimentBase)` | ← output       | `+ uuid`, `submitted_by_user_uuid`, `status`, `artifacts`, `created_at`, `finished_at`            |
+| `ExperimentSummary`                | ← output lista | `uuid`, `dataset_uuid`, `model_uuid`, `run_name`, `status`, `created_at`                          |
 
 **Campi esclusi da `ExperimentCreate`** (gestiti dal server):
 

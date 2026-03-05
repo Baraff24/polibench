@@ -141,20 +141,20 @@ class Splits(BaseModel):
 Rappresenta un **algoritmo** di raccomandazione registrato nella piattaforma. Non rappresenta un'istanza addestrata, ma
 la famiglia algoritmica (es. "BPR-MF", "LightGCN").
 
-| Campo                | Tipo                       | Indice | Note                                |
-|----------------------|----------------------------|--------|-------------------------------------|
-| `uuid`               | `UUID`                     | unique | Identificatore pubblico             |
-| `name`               | `str`                      | unique | Nome univoco dell'algoritmo         |
-| `family`             | `str \| None`              | —      | Es. "matrix_factorization", "graph" |
-| `paper_url`          | `str \| None`              | —      | URL al paper di riferimento         |
-| `implementation`     | `str \| None`              | —      | URL alla repo di implementazione    |
-| `hyperparams`        | `dict[str, Any] \| None`   | —      | Iperparametri default (opzionale)   |
-| `created_by_user_id` | `PydanticObjectId \| None` | sì     | FK verso User                       |
-| `created_at`         | `datetime`                 | —      | Timestamp creazione                 |
+| Campo                | Tipo                       | Indice | Note                                          |
+|----------------------|----------------------------|--------|-----------------------------------------------|
+| `uuid`               | `UUID`                     | unique | Identificatore pubblico                       |
+| `name`               | `str`                      | unique | Nome univoco dell'algoritmo                   |
+| `family`             | `str \| None`              | —      | Es. "matrix_factorization", "graph"           |
+| `paper_url`          | `str \| None`              | —      | URL al paper di riferimento                   |
+| `implementation`     | `str \| None`              | —      | URL alla repo di implementazione              |
+| `hyperparams`        | `dict[str, Any] \| None`   | —      | Configurazione canonica dell'algoritmo (opz.) |
+| `created_by_user_id` | `PydanticObjectId \| None` | sì     | FK verso User                                 |
+| `created_at`         | `datetime`                 | —      | Timestamp creazione                           |
 
-**Nota**: `hyperparams` è presente sul modello ma ha una semantica diversa da `Experiment.training_config`. Sul modello
-rappresenta eventuali configurazioni di default o tipiche dell'algoritmo. Gli iperparametri specifici di una run
-appartengono all'`Experiment`.
+**Nota su `hyperparams`**: appartiene a `MLModel` perché rappresenta la configurazione canonica dell'algoritmo
+(es. i valori di default riportati nel paper di riferimento: `{"factors": 64, "lr": 0.01}`).
+Variazioni run-specific (seed, scheduler) appartengono a `Experiment.training_config`.
 
 ---
 
@@ -166,23 +166,22 @@ appartengono all'`Experiment`.
 Rappresenta una **run sperimentale**: l'esecuzione di un algoritmo su un dataset con una configurazione specifica. È
 l'entità centrale del sistema.
 
-| Campo                  | Tipo                       | Indice | Note                              |
-|------------------------|----------------------------|--------|-----------------------------------|
-| `uuid`                 | `UUID`                     | unique | Identificatore pubblico           |
-| `dataset_id`           | `PydanticObjectId`         | sì     | FK verso Dataset                  |
-| `model_id`             | `PydanticObjectId`         | sì     | FK verso MLModel                  |
-| `submitted_by_user_id` | `PydanticObjectId`         | sì     | FK verso User                     |
-| `team_id`              | `PydanticObjectId \| None` | sì     | FK verso Team (opzionale)         |
-| `run_name`             | `str \| None`              | —      | Nome descrittivo della run        |
-| `status`               | `Status`                   | —      | Stato della run                   |
-| `hyperparams`          | `dict[str, Any] \| None`   | —      | Iperparametri specifici della run |
-| `training_config`      | `dict[str, Any] \| None`   | —      | Configurazione training           |
-| `seed`                 | `int \| None`              | —      | Seed per riproducibilità          |
-| `notes`                | `str \| None`              | —      | Note libere                       |
-| `code`                 | `CodeInfo \| None`         | —      | Informazioni sul codice           |
-| `artifacts`            | `Artifacts \| None`        | —      | Path a log, modello, predizioni   |
-| `created_at`           | `datetime`                 | —      | Timestamp creazione               |
-| `finished_at`          | `datetime \| None`         | —      | Timestamp completamento           |
+| Campo                  | Tipo                       | Indice | Note                            |
+|------------------------|----------------------------|--------|---------------------------------|
+| `uuid`                 | `UUID`                     | unique | Identificatore pubblico         |
+| `dataset_id`           | `PydanticObjectId`         | sì     | FK verso Dataset                |
+| `model_id`             | `PydanticObjectId`         | sì     | FK verso MLModel                |
+| `submitted_by_user_id` | `PydanticObjectId`         | sì     | FK verso User                   |
+| `team_id`              | `PydanticObjectId \| None` | sì     | FK verso Team (opzionale)       |
+| `run_name`             | `str \| None`              | —      | Nome descrittivo della run      |
+| `status`               | `Status`                   | —      | Stato della run                 |
+| `training_config`      | `dict[str, Any] \| None`   | —      | Configurazione run-specific     |
+| `seed`                 | `int \| None`              | —      | Seed per riproducibilità        |
+| `notes`                | `str \| None`              | —      | Note libere                     |
+| `code`                 | `CodeInfo \| None`         | —      | Informazioni sul codice         |
+| `artifacts`            | `Artifacts \| None`        | —      | Path a log, modello, predizioni |
+| `created_at`           | `datetime`                 | —      | Timestamp creazione             |
+| `finished_at`          | `datetime \| None`         | —      | Timestamp completamento         |
 
 **Enumerazione `Status`**: `queued` | `running` | `finished` | `failed`
 

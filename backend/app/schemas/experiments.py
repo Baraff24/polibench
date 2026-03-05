@@ -6,12 +6,17 @@ schemas/experiments.py
          ├── ExperimentCreate   il server popola status e submitted_by
          └── ExperimentPublic   aggiunge uuid, status, submitted_by, timestamps
 
-    ExperimentSummary FUORI dalla gerarchia — omette training_config, hyperparams e code.
+    ExperimentSummary FUORI dalla gerarchia — omette training_config e code.
 
 Principio UUID-first:
     - input:   dataset_uuid, model_uuid, team_uuid (mai ObjectId)
     - output:  uuid come identificatore primario, tutti i riferimenti come UUID
     - _id MongoDB: mai esposto nelle response pubbliche
+
+Nota su hyperparams:
+    hyperparams appartiene a MLModel (configurazione canonica dell'algoritmo).
+    Experiment usa training_config per variazioni run-specific
+    (es. seed, batch_size, scheduler) che non cambiano la natura dell'algoritmo.
 
     submitted_by_user_uuid e status NON sono in Base:
         - submitted_by_user_uuid → estratto dal token JWT nel router
@@ -36,8 +41,6 @@ class ExperimentBase(BaseModel):
     run_name: str | None = None
     seed: int | None = None
     notes: str | None = None
-    # hyperparams specifici di questa run (non dell'algoritmo)
-    hyperparams: dict[str, Any] | None = None
     training_config: dict[str, Any] | None = None
     code: CodeInfo | None = None
 
