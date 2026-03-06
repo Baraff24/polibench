@@ -3,9 +3,7 @@
 // =============================================================================
 
 @use '../abstracts/variables' as *;
-@use '../abstracts/mixins' as *;
 
-// Alert inline (messaggio nella pagina)
 .alert {
   display: flex;
   align-items: flex-start;
@@ -15,90 +13,39 @@
   font-size: $font-size-sm;
   border: 1px solid;
 
-  &--success {
-    background: $color-success-bg;
-    border-color: $color-success;
-    color: $color-success;
-  }
+  &--success { background: $color-success-bg; border-color: $color-success; color: $color-success; }
+  &--error   { background: $color-error-bg;   border-color: $color-error;   color: $color-error;   }
+  &--warning { background: $color-warning-bg; border-color: $color-warning; color: $color-warning; }
+  &--info    { background: $color-info-bg;    border-color: $color-info;    color: $color-info;    }
 
-  &--error {
-    background: $color-error-bg;
-    border-color: $color-error;
-    color: $color-error;
-  }
-
-  &--warning {
-    background: $color-warning-bg;
-    border-color: $color-warning;
-    color: $color-warning;
-  }
-
-  &--info {
-    background: $color-info-bg;
-    border-color: $color-info;
-    color: $color-info;
-  }
-
-  &__icon {
-    width: 1.125rem;    // 18px
-    height: 1.125rem;
-    flex-shrink: 0;
-    margin-top: 0.0625rem;  // 1px
-  }
-
-  &__message {
-    flex: 1;
-    line-height: $line-height-base;
-  }
-
-  &__close {
-    @include flex-center;
-    width: 1.375rem;    // 22px
-    height: 1.375rem;
-    border-radius: $radius-sm;
-    cursor: pointer;
-    opacity: 0.6;
-    transition: opacity $transition-fast;
-    flex-shrink: 0;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
+  &__message { flex: 1; line-height: $line-height-base; }
 }
 
-// Toast (notifica a scomparsa in basso)
 .toast-container {
   position: fixed;
   bottom: $space-6;
   left: 50%;
   transform: translateX(-50%);
   z-index: $z-toast;
-  @include flex-column;
+  display: flex;
+  flex-direction: column;
   gap: $space-3;
-  align-items: center;
   pointer-events: none;
 }
 
 .toast {
-  @include flex-center;
+  display: flex;
+  align-items: center;
   gap: $space-3;
   padding: $space-3 $space-6;
   border-radius: $radius-full;
   font-size: $font-size-sm;
   font-weight: $font-weight-medium;
-  box-shadow: $shadow-lg;
+  box-shadow: $shadow;
   pointer-events: auto;
-  animation: toast-in $transition-base;
 
   &--success { background: $color-success; color: $color-white; }
   &--error   { background: $color-error;   color: $color-white; }
   &--warning { background: $color-warning; color: $color-white; }
   &--info    { background: $color-info;    color: $color-white; }
 }
-
-@keyframes toast-in {
-  from { opacity: 0; transform: translateY(0.75rem); }
-  to   { opacity: 1; transform: translateY(0);       }
-}
-

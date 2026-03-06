@@ -3,37 +3,20 @@
 // =============================================================================
 
 @use '../abstracts/variables' as *;
-@use '../abstracts/mixins' as *;
 
 .auth {
-  min-height: calc(100vh - $navbar-height);
-  @include flex-center;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: $space-8 $space-6;
-  background: $color-bg;
 
   &__card {
-    @include card-surface;
+    background: $color-bg-card;
+    border: 1px solid $color-border;
+    border-radius: $radius-xl;
     width: 100%;
-    max-width: 440px;
+    max-width: 28rem;
     padding: $space-10 $space-8;
-
-    @include respond-to(sm) {
-      padding: $space-12 $space-10;
-    }
-  }
-
-  &__logo {
-    @include flex-center;
-    margin-bottom: $space-6;
-  }
-
-  &__logo-icon {
-    @include flex-center;
-    width: 48px;
-    height: 48px;
-    border-radius: $radius-full;
-    background-color: $color-primary;
-    color: $color-white;
   }
 }
-

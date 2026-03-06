@@ -1,166 +1,172 @@
-// =============================================================================
-// Layout: Navbar  (BEM: .navbar)
-// =============================================================================
-
 @use '../abstracts/variables' as *;
 @use '../abstracts/mixins' as *;
 
-.navbar {
+.sidebar {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: $z-navbar;
-  height: $navbar-height;
-  background-color: $color-primary-dark;
-  box-shadow: $shadow-md;
+  top: 0; left: 0; bottom: 0;
+  width: $sidebar-width;
+  z-index: $z-sidebar;
+  background: $color-bg-sidebar;
+  border-right: 1px solid $color-border;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  transition: transform 0.2s ease;
 
-  &__inner {
-    @include flex-between;
-    height: 100%;
-    max-width: $container-max;
-    margin: 0 auto;
-    padding: 0 $space-6;
-  }
+  &--hidden { transform: translateX(-100%); }
 
   &__brand {
-    font-size: $font-size-lg;
-    font-weight: $font-weight-bold;
-    color: $color-text-inverse;
-    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: $topbar-height;
+    padding: 0 $space-6;
+    border-bottom: 1px solid $color-border;
+    flex-shrink: 0;
+  }
+
+  &__brand-link {
     text-decoration: none;
-
-    &:hover {
-      color: $color-text-inverse;
-      text-decoration: none;
-      opacity: 0.85;
-    }
   }
 
-  &__nav {
-    @include flex-center;
-    gap: $space-2;
+  &__brand-name {
+    font-size: $font-size-md;
+    font-weight: $font-weight-bold;
+    color: $color-text-strong;
   }
 
-  &__link {
-    padding: $space-2 $space-4;
-    font-size: $font-size-sm;
-    font-weight: $font-weight-medium;
-    color: rgba($color-white, 0.85);
+  &__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
     border-radius: $radius-md;
-    transition: background-color $transition-fast, color $transition-fast;
+    color: $color-text-muted;
+    transition: background $transition, color $transition;
 
-    &:hover {
-      background-color: rgba($color-white, 0.1);
-      color: $color-white;
-      text-decoration: none;
-    }
+    &:hover { background: rgba($color-white, 0.06); color: $color-text; }
+  }
+
+  &__nav { padding: $space-4 0; flex: 1; }
+
+  &__section-label {
+    padding: $space-3 $space-6 $space-2;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-bold;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: $color-text-muted;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-3 $space-6;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    text-decoration: none;
+    transition: color $transition, background $transition;
+
+    &:hover { color: $color-text; background: rgba($color-white, 0.04); }
 
     &--active {
-      background-color: rgba($color-white, 0.15);
-      color: $color-white;
+      color: $color-accent-light;
+      background: rgba($color-accent, 0.1);
     }
   }
 
-  &__actions {
-    @include flex-center;
+  &__item-icon { width: 1.125rem; height: 1.125rem; flex-shrink: 0; }
+}
+
+.topbar {
+  position: fixed;
+  top: 0;
+  left: $sidebar-width;
+  right: 0;
+  height: $topbar-height;
+  z-index: $z-topbar;
+  background: $color-bg-sidebar;
+  border-bottom: 1px solid $color-border;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 $space-6;
+  transition: left 0.2s ease;
+
+  &--full { left: 0; }
+
+  &__toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: $radius-md;
+    color: $color-text-muted;
+    transition: background $transition, color $transition;
+
+    &:hover { background: rgba($color-white, 0.06); color: $color-text; }
+  }
+
+  &__right {
+    display: flex;
+    align-items: center;
     gap: $space-3;
   }
 
-  // Avatar + dropdown trigger
   &__avatar-btn {
-    @include flex-center;
-    width: 2.25rem;      // 36px
-    height: 2.25rem;     // 36px
-    border-radius: $radius-full;
-    border: 1px solid rgba($color-white, 0.4);
-    overflow: hidden;
-    cursor: pointer;
-    transition: border-color $transition-fast;
-    background: none;
-    padding: 0;
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2 $space-3;
+    border-radius: $radius-lg;
+    transition: background $transition;
 
-    &:hover {
-      border-color: $color-white;
-    }
-
-    &:focus-visible {
-      @include focus-ring;
-    }
+    &:hover { background: rgba($color-white, 0.06); }
   }
 
-  &__avatar-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  &__avatar-initials {
-    width: 100%;
-    height: 100%;
-    @include flex-center;
+  &__user-name {
     font-size: $font-size-sm;
-    font-weight: $font-weight-semibold;
-    color: $color-white;
-    background-color: $color-accent;
+    color: $color-text;
+
+    @media (max-width: $bp-md) { display: none; }
   }
 }
 
-// --- Dropdown menu (BEM: .dropdown) ---
 .dropdown {
   position: relative;
 
   &__menu {
     position: absolute;
-    top: calc(100% + $space-2);
+    top: calc(100% + #{$space-2});
     right: 0;
-    min-width: 11.25rem;   // 180px
+    min-width: 12rem;
     background: $color-bg-card;
-    border: 1px solid $color-border;
-    border-radius: $radius-lg;
-    box-shadow: $shadow-lg;
+    border: 1px solid $color-border-strong;
+    border-radius: $radius-xl;
+    box-shadow: $shadow;
     z-index: $z-dropdown;
-    overflow: hidden;
-
-    // hidden by default, shown via JS class
     display: none;
 
-    &--open {
-      display: block;
-    }
+    &--open { display: block; }
   }
 
   &__item {
-    @include flex-center;
-    justify-content: flex-start;
+    display: flex;
+    align-items: center;
     gap: $space-3;
     width: 100%;
     padding: $space-3 $space-4;
     font-size: $font-size-sm;
-    font-weight: $font-weight-regular;
     color: $color-text;
-    background: none;
-    border: none;
-    cursor: pointer;
     text-decoration: none;
-    transition: background-color $transition-fast;
+    transition: background $transition;
 
-    &:hover {
-      background-color: $color-bg;
-      text-decoration: none;
-      color: $color-text;
-    }
+    &:hover { background: rgba($color-white, 0.05); }
+    &--danger { color: $color-error; }
   }
 
-  &__divider {
-    height: 1px;
-    background-color: $color-border;
-    margin: $space-1 0;
-  }
-
-  &__icon {
-    width: 1.125rem;   // 18px
-    height: 1.125rem;  // 18px
-    color: $color-text-muted;
-  }
+  &__divider { height: 1px; background: $color-border; margin: $space-1 0; }
 }

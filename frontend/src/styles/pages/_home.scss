@@ -3,63 +3,45 @@
 // =============================================================================
 
 @use '../abstracts/variables' as *;
-@use '../abstracts/mixins' as *;
 
 // Hero section
 .hero {
   padding: $space-20 $space-6 $space-12;
   text-align: center;
-  background: linear-gradient(160deg, $color-primary-dark 0%, $color-primary 100%);
-  color: $color-white;
 
   &__title {
     font-size: $font-size-3xl;
     font-weight: $font-weight-bold;
-    letter-spacing: -0.03em;
+    color: $color-text-strong;
     margin-bottom: $space-4;
-
-    @include respond-to(md) {
-      font-size: 3rem;
-    }
   }
 
   &__subtitle {
     font-size: $font-size-md;
-    color: rgba($color-white, 0.75);
-    max-width: 560px;
+    color: $color-text-muted;
+    max-width: 35rem;
     margin: 0 auto $space-8;
-    line-height: $line-height-relaxed;
+    line-height: $line-height-base;
   }
 
   &__stack {
-    @include flex-center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-wrap: wrap;
     gap: $space-4;
-    margin-bottom: $space-8;
   }
 
   &__stack-item {
-    @include flex-center;
+    display: inline-flex;
+    align-items: center;
     gap: $space-2;
     font-size: $font-size-sm;
-    font-weight: $font-weight-medium;
-    color: rgba($color-white, 0.85);
-    background: rgba($color-white, 0.1);
+    color: $color-text-muted;
+    background: rgba($color-white, 0.06);
     padding: $space-2 $space-4;
     border-radius: $radius-full;
-    border: 1px solid rgba($color-white, 0.2);
-
-    img {
-      width: 20px;
-      height: 20px;
-      object-fit: contain;
-    }
-  }
-
-  &__separator {
-    font-size: $font-size-2xl;
-    color: rgba($color-white, 0.4);
-    line-height: 1;
+    border: 1px solid $color-border;
   }
 }
 
@@ -77,14 +59,14 @@
   &__title {
     font-size: $font-size-2xl;
     font-weight: $font-weight-bold;
+    color: $color-text-strong;
     margin-bottom: $space-3;
   }
 
   &__desc {
     font-size: $font-size-base;
     color: $color-text-muted;
-    max-width: 480px;
+    max-width: 30rem;
     margin: 0 auto;
   }
 }
-

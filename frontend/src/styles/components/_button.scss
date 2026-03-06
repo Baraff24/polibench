@@ -2,74 +2,70 @@
 // Component: Button  (BEM: .btn)
 // =============================================================================
 
-@use 'sass:color';
 @use '../abstracts/variables' as *;
-@use '../abstracts/mixins' as *;
 
 .btn {
-  @include button-base;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-2;
+  padding: $space-3 $space-5;
+  font: inherit;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  border: 1px solid transparent;
+  border-radius: $radius-lg;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background $transition, border-color $transition;
 
-  // --- Variants ---
-  &--primary {
-    background-color: $color-primary;
-    border-color: $color-primary;
-    color: $color-text-inverse;
-
-    &:hover:not(:disabled) {
-      background-color: $color-primary-dark;
-      border-color: $color-primary-dark;
-    }
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
-  &--accent {
-    background-color: $color-accent;
-    border-color: $color-accent;
-    color: $color-text-inverse;
+  &--primary {
+    background: $color-accent;
+    color: $color-white;
 
     &:hover:not(:disabled) {
-      background-color: $color-accent-dark;
-      border-color: $color-accent-dark;
+      background: $color-accent-light;
     }
   }
 
   &--outline {
-    background-color: transparent;
-    border-color: $color-border;
+    background: transparent;
+    border-color: $color-border-strong;
     color: $color-text;
 
     &:hover:not(:disabled) {
-      background-color: $color-bg;
-      border-color: $color-primary;
-      color: $color-primary;
+      border-color: $color-accent;
+      color: $color-accent-light;
     }
   }
 
   &--ghost {
-    background-color: transparent;
-    border-color: transparent;
+    background: transparent;
     color: $color-text-muted;
 
     &:hover:not(:disabled) {
-      background-color: $color-bg;
+      background: rgba($color-white, 0.05);
       color: $color-text;
     }
   }
 
   &--danger {
-    background-color: $color-error;
-    border-color: $color-error;
-    color: $color-text-inverse;
+    background: $color-error;
+    color: $color-white;
 
     &:hover:not(:disabled) {
-      background-color: color.adjust($color-error, $lightness: -8%);
+      opacity: 0.85;
     }
   }
 
-  // --- Sizes ---
   &--sm {
     padding: $space-2 $space-4;
-    font-size: $font-size-sm;
-    border-radius: $radius-sm;
+    font-size: $font-size-xs;
   }
 
   &--lg {
@@ -77,22 +73,13 @@
     font-size: $font-size-md;
   }
 
-  // --- Full width ---
   &--full {
     width: 100%;
   }
 
-  // --- Icon-only ---
-  &--icon {
-    padding: $space-2;
-    border-radius: $radius-full;
-  }
-
-  // Icona SVG inline
   &__icon {
-    width: 18px;
-    height: 18px;
+    width: 1.125rem;
+    height: 1.125rem;
     flex-shrink: 0;
   }
 }
-

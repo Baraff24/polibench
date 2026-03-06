@@ -4,47 +4,7 @@
 
 @use '../abstracts/variables' as *;
 
-.text-xs {
-  font-size: $font-size-xs;
-}
+// Classi helper tipografia
 
-.text-sm {
-  font-size: $font-size-sm;
-}
-
-.text-base {
-  font-size: $font-size-base;
-}
-
-.text-md {
-  font-size: $font-size-md;
-}
-
-.text-lg {
-  font-size: $font-size-lg;
-}
-
-.text-xl {
-  font-size: $font-size-xl;
-}
-
-.text-2xl {
-  font-size: $font-size-2xl;
-}
-
-.text-3xl {
-  font-size: $font-size-3xl;
-}
-
-.text-muted {
-  color: $color-text-muted;
-}
-
-.text-inverse {
-  color: $color-text-inverse;
-}
-
-.text-center {
-  text-align: center;
-}
-
+.text-muted  { color: $color-text-muted; }
+.text-center { text-align: center; }

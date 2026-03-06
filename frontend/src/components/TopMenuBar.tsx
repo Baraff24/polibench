@@ -2,17 +2,22 @@ import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router'
 import { useAuth } from '../contexts/auth'
 
-export default function TopMenuBar() {
+type Props = {
+  sidebarOpen: boolean
+  onToggleSidebar: () => void
+}
+
+export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const [open, setOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Chiude il dropdown cliccando fuori
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false)
+        setMenuOpen(false)
       }
     }
     document.addEventListener('mousedown', handler)
@@ -20,7 +25,7 @@ export default function TopMenuBar() {
   }, [])
 
   const handleLogout = () => {
-    setOpen(false)
+    setMenuOpen(false)
     logout()
     navigate('/')
   }
@@ -29,32 +34,89 @@ export default function TopMenuBar() {
   const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ')
 
   return (
-    <nav className='navbar' role='navigation' aria-label='Main navigation'>
-      <div className='navbar__inner'>
-        {/* Brand */}
-        <NavLink to='/' className='navbar__brand'>
-          Polibench
-        </NavLink>
+    <>
+      {/* Sidebar */}
+      <aside className={`sidebar${sidebarOpen ? '' : ' sidebar--hidden'}`}>
+        <div className='sidebar__brand'>
+          <NavLink to='/' className='sidebar__brand-link'>
+            <span className='sidebar__brand-name'>Polibench</span>
+          </NavLink>
+          <button className='sidebar__close' aria-label='Close sidebar' onClick={onToggleSidebar}>
+            <svg
+              width='18'
+              height='18'
+              viewBox='0 0 24 24'
+              fill='none'
+              stroke='currentColor'
+              strokeWidth='2'
+            >
+              <line x1='18' y1='6' x2='6' y2='18' />
+              <line x1='6' y1='6' x2='18' y2='18' />
+            </svg>
+          </button>
+        </div>
 
-        {/* Nav links + actions */}
-        <div className='navbar__nav'>
+        <nav className='sidebar__nav'>
+          <div className='sidebar__section-label'>Menu</div>
+
+          <NavLink
+            to='/'
+            end
+            className={({ isActive }) => `sidebar__item${isActive ? ' sidebar__item--active' : ''}`}
+          >
+            <svg
+              className='sidebar__item-icon'
+              viewBox='0 0 24 24'
+              fill='none'
+              stroke='currentColor'
+              strokeWidth='2'
+            >
+              <path d='M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z' />
+              <polyline points='9 22 9 12 15 12 15 22' />
+            </svg>
+            Home
+          </NavLink>
+
           {/* Guest */}
           {user === undefined && (
             <>
               <NavLink
                 to='/login'
                 className={({ isActive }) =>
-                  `navbar__link${isActive ? ' navbar__link--active' : ''}`
+                  `sidebar__item${isActive ? ' sidebar__item--active' : ''}`
                 }
               >
+                <svg
+                  className='sidebar__item-icon'
+                  viewBox='0 0 24 24'
+                  fill='none'
+                  stroke='currentColor'
+                  strokeWidth='2'
+                >
+                  <path d='M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4' />
+                  <polyline points='10 17 15 12 10 7' />
+                  <line x1='15' y1='12' x2='3' y2='12' />
+                </svg>
                 Login
               </NavLink>
               <NavLink
                 to='/register'
                 className={({ isActive }) =>
-                  `navbar__link${isActive ? ' navbar__link--active' : ''}`
+                  `sidebar__item${isActive ? ' sidebar__item--active' : ''}`
                 }
               >
+                <svg
+                  className='sidebar__item-icon'
+                  viewBox='0 0 24 24'
+                  fill='none'
+                  stroke='currentColor'
+                  strokeWidth='2'
+                >
+                  <path d='M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2' />
+                  <circle cx='8.5' cy='7' r='4' />
+                  <line x1='20' y1='8' x2='20' y2='14' />
+                  <line x1='23' y1='11' x2='17' y2='11' />
+                </svg>
                 Register
               </NavLink>
             </>
@@ -62,67 +124,87 @@ export default function TopMenuBar() {
 
           {/* Admin-only */}
           {user?.is_superuser && (
-            <NavLink
-              to='/users'
-              className={({ isActive }) => `navbar__link${isActive ? ' navbar__link--active' : ''}`}
-            >
-              Users
-            </NavLink>
+            <>
+              <div className='sidebar__section-label'>Admin</div>
+              <NavLink
+                to='/users'
+                className={({ isActive }) =>
+                  `sidebar__item${isActive ? ' sidebar__item--active' : ''}`
+                }
+              >
+                <svg
+                  className='sidebar__item-icon'
+                  viewBox='0 0 24 24'
+                  fill='none'
+                  stroke='currentColor'
+                  strokeWidth='2'
+                >
+                  <path d='M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2' />
+                  <circle cx='9' cy='7' r='4' />
+                  <path d='M23 21v-2a4 4 0 00-3-3.87' />
+                  <path d='M16 3.13a4 4 0 010 7.75' />
+                </svg>
+                Users
+              </NavLink>
+            </>
           )}
+        </nav>
+      </aside>
 
-          {/* Avatar dropdown */}
+      {/* Topbar */}
+      <header className={`topbar${sidebarOpen ? '' : ' topbar--full'}`}>
+        {!sidebarOpen && (
+          <button className='topbar__toggle' aria-label='Open sidebar' onClick={onToggleSidebar}>
+            <svg
+              width='20'
+              height='20'
+              viewBox='0 0 24 24'
+              fill='none'
+              stroke='currentColor'
+              strokeWidth='2'
+            >
+              <line x1='3' y1='6' x2='21' y2='6' />
+              <line x1='3' y1='12' x2='21' y2='12' />
+              <line x1='3' y1='18' x2='21' y2='18' />
+            </svg>
+          </button>
+        )}
+
+        <div className='topbar__right'>
           {user !== undefined && (
             <div className='dropdown' ref={dropdownRef}>
               <button
-                className='navbar__avatar-btn'
-                aria-expanded={open}
+                className='topbar__avatar-btn'
+                aria-expanded={menuOpen}
                 aria-haspopup='true'
                 aria-label='Account menu'
-                onClick={() => setOpen((v) => !v)}
+                onClick={() => setMenuOpen((v) => !v)}
               >
                 {user.picture ? (
-                  <img className='navbar__avatar-img' src={user.picture} alt={fullName} />
+                  <img className='avatar avatar--sm' src={user.picture} alt={fullName} />
                 ) : (
-                  <span className='navbar__avatar-initials' aria-hidden='true'>
-                    {initials}
-                  </span>
+                  <span className='avatar avatar--sm'>{initials}</span>
                 )}
+                <span className='topbar__user-name'>{fullName || 'Account'}</span>
               </button>
 
-              <div className={`dropdown__menu${open ? ' dropdown__menu--open' : ''}`}>
-                <NavLink to='/profile' className='dropdown__item' onClick={() => setOpen(false)}>
-                  <svg
-                    className='dropdown__icon'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeWidth='2'
-                  >
-                    <path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2' />
-                    <circle cx='12' cy='7' r='4' />
-                  </svg>
+              <div className={`dropdown__menu${menuOpen ? ' dropdown__menu--open' : ''}`}>
+                <NavLink
+                  to='/profile'
+                  className='dropdown__item'
+                  onClick={() => setMenuOpen(false)}
+                >
                   Profile
                 </NavLink>
                 <div className='dropdown__divider' />
-                <button className='dropdown__item' onClick={handleLogout}>
-                  <svg
-                    className='dropdown__icon'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeWidth='2'
-                  >
-                    <path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4' />
-                    <polyline points='16 17 21 12 16 7' />
-                    <line x1='21' y1='12' x2='9' y2='12' />
-                  </svg>
+                <button className='dropdown__item dropdown__item--danger' onClick={handleLogout}>
                   Logout
                 </button>
               </div>
             </div>
           )}
         </div>
-      </div>
-    </nav>
+      </header>
+    </>
   )
 }

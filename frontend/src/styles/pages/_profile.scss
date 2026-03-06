@@ -6,21 +6,19 @@
 @use '../abstracts/mixins' as *;
 
 .profile {
-  padding: $space-12 $space-6;
   max-width: $container-narrow;
   margin: 0 auto;
+  padding: $space-12 $space-6;
 
   &__header {
-    @include flex-column;
-    align-items: center;
-    gap: $space-4;
-    margin-bottom: $space-10;
     text-align: center;
+    margin-bottom: $space-10;
   }
 
   &__name {
     font-size: $font-size-xl;
     font-weight: $font-weight-semibold;
+    color: $color-text-strong;
   }
 
   &__email {
@@ -29,7 +27,7 @@
   }
 
   &__section {
-    @include card-surface;
+    @include card;
     padding: $space-6;
     margin-bottom: $space-6;
   }
@@ -37,16 +35,16 @@
   &__section-title {
     font-size: $font-size-base;
     font-weight: $font-weight-semibold;
+    color: $color-text-strong;
     margin-bottom: $space-5;
     padding-bottom: $space-3;
     border-bottom: 1px solid $color-border;
   }
 
   &__danger-zone {
-    @include card-surface;
+    @include card;
     padding: $space-6;
     border-color: $color-error;
-    background: $color-error-bg;
   }
 
   &__danger-title {
@@ -62,4 +60,3 @@
     margin-bottom: $space-4;
   }
 }
-

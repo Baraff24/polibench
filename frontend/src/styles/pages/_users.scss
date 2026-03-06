@@ -10,97 +10,75 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: $space-6;
-  align-items: start;
 
-  @include respond-to(md) {
-    grid-template-columns: 20rem 1fr;  // 320px
+  @media (min-width: $bp-md) {
+    grid-template-columns: 20rem 1fr;
   }
 }
 
 // --- Left panel: scrollable user list ---
 .user-list-panel {
-  @include card-surface;
+  @include card;
   overflow: hidden;
 }
 
 .user-list {
-  max-height: 32.5rem;   // 520px
+  max-height: 32.5rem;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: $color-border transparent;
 
   &__item {
-    @include flex-between;
-    padding: $space-1 $space-3 $space-1 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: $space-3 $space-4;
     border-bottom: 1px solid $color-border;
-    transition: background-color $transition-fast;
 
-    &:last-child {
-      border-bottom: none;
-    }
-
-    &:hover {
-      background-color: $color-bg;
-    }
-
-    &--selected {
-      background-color: rgba($color-accent, 0.06);
-    }
+    &:last-child { border-bottom: none; }
+    &:hover { background: rgba($color-white, 0.03); }
+    &--selected { background: rgba($color-accent, 0.08); }
   }
 
   &__btn {
-    @include flex-center;
-    justify-content: flex-start;
-    flex: 1;
+    display: flex;
+    align-items: center;
     gap: $space-3;
-    padding: $space-3 $space-4;
+    flex: 1;
     text-align: left;
-    background: none;
-    border: none;
-    cursor: pointer;
-    min-width: 0;
-
-    &:focus-visible {
-      @include focus-ring;
-    }
-  }
-
-  &__info {
-    @include flex-column;
-    gap: $space-1;
     min-width: 0;
   }
 
   &__name {
     font-size: $font-size-sm;
     font-weight: $font-weight-medium;
-    @include truncate;
+    color: $color-text-strong;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   &__email {
     font-size: $font-size-xs;
     color: $color-text-muted;
-    @include truncate;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   &__delete {
     opacity: 0;
-    transition: opacity $transition-fast;
     color: $color-error;
-    flex-shrink: 0;
-
-    .user-list__item:hover & {
-      opacity: 1;
-    }
+    .user-list__item:hover & { opacity: 1; }
   }
 }
 
 // --- Right panel: editor ---
 .user-detail-panel {
   &__empty {
-    @include card-surface;
-    @include flex-center;
-    min-height: 12.5rem;  // 200px
+    @include card;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 12rem;
     color: $color-text-muted;
     font-size: $font-size-sm;
   }
@@ -108,24 +86,10 @@
 
 // --- Loading spinner (HydrateFallback) ---
 #loading-splash {
-  @include flex-column;
-  @include flex-center;
-  gap: $space-4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-height: 60vh;
   color: $color-text-muted;
   font-size: $font-size-sm;
 }
-
-#loading-splash-spinner {
-  width: 2.25rem;    // 36px
-  height: 2.25rem;
-  border: 0.1875rem solid $color-border;    // 3px
-  border-top-color: $color-accent;
-  border-radius: $radius-full;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-

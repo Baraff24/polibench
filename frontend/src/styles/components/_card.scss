@@ -6,71 +6,48 @@
 @use '../abstracts/mixins' as *;
 
 .card {
-  @include card-surface;
-  @include flex-column;
+  @include card;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  transition: box-shadow $transition-base;
-
-  &:hover {
-    box-shadow: $shadow-md;
-  }
 
   &__media {
     width: 100%;
-    aspect-ratio: 16 / 9;
+    height: 8rem;
     object-fit: contain;
-    padding: $space-8;
-    background: $color-bg;
+    padding: $space-6;
+    border-bottom: 1px solid $color-border;
   }
 
   &__body {
-    @include flex-column;
     flex: 1;
     padding: $space-5 $space-6;
-    gap: $space-3;
   }
 
   &__title {
     font-size: $font-size-md;
     font-weight: $font-weight-semibold;
-    color: $color-text;
+    color: $color-text-strong;
+    margin-bottom: $space-2;
   }
 
   &__desc {
     font-size: $font-size-sm;
     color: $color-text-muted;
-    line-height: $line-height-relaxed;
-    flex: 1;
+    line-height: $line-height-base;
   }
 
   &__footer {
     padding: $space-4 $space-6;
     border-top: 1px solid $color-border;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  // Variante compact (no media)
-  &--compact {
-    .card__body {
-      padding: $space-4 $space-5;
-    }
   }
 }
 
-// Griglia di card responsive
 .card-grid {
   display: grid;
   gap: $space-6;
   grid-template-columns: 1fr;
 
-  @include respond-to(sm) {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  @include respond-to(lg) {
-    grid-template-columns: repeat(3, 1fr);
-  }
+  @media (min-width: $bp-md) { grid-template-columns: repeat(2, 1fr); }
+  @media (min-width: $bp-lg) { grid-template-columns: repeat(3, 1fr); }
 }
-

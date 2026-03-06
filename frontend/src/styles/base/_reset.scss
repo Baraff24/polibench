@@ -1,9 +1,7 @@
 // =============================================================================
-// Reset & Base
+// Reset & Base — dark theme
 // =============================================================================
-
 @use '../abstracts/variables' as *;
-
 *,
 *::before,
 *::after {
@@ -11,63 +9,32 @@
   margin: 0;
   padding: 0;
 }
-
 html {
   font-size: 16px;
-  scroll-behavior: smooth;
-  -webkit-text-size-adjust: 100%;
+  color-scheme: dark;
 }
-
 body {
   font-family: $font-family-base;
   font-size: $font-size-base;
-  font-weight: $font-weight-regular;
   line-height: $line-height-base;
   color: $color-text;
-  background-color: $color-bg;
+  background: $color-bg-app;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
-
-img,
-svg,
-video {
+img, svg {
   display: block;
   max-width: 100%;
 }
-
 a {
-  color: $color-accent;
+  color: $color-accent-light;
   text-decoration: none;
-  transition: color $transition-fast;
-
-  &:hover {
-    color: $color-accent-dark;
-    text-decoration: underline;
-  }
+  &:hover { text-decoration: underline; }
 }
-
-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font: inherit;
-}
-
-input,
-textarea,
-select {
-  font: inherit;
-}
-
-ul,
-ol {
-  list-style: none;
-}
-
+button { background: none; border: none; cursor: pointer; font: inherit; color: inherit; }
+input, textarea, select { font: inherit; color: inherit; }
+ul, ol { list-style: none; }
 h1, h2, h3, h4, h5, h6 {
   font-weight: $font-weight-semibold;
   line-height: $line-height-tight;
-  color: $color-text;
+  color: $color-text-strong;
 }
-

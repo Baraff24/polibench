@@ -1,109 +1,100 @@
 // =============================================================================
-// Variables
+// Variables — Dark theme
 // =============================================================================
 
-// --- Colors ---
-$color-primary:        #455a64;
-$color-primary-light:  #718792;
-$color-primary-dark:   #1c313a;
+// --- Core dark palette ---
+$color-bg-app:         #0f1117;   // sfondo app principale
+$color-bg-sidebar:     #14171f;   // sidebar
+$color-bg-card:        #1a1d27;   // card/panel
+$color-bg-input:       #1a1d27;   // input
+$color-bg-overlay:     rgba(#0f1117, 0.75); // backdrop
 
-$color-accent:         #1976d2;
-$color-accent-light:   #63a4ff;
-$color-accent-dark:    #004ba0;
+// --- Accent: indigo/violet (Velzon Galaxy) ---
+$color-accent:         #564ab1;   // indigo primario
+$color-accent-light:   #7b72cc;
 
-$color-white:          #ffffff;
-$color-black:          #111111;
+// --- Text ---
+$color-text:           #ced4da;   // testo principale (non bianco puro)
+$color-text-strong:    #e9ecef;   // titoli
+$color-text-muted:     #6c757d;   // testo secondario
+$color-text-inverse:   #0f1117;   // testo su sfondo chiaro
 
-$color-bg:             #f5f6f7;
-$color-bg-card:        #ffffff;
-$color-bg-input:       #f9fafb;
+// --- Borders ---
+$color-border:         rgba(#fff, 0.07);   // bordo sottile su dark
+$color-border-strong:  rgba(#fff, 0.12);
 
-$color-text:           #1a1a2e;
-$color-text-muted:     #637381;
-$color-text-inverse:   #ffffff;
+// --- Semantic ---
+$color-success:        #0ab39c;
+$color-success-bg:     rgba(#0ab39c, 0.15);
+$color-error:          #f06548;
+$color-error-bg:       rgba(#f06548, 0.15);
+$color-warning:        #f7b84b;
+$color-warning-bg:     rgba(#f7b84b, 0.15);
+$color-info:           #4bc8ef;
+$color-info-bg:        rgba(#4bc8ef, 0.15);
 
-$color-border:         #dde1e7;
-$color-border-focus:   $color-accent;
-
-$color-success:        #2e7d32;
-$color-success-bg:     #e8f5e9;
-$color-error:          #c62828;
-$color-error-bg:       #ffebee;
-$color-warning:        #e65100;
-$color-warning-bg:     #fff3e0;
-$color-info:           #0277bd;
-$color-info-bg:        #e1f5fe;
+$color-white: #ffffff;
 
 // --- Typography ---
-$font-family-base:     'Inter', system-ui, -apple-system, sans-serif;
-$font-family-mono:     'JetBrains Mono', 'Fira Code', monospace;
+$font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
 
-$font-size-xs:         0.75rem;   // 12px
-$font-size-sm:         0.875rem;  // 14px
-$font-size-base:       1rem;      // 16px
-$font-size-md:         1.125rem;  // 18px
-$font-size-lg:         1.25rem;   // 20px
-$font-size-xl:         1.5rem;    // 24px
-$font-size-2xl:        1.875rem;  // 30px
-$font-size-3xl:        2.25rem;   // 36px
+$font-size-xs:   0.6875rem;  // 11px
+$font-size-sm:   0.8125rem;  // 13px
+$font-size-base: 0.9375rem;  // 15px
+$font-size-md:   1rem;       // 16px
+$font-size-lg:   1.125rem;   // 18px
+$font-size-xl:   1.375rem;   // 22px
+$font-size-2xl:  1.75rem;    // 28px
+$font-size-3xl:  2.25rem;    // 36px
 
 $font-weight-regular:  400;
 $font-weight-medium:   500;
 $font-weight-semibold: 600;
 $font-weight-bold:     700;
 
-$line-height-tight:    1.25;
-$line-height-base:     1.6;
-$line-height-relaxed:  1.75;
+$line-height-base:    1.6;
+$line-height-tight:   1.25;
 
-// --- Spacing (base 4px = 0.25rem) ---
-$space-1:  0.25rem;   // 4px
-$space-2:  0.5rem;    // 8px
-$space-3:  0.75rem;   // 12px
-$space-4:  1rem;      // 16px
-$space-5:  1.25rem;   // 20px
-$space-6:  1.5rem;    // 24px
-$space-8:  2rem;      // 32px
-$space-10: 2.5rem;    // 40px
-$space-12: 3rem;      // 48px
-$space-16: 4rem;      // 64px
-$space-20: 5rem;      // 80px
+// --- Spacing ---
+$space-1:  0.25rem;
+$space-2:  0.5rem;
+$space-3:  0.75rem;
+$space-4:  1rem;
+$space-5:  1.25rem;
+$space-6:  1.5rem;
+$space-8:  2rem;
+$space-10: 2.5rem;
+$space-12: 3rem;
+$space-16: 4rem;
+$space-20: 5rem;
 
 // --- Border radius ---
-$radius-sm:   0.25rem;   // 4px
-$radius-md:   0.5rem;    // 8px
-$radius-lg:   0.75rem;   // 12px
-$radius-xl:   1rem;      // 16px
-$radius-full: 9999px;    // pill — px è corretto qui
+$radius-sm:   0.25rem;
+$radius-md:   0.375rem;
+$radius-lg:   0.5rem;
+$radius-xl:   0.75rem;
+$radius-full: 9999px;
 
-// --- Shadows (offset/blur in rem, spread e colore invariati) ---
-$shadow-sm:  0 0.0625rem 0.1875rem rgba(0, 0, 0, 0.08);
-$shadow-md:  0 0.25rem   0.75rem   rgba(0, 0, 0, 0.10);
-$shadow-lg:  0 0.5rem    1.5rem    rgba(0, 0, 0, 0.12);
-$shadow-xl:  0 1rem      2.5rem    rgba(0, 0, 0, 0.14);
+// --- Shadows (dark-aware) ---
+$shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.4);
 
 // --- Transitions ---
-$transition-fast:    0.15s ease;
-$transition-base:    0.25s ease;
-$transition-slow:    0.4s ease;
+$transition: 0.15s ease;
 
 // --- Layout ---
-$navbar-height:      4rem;      // 64px
-$container-max:      75rem;     // 1200px
-$container-narrow:   45rem;     // 720px
-$container-wide:     90rem;     // 1440px
+$sidebar-width:        15rem;     // 240px
+$topbar-height:        4.375rem;  // 70px
+$container-max:        75rem;
+$container-narrow:     45rem;
 
 // --- Z-index ---
-$z-dropdown:    100;
-$z-sticky:      200;
-$z-navbar:      300;
-$z-modal-bg:    400;
-$z-modal:       500;
-$z-toast:       600;
+$z-dropdown: 100;
+$z-sidebar:  300;
+$z-topbar:   300;
+$z-modal-bg: 400;
+$z-modal:    500;
+$z-toast:    600;
 
-// --- Breakpoints (px restano px: media query non scalano con font-size) ---
-$bp-sm:  36rem;    // 576px
-$bp-md:  48rem;    // 768px
-$bp-lg:  62rem;    // 992px
-$bp-xl:  75rem;    // 1200px
-$bp-2xl: 90rem;    // 1440px
+// --- Breakpoints ---
+$bp-md:  48rem;
+$bp-lg:  62rem;

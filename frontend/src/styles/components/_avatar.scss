@@ -3,14 +3,15 @@
 // =============================================================================
 
 @use '../abstracts/variables' as *;
-@use '../abstracts/mixins' as *;
 
 .avatar {
-  @include flex-center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: $radius-full;
   overflow: hidden;
   flex-shrink: 0;
-  background-color: $color-accent;
+  background: $color-accent;
   color: $color-white;
   font-weight: $font-weight-semibold;
 
@@ -31,12 +32,6 @@
     width: 4rem;       // 64px
     height: 4rem;
     font-size: $font-size-xl;
-  }
-
-  &--xl {
-    width: 6rem;       // 96px
-    height: 6rem;
-    font-size: $font-size-2xl;
   }
 
   &__img {

@@ -3,40 +3,49 @@
 // =============================================================================
 
 @use '../abstracts/variables' as *;
-@use '../abstracts/mixins' as *;
 
+// App shell: sidebar fissa a sinistra + area main a destra
 .layout {
-  @include flex-column;
+  display: flex;
   min-height: 100vh;
 
   &__main {
     flex: 1;
-    padding-top: $navbar-height;
+    margin-left: $sidebar-width;
+    padding-top: $topbar-height;
+    transition: margin-left 0.2s ease;
   }
+
+  &--collapsed &__main {
+    margin-left: 0;
+  }
+}
+
+// Pagina con padding standard
+.page {
+  padding: $space-8 $space-6;
 }
 
 // Contenitore di pagina con max-width centrato
 .container {
-  width: 100%;
   max-width: $container-max;
   margin: 0 auto;
-  padding: 0 $space-6;
 
   &--narrow {
     max-width: $container-narrow;
   }
-
-  &--wide {
-    max-width: $container-wide;
-  }
 }
 
-// Pagina con padding verticale standard
-.page {
-  padding: $space-12 $space-6;
+// Intestazione di pagina (titolo + azioni)
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $space-8;
 
-  @include respond-to(md) {
-    padding: $space-16 $space-6;
+  &__title {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    color: $color-text-strong;
   }
 }
-

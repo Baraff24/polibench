@@ -1,29 +1,30 @@
 // =============================================================================
 // Component: Dialog / Modal  (BEM: .dialog)
 // =============================================================================
-
 @use '../abstracts/variables' as *;
 @use '../abstracts/mixins' as *;
 
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba($color-black, 0.5);
+  background: $color-bg-overlay;
   z-index: $z-modal-bg;
-  @include flex-center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: $space-6;
-  animation: backdrop-in $transition-base;
 }
 
 .dialog {
-  @include card-surface;
+  @include card;
   width: 100%;
-  max-width: 30rem;    // 480px
+  max-width: 30rem;
   z-index: $z-modal;
-  animation: dialog-in $transition-base;
 
   &__header {
-    @include flex-between;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: $space-5 $space-6;
     border-bottom: 1px solid $color-border;
   }
@@ -31,44 +32,26 @@
   &__title {
     font-size: $font-size-lg;
     font-weight: $font-weight-semibold;
+    color: $color-text-strong;
   }
 
   &__close {
-    @include flex-center;
-    width: 2rem;       // 32px
-    height: 2rem;
-    border-radius: $radius-md;
     color: $color-text-muted;
-    transition: background-color $transition-fast, color $transition-fast;
-
-    &:hover {
-      background-color: $color-bg;
-      color: $color-text;
-    }
+    &:hover { color: $color-text; }
   }
 
   &__body {
     padding: $space-6;
     font-size: $font-size-sm;
     color: $color-text-muted;
-    line-height: $line-height-relaxed;
+    line-height: $line-height-base;
   }
 
   &__footer {
-    @include flex-between;
+    display: flex;
+    justify-content: flex-end;
     gap: $space-3;
     padding: $space-4 $space-6;
     border-top: 1px solid $color-border;
-    justify-content: flex-end;
   }
-}
-
-@keyframes backdrop-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes dialog-in {
-  from { opacity: 0; transform: translateY(-1rem) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0)     scale(1);    }
 }
