@@ -1,8 +1,6 @@
-import { Button, Card, CardActions, CardContent, Typography } from '@mui/material'
-import Grid from '@mui/material/Grid'
 import { isRouteErrorResponse, Link as RouterLink, useRouteError } from 'react-router'
 
-interface Error {
+interface RouteError {
   status: number
   statusText: string
   data: string
@@ -10,43 +8,37 @@ interface Error {
 }
 
 export default function ErrorPage() {
-  const error = useRouteError() as Error
-  console.error(error)
-  if (isRouteErrorResponse(error)) {
-    return (
-      <Grid
-        container
-        sx={{
-          backgroundColor: (theme) =>
-            theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[900],
-        }}
-        spacing={0}
-        direction='column'
-        alignItems='center'
-        justifyContent='center'
-        style={{ minHeight: '100vh' }}
-      >
-        <Grid size={3}>
-          <Card sx={{ minWidth: 275, margin: 'auto' }}>
-            <CardContent>
-              <Typography variant='h1' component='div'>
-                {error.status}
-              </Typography>
-              <Typography sx={{ mb: 1.5 }} color='text.secondary'>
-                {error.statusText || error.message}
-              </Typography>
-              <Typography variant='body2'>Sorry, an unexpected error has occured.</Typography>
-            </CardContent>
-            <CardActions>
-              <Button component={RouterLink} to='/'>
-                Back Home
-              </Button>
-            </CardActions>
-          </Card>
-        </Grid>
-      </Grid>
-    )
-  } else {
-    return <div>Oops</div>
-  }
+  const error = useRouteError() as RouteError
+
+  const status = isRouteErrorResponse(error) ? error.status : null
+  const title = status === 404 ? 'Page not found' : 'Unexpected error'
+  const message = isRouteErrorResponse(error)
+    ? error.statusText || error.data
+    : (error as { message?: string })?.message || 'Something went wrong.'
+
+  return (
+    <div className='auth'>
+      <div className='auth__card' style={{ textAlign: 'center' }}>
+        {status && (
+          <p
+            className='text-3xl'
+            style={{
+              fontWeight: 700,
+              color: 'var(--color-primary, #455a64)',
+              marginBottom: '0.5rem',
+            }}
+          >
+            {status}
+          </p>
+        )}
+        <h1 className='form__title'>{title}</h1>
+        <p className='text-sm text-muted' style={{ marginBottom: '1.5rem' }}>
+          {message}
+        </p>
+        <RouterLink to='/' className='btn btn--primary'>
+          Back to home
+        </RouterLink>
+      </div>
+    </div>
+  )
 }

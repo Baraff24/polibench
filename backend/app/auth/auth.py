@@ -8,13 +8,24 @@ from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
 from fastapi.security import OAuth2, OAuth2PasswordBearer
 from fastapi.security.utils import get_authorization_scheme_param
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+from pwdlib import PasswordHash
+from pwdlib.hashers.bcrypt import BcryptHasher
 
 from .. import models, schemas
 from ..config.config import settings
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 30  # 30 minutes
 ALGORITHM = "HS256"
+
+password_hash = PasswordHash((BcryptHasher(),))
+
+
+def get_hashed_password(password: str) -> str:
+    return password_hash.hash(password)
+
+
+def verify_password(password: str, hashed_pass: str) -> bool:
+    return password_hash.verify(password, hashed_pass)
 
 
 class OAuth2PasswordBearerWithCookie(OAuth2):
@@ -64,16 +75,6 @@ oauth2_scheme_with_cookies = OAuth2PasswordBearerWithCookie(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"
 )
 
-password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def get_hashed_password(password: str) -> str:
-    return password_context.hash(password)
-
-
-def verify_password(password: str, hashed_pass: str) -> bool:
-    return password_context.verify(password, hashed_pass)
-
 
 async def authenticate_user(email: str, password: str) -> models.User | None:
     user = await models.User.find_one({"email": email})
@@ -86,27 +87,28 @@ async def authenticate_user(email: str, password: str) -> models.User | None:
     return user
 
 
-def create_access_token(subject: str | Any, expires_delta: timedelta | None = None):
+def create_access_token(
+    subject: str | Any, expires_delta: timedelta | None = None
+) -> str:
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode = {"exp": expire, "sub": str(subject)}
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> models.User:
     return await _get_current_user(token)
 
 
 async def get_current_user_from_cookie(
     token: str = Depends(oauth2_scheme_with_cookies),
-):
+) -> models.User:
     return await _get_current_user(token)
 
 
-async def _get_current_user(token):
+async def _get_current_user(token: str) -> models.User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -139,6 +141,6 @@ def get_current_active_superuser(
 ) -> models.User:
     if not current_user.is_superuser:
         raise HTTPException(
-            status_code=400, detail="The user doesn't have enough privileges"
+            status_code=403, detail="The user doesn't have enough privileges"
         )
     return current_user

@@ -1,5 +1,48 @@
 # Architettura Frontend
 
+## Struttura delle cartelle
+
+```
+src/
+├── main.tsx              ← punto di ingresso, monta React + Provider
+├── router.tsx            ← definizione route con createBrowserRouter
+├── axios.ts              ← interceptor JWT globale
+├── error-page.tsx        ← pagina di errore (404, crash)
+├── fallback.tsx          ← spinner di loading (HydrateFallback)
+├── vite-env.d.ts         ← tipi variabili d'ambiente Vite
+├── setupTest.ts          ← setup Vitest + jest-dom
+├── styles/               ← tutto il CSS, organizzato per responsabilità
+│   ├── main.scss         ← entry point: importa tutto in ordine
+│   ├── abstracts/        ← variabili e mixin (no output CSS)
+│   ├── base/             ← reset e tipografia
+│   ├── components/       ← btn, form, card, alert, avatar, dialog
+│   ├── layout/           ← navbar, layout shell, container
+│   └── pages/            ← stili specifici per pagina
+├── components/           ← componenti UI riutilizzabili
+│   ├── TopMenuBar.tsx
+│   ├── LoginForm.tsx
+│   ├── RegisterForm.tsx
+│   └── UserProfile.tsx
+├── contexts/             ← stato globale (React Context)
+│   ├── auth.tsx
+│   └── snackbar.tsx
+├── models/               ← interfacce TypeScript
+│   └── user.ts
+├── services/             ← client HTTP (chiamate al backend)
+│   ├── auth.service.ts
+│   └── user.service.ts
+└── routes/               ← componenti di pagina (un file per route)
+    ├── root.tsx
+    ├── home.tsx
+    ├── login.tsx
+    ├── register.tsx
+    ├── profile.tsx
+    ├── users.tsx
+    └── sso.login.tsx
+```
+
+---
+
 ## Struttura a strati
 
 Il frontend segue un'architettura a strati orizzontali con responsabilità separate:
@@ -10,7 +53,10 @@ Il frontend segue un'architettura a strati orizzontali con responsabilità separ
 │  home, login, register, profile, users  │
 ├─────────────────────────────────────────┤
 │         Components (UI)                 │  ← components/
-│  LoginForm, TopMenuBar, UserProfile...  │
+│  LoginForm, TopMenuBar, UserProfile…    │
+├─────────────────────────────────────────┤
+│         Styles (SCSS + BEM)             │  ← styles/
+│  variables, mixins, components, pages  │
 ├─────────────────────────────────────────┤
 │         Contexts (stato globale)        │  ← contexts/
 │  AuthContext, SnackBarContext           │
@@ -20,9 +66,6 @@ Il frontend segue un'architettura a strati orizzontali con responsabilità separ
 ├─────────────────────────────────────────┤
 │         Models (tipi TypeScript)        │  ← models/
 │  User                                   │
-├─────────────────────────────────────────┤
-│         Axios (client HTTP)             │  ← axios.ts
-│  interceptor JWT                        │
 └─────────────────────────────────────────┘
 ```
 
@@ -33,15 +76,21 @@ Ogni strato dipende solo dagli strati sottostanti, mai da quelli superiori.
 ## Punto di ingresso: `main.tsx`
 
 ```tsx
-// src/main.tsx
+import './styles/main.scss'   // unico import CSS globale
+
 ReactDOM.createRoot(document.getElementById('root')).render(
-    <React.StrictMode>
-        <RouterProvider router={router}/>
-    </React.StrictMode>
+  <React.StrictMode>
+    <AuthProvider>
+      <SnackBarProvider>
+        <RouterProvider router={router} />
+      </SnackBarProvider>
+    </AuthProvider>
+  </React.StrictMode>,
 )
 ```
 
-React monta l'applicazione nel div `#root` di `index.html`. `RouterProvider` gestisce il routing lato client.
+`main.scss` è l'unico foglio di stile importato. Non esistono import CSS nei singoli componenti: tutti gli stili
+sono centralizati nella cartella `styles/` e compilati da Vite in un unico bundle CSS ottimizzato.
 
 ---
 
@@ -51,19 +100,19 @@ Le route sono definite come array di oggetti e passate a `createBrowserRouter`:
 
 ```typescript
 export const routes = [
-    {
-        path: '/',
-        Component: Root,          // layout principale con TopMenuBar
-        errorElement: <ErrorPage / >,
-        children: [
-            {index: true, Component: Home, loader: homeLoader},
-            {path: 'sso-login-callback', Component: SSOLogin, loader: ssoLoader},
-            {path: 'profile', Component: Profile},
-            {path: 'login', Component: Login},
-            {path: 'register', Component: Register},
-            {path: 'users', Component: Users, loader: usersLoader},
-        ],
-    },
+  {
+    path: '/',
+    Component: Root,           // layout principale con TopMenuBar
+    errorElement: <ErrorPage />,
+    children: [
+      { index: true, Component: Home, loader: homeLoader },
+      { path: 'sso-login-callback', Component: SSOLogin, loader: ssoLoader },
+      { path: 'profile', Component: Profile },
+      { path: 'login', Component: Login },
+      { path: 'register', Component: Register },
+      { path: 'users', Component: Users, loader: usersLoader },
+    ],
+  },
 ]
 ```
 
@@ -85,24 +134,71 @@ il "flash" di contenuto vuoto tipico del fetch-on-render.
 ```tsx
 export default function Root() {
     return (
-        <Box sx={{display: 'flex'}}>
+        <div className="layout">
             <TopMenuBar/>
-            <Box component='main' sx={{flexGrow: 1, height: '100vh', overflow: 'auto'}}>
-                <Toolbar/> {/* spacer per non sovrapporre la AppBar */}
+            <main className="layout__main">
                 <Outlet/>
-            </Box>
-        </Box>
+            </main>
+        </div>
     )
 }
 ```
 
-`TopMenuBar` (`components/TopMenuBar.tsx`) è una `AppBar` Material UI che:
+`TopMenuBar` (`components/TopMenuBar.tsx`) usa le classi BEM `.navbar` e `.dropdown`. Implementa:
 
-- mostra il nome dell'applicazione e link di navigazione
-- se l'utente è autenticato, mostra un avatar con menu dropdown (profilo, logout)
-- se l'utente non è autenticato, mostra i link Login e Register
-- usa `useAuth()` dal contesto di autenticazione per leggere lo stato dell'utente
-- usa `useNavigate()` di React Router per reindirizzare dopo il logout
+- brand link a sinistra (`.navbar__brand`)
+- link di navigazione contestuali a destra (`.navbar__link`, `.navbar__link--active`)
+- avatar button con dropdown accessibile via `aria-expanded` e click-outside handler
+- SVG inline al posto di librerie di icone esterne
+
+Il dropdown si chiude automaticamente cliccando fuori grazie a un `mousedown` listener su `document` (pulito nel
+cleanup di `useEffect`).
+
+---
+
+## Sistema di stile: SCSS + BEM
+
+### Principio generale
+
+Nessun componente ha stili inline né fogli CSS propri. Tutti gli stili sono in `src/styles/`. Un componente React
+applica classi BEM con `className`:
+
+```tsx
+// Block + Modifier
+<button className="btn btn--primary btn--full">
+
+// Block__Element
+<label className="field__label">
+
+// Block__Element con stato condizionale
+<input className={`field__input${errors.email ? ' field__input--error' : ''}`} />
+```
+
+### Variabili e mixin
+
+Tutti i valori di design (colori, spaziature, breakpoint, tipografia) sono dichiarati in `_variables.scss` e usati
+tramite `@use '../abstracts/variables' as *`. Un cambio di colore primario si propaga automaticamente in tutto il CSS.
+
+I mixin riutilizzabili (`flex-center`, `card-surface`, `input-base`, `button-base`, `respond-to`) sono in
+`_mixins.scss` e riducono la duplicazione tra componenti.
+
+### Responsive design
+
+Il breakpoint system usa `@include respond-to(md)` (mobile-first):
+
+```scss
+.card-grid {
+  grid-template-columns: 1fr;             // mobile
+
+  @include respond-to(sm) {
+    grid-template-columns: repeat(2, 1fr); // ≥576px
+  }
+
+  @include respond-to(lg) {
+    grid-template-columns: repeat(3, 1fr); // ≥992px
+  }
+}
+```
 
 ---
 
@@ -114,10 +210,10 @@ Il contesto di autenticazione espone:
 
 ```typescript
 type AuthContextType = {
-    user: User | undefined
-    setUser: (user: User | undefined) => void
-    login: (data: FormData) => void
-    logout: () => void
+  user: User | undefined
+  setUser: (user: User | undefined) => void
+  login: (data: FormData) => void
+  logout: () => void
 }
 ```
 
@@ -125,24 +221,18 @@ All'inizializzazione del provider (`useEffect` al primo mount), viene chiamato `
 se esiste una sessione attiva (token in `localStorage`). Se la chiamata ha successo, l'utente viene salvato nello stato;
 altrimenti lo stato rimane `undefined`.
 
-**`login(data)`**: chiama `authService.login(data)` (che salva il token in `localStorage`), poi
-`userService.getProfile()` per aggiornare lo stato utente.
-
-**`logout()`**: chiama `authService.logout()` (che rimuove il token da `localStorage`) e imposta `user = undefined`.
-
-Il contesto è accessibile in qualsiasi componente tramite il hook `useAuth()`.
-
 ### SnackBarContext (`contexts/snackbar.tsx`)
 
-Gestisce le notifiche toaste globali (Material UI `Snackbar`). Espone:
+Gestisce le notifiche toast globali senza dipendenze esterne. Ogni toast ha un ID progressivo e viene rimosso
+automaticamente dopo il timeout tramite `setTimeout`. Il container `.toast-container` è posizionato fixed in basso e
+usa `aria-live="polite"` per accessibilità.
 
 ```typescript
 type SnackBarContextActions = {
-    showSnackBar: (message: string, severity: AlertColor, timeout?: number) => void
+  showSnackBar: (message: string, severity: Severity, timeout?: number) => void
 }
+// severity: 'success' | 'error' | 'warning' | 'info'
 ```
-
-Qualsiasi componente può mostrare una notifica con `useSnackBar().showSnackBar("messaggio", "success")`.
 
 ---
 
@@ -177,15 +267,15 @@ I service sono classi singleton che incapsulano le chiamate HTTP al backend. Non
 
 ```typescript
 export interface User {
-    uuid: string
-    email: string
-    password?: string
-    first_name?: string
-    last_name?: string
-    provider?: string
-    picture?: string
-    is_active?: boolean
-    is_superuser?: boolean
+  uuid: string
+  email: string
+  password?: string
+  first_name?: string
+  last_name?: string
+  provider?: string
+  picture?: string
+  is_active?: boolean
+  is_superuser?: boolean
 }
 ```
 
@@ -196,8 +286,7 @@ Questa interfaccia rispecchia lo schema `schemas.User` del backend. I campi opzi
 
 ## Flusso SSO Google
 
-1. L'utente clicca "Accedi con Google" → il frontend naviga a `authService.getGoogleLoginUrl()` che punta a
-   `GET /api/v1/login/google`
+1. L'utente clicca "Connect with Google" → redirect a `GET /api/v1/login/google`
 2. Il backend esegue il redirect a Google
 3. Dopo il consenso, Google redirige al backend (`/api/v1/login/google/callback`)
 4. Il backend crea/trova l'utente, genera il JWT, imposta un cookie `HttpOnly` e redirige al frontend su

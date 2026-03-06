@@ -59,16 +59,75 @@ Struttura delle route:
 
 ---
 
-## Component library: Material UI (MUI) 7
+## Styling: SASS (SCSS) + BEM
 
-**Material UI 7** fornisce i componenti UI pronti all'uso seguendo le linee guida Material Design di Google. Il progetto
-usa:
+Il progetto usa **SASS (SCSS)** come preprocessore CSS. Non viene usato nessun framework di componenti (niente
+Material UI, niente Tailwind, niente Bootstrap). Tutta la stilizzazione è scritta a mano seguendo la metodologia
+**BEM** (Block Element Modifier) per i nomi delle classi.
 
-- `@mui/material`: componenti base (Button, TextField, AppBar, Card, ecc.)
-- `@mui/icons-material`: icone SVG
-- `@emotion/react` e `@emotion/styled`: sistema CSS-in-JS usato internamente da MUI
+### Perché SASS senza framework
 
-Il tema è personalizzato in `src/theme.tsx`.
+- **Controllo totale**: lo stile riflette esattamente il design system del progetto, senza override di componenti di
+  terze parti.
+- **Zero dipendenze CSS a runtime**: il CSS generato è statico e ottimizzato da Vite. Nessun CSS-in-JS, nessun
+  runtime overhead.
+- **Leggibilità**: un componente React usa classi descrittive (`className="btn btn--primary btn--full"`) che
+  documentano visivamente la struttura.
+- **Manutenibilità**: una modifica al design system (es. cambiare il colore primario) richiede di toccare un unico
+  file (`_variables.scss`).
+
+### Metodologia BEM
+
+BEM organizza le classi CSS in tre concetti:
+
+| Concetto     | Sintassi           | Esempio                           |
+|--------------|--------------------|-----------------------------------|
+| **Block**    | `.block`           | `.btn`, `.card`, `.navbar`        |
+| **Element**  | `.block__element`  | `.card__title`, `.btn__icon`      |
+| **Modifier** | `.block--modifier` | `.btn--primary`, `.card--compact` |
+
+Esempio concreto in React:
+
+```tsx
+<button className="btn btn--primary btn--full">
+    <svg className="btn__icon"
+    .../>
+    Sign In
+</button>
+```
+
+Il modifier è sempre aggiunto **accanto** al block, mai al posto: `btn btn--primary`, non solo `btn--primary`.
+
+### Struttura dei file SCSS (pattern 7-1 semplificato)
+
+```
+src/styles/
+├── abstracts/
+│   ├── _variables.scss   ← colori, spaziature, tipografia, breakpoint
+│   └── _mixins.scss      ← respond-to, flex-center, card-surface, input-base, button-base
+├── base/
+│   ├── _reset.scss       ← reset CSS moderno (box-sizing, margini, font)
+│   └── _typography.scss  ← utility classes di testo (.text-sm, .text-muted…)
+├── components/
+│   ├── _button.scss      ← .btn, varianti, dimensioni
+│   ├── _form.scss        ← .form, .field (label + input + errore)
+│   ├── _card.scss        ← .card, .card-grid
+│   ├── _alert.scss       ← .alert (inline), .toast (notifica a scomparsa)
+│   ├── _avatar.scss      ← .avatar con varianti di dimensione
+│   └── _dialog.scss      ← .dialog, .dialog-backdrop
+├── layout/
+│   ├── _layout.scss      ← .layout, .container, .page
+│   └── _navbar.scss      ← .navbar, .dropdown
+├── pages/
+│   ├── _home.scss        ← .hero, .features
+│   ├── _auth.scss        ← .auth (login/register)
+│   ├── _profile.scss     ← .profile
+│   └── _users.scss       ← .users-layout, .user-list, .user-detail-panel
+└── main.scss             ← entry point: importa tutto in ordine
+```
+
+`main.scss` è l'unico file importato in `main.tsx`. Gli altri file usano `@use` per dipendere da `abstracts/`
+senza importazioni circolari.
 
 ---
 
@@ -134,4 +193,4 @@ I test si trovano nei file `*.test.tsx` accanto ai componenti che testano:
 | **Prettier 3.5**        | Formattazione automatica del codice         |
 | **eslint-plugin-react** | Regole specifiche per React                 |
 | **typescript-eslint**   | Regole TypeScript per ESLint                |
-
+| **sass**                | Compilazione SCSS → CSS (dev dependency)    |

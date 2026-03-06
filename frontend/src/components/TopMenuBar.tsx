@@ -1,141 +1,128 @@
-import { Logout } from '@mui/icons-material'
-import {
-  AppBar,
-  Avatar,
-  Box,
-  Button,
-  Divider,
-  IconButton,
-  Link,
-  ListItemIcon,
-  Menu,
-  MenuItem,
-  Toolbar,
-  Tooltip,
-  Typography,
-} from '@mui/material'
-import * as React from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router'
 import { useAuth } from '../contexts/auth'
 
 export default function TopMenuBar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null)
-  const open = Boolean(anchorEl)
-  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget)
-  }
-  const handleClose = () => {
-    setAnchorEl(null)
-  }
+  const [open, setOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Chiude il dropdown cliccando fuori
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   const handleLogout = () => {
+    setOpen(false)
     logout()
-    setAnchorEl(null)
     navigate('/')
   }
 
+  const initials = user?.first_name ? user.first_name[0].toUpperCase() : 'P'
+  const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ')
+
   return (
-    <AppBar position='absolute'>
-      <Toolbar>
-        <Typography component='h1' variant='h6' color='inherit' noWrap sx={{ flexGrow: 1 }}>
-          <Link component={NavLink} to='/' color='inherit' underline='none'>
-            Polibench
-          </Link>
-        </Typography>
+    <nav className='navbar' role='navigation' aria-label='Main navigation'>
+      <div className='navbar__inner'>
+        {/* Brand */}
+        <NavLink to='/' className='navbar__brand'>
+          Polibench
+        </NavLink>
 
-        {user === undefined && (
-          <Box aria-label='button group'>
-            <Button component={NavLink} to='/login' sx={{ color: '#fff' }}>
-              Login
-            </Button>
-            <Button component={NavLink} to='/register' sx={{ color: '#fff' }}>
-              Register
-            </Button>
-          </Box>
-        )}
-
-        {user !== undefined && user.is_superuser && (
-          <Button component={NavLink} to='/users' sx={{ color: '#fff' }}>
-            Users
-          </Button>
-        )}
-
-        {user !== undefined && (
-          <Tooltip title='Account settings'>
-            <IconButton
-              onClick={handleClick}
-              size='small'
-              sx={{ ml: 2 }}
-              aria-controls={open ? 'account-menu' : undefined}
-              aria-haspopup='true'
-              aria-expanded={open ? 'true' : undefined}
-            >
-              <Avatar
-                sx={{ width: 32, height: 32 }}
-                alt={user.first_name + ' ' + user.last_name}
-                src={user.picture && user.picture}
+        {/* Nav links + actions */}
+        <div className='navbar__nav'>
+          {/* Guest */}
+          {user === undefined && (
+            <>
+              <NavLink
+                to='/login'
+                className={({ isActive }) =>
+                  `navbar__link${isActive ? ' navbar__link--active' : ''}`
+                }
               >
-                {user && user.first_name ? user.first_name[0] : 'P'}
-              </Avatar>
-            </IconButton>
-          </Tooltip>
-        )}
-      </Toolbar>
-      <Menu
-        anchorEl={anchorEl}
-        id='account-menu'
-        open={open}
-        onClose={handleClose}
-        onClick={handleClose}
-        PaperProps={{
-          elevation: 0,
-          sx: {
-            overflow: 'visible',
-            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
-            mt: 1.5,
-            '& .MuiAvatar-root': {
-              width: 32,
-              height: 32,
-              ml: -0.5,
-              mr: 1,
-            },
-            '&:before': {
-              content: '""',
-              display: 'block',
-              position: 'absolute',
-              top: 0,
-              right: 14,
-              width: 10,
-              height: 10,
-              bgcolor: 'background.paper',
-              transform: 'translateY(-50%) rotate(45deg)',
-              zIndex: 0,
-            },
-          },
-        }}
-        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-      >
-        <Link component={NavLink} to='/profile' color='inherit' underline='none'>
-          <MenuItem onClick={handleClose}>
-            <Avatar
-              alt={user && user.first_name + ' ' + user.last_name}
-              src={user && user.picture && user.picture}
-            />{' '}
-            Profile
-          </MenuItem>
-        </Link>
+                Login
+              </NavLink>
+              <NavLink
+                to='/register'
+                className={({ isActive }) =>
+                  `navbar__link${isActive ? ' navbar__link--active' : ''}`
+                }
+              >
+                Register
+              </NavLink>
+            </>
+          )}
 
-        <Divider />
-        <MenuItem onClick={handleLogout}>
-          <ListItemIcon>
-            <Logout fontSize='small' />
-          </ListItemIcon>
-          Logout
-        </MenuItem>
-      </Menu>
-    </AppBar>
+          {/* Admin-only */}
+          {user?.is_superuser && (
+            <NavLink
+              to='/users'
+              className={({ isActive }) => `navbar__link${isActive ? ' navbar__link--active' : ''}`}
+            >
+              Users
+            </NavLink>
+          )}
+
+          {/* Avatar dropdown */}
+          {user !== undefined && (
+            <div className='dropdown' ref={dropdownRef}>
+              <button
+                className='navbar__avatar-btn'
+                aria-expanded={open}
+                aria-haspopup='true'
+                aria-label='Account menu'
+                onClick={() => setOpen((v) => !v)}
+              >
+                {user.picture ? (
+                  <img className='navbar__avatar-img' src={user.picture} alt={fullName} />
+                ) : (
+                  <span className='navbar__avatar-initials' aria-hidden='true'>
+                    {initials}
+                  </span>
+                )}
+              </button>
+
+              <div className={`dropdown__menu${open ? ' dropdown__menu--open' : ''}`}>
+                <NavLink to='/profile' className='dropdown__item' onClick={() => setOpen(false)}>
+                  <svg
+                    className='dropdown__icon'
+                    viewBox='0 0 24 24'
+                    fill='none'
+                    stroke='currentColor'
+                    strokeWidth='2'
+                  >
+                    <path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2' />
+                    <circle cx='12' cy='7' r='4' />
+                  </svg>
+                  Profile
+                </NavLink>
+                <div className='dropdown__divider' />
+                <button className='dropdown__item' onClick={handleLogout}>
+                  <svg
+                    className='dropdown__icon'
+                    viewBox='0 0 24 24'
+                    fill='none'
+                    stroke='currentColor'
+                    strokeWidth='2'
+                  >
+                    <path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4' />
+                    <polyline points='16 17 21 12 16 7' />
+                    <line x1='21' y1='12' x2='9' y2='12' />
+                  </svg>
+                  Logout
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </nav>
   )
 }

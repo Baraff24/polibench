@@ -1,62 +1,50 @@
-import { Alert, AlertColor, Snackbar } from '@mui/material'
-import { createContext, FC, useState, ReactNode, useContext } from 'react'
+import { createContext, FC, useState, ReactNode, useContext, useCallback } from 'react'
+
+type Severity = 'success' | 'error' | 'warning' | 'info'
 
 type SnackBarContextActions = {
-  showSnackBar: (message: string, severity: AlertColor, timeout?: number) => void
+  showSnackBar: (message: string, severity: Severity, timeout?: number) => void
 }
 
 const SnackBarContext = createContext<SnackBarContextActions>({} as SnackBarContextActions)
 
-interface SnackBarContextProviderProps {
-  children: ReactNode
+interface Toast {
+  id: number
+  message: string
+  severity: Severity
 }
 
-const SnackBarProvider: FC<SnackBarContextProviderProps> = ({ children }) => {
-  const [open, setOpen] = useState<boolean>(false)
-  const [message, setMessage] = useState<string>('')
-  const [timeout, setTimeout] = useState<number>(6000)
-  const [alertColor, setAlertColor] = useState<AlertColor>('info')
+let nextId = 0
 
-  const showSnackBar = (text: string, color: AlertColor, timeout?: number) => {
-    setMessage(text)
-    setAlertColor(color)
-    setOpen(true)
-    if (timeout) {
-      setTimeout(timeout)
-    }
-  }
+const SnackBarProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const [toasts, setToasts] = useState<Toast[]>([])
 
-  const handleClose = () => {
-    setOpen(false)
-    setAlertColor('info')
-    setTimeout(6000)
-  }
+  const showSnackBar = useCallback((message: string, severity: Severity, timeout = 4000) => {
+    const id = ++nextId
+    setToasts((prev) => [...prev, { id, message, severity }])
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id))
+    }, timeout)
+  }, [])
 
   return (
     <SnackBarContext.Provider value={{ showSnackBar }}>
-      <Snackbar
-        open={open}
-        autoHideDuration={timeout}
-        // anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-        onClose={handleClose}
-      >
-        <Alert onClose={handleClose} severity={alertColor}>
-          {message}
-        </Alert>
-      </Snackbar>
       {children}
+      <div className='toast-container' role='region' aria-live='polite'>
+        {toasts.map((t) => (
+          <div key={t.id} className={`toast toast--${t.severity}`}>
+            {t.message}
+          </div>
+        ))}
+      </div>
     </SnackBarContext.Provider>
   )
 }
 
 const useSnackBar = (): SnackBarContextActions => {
-  const context = useContext(SnackBarContext)
-
-  if (!context) {
-    throw new Error('useSnackBar must be used within a SnackBarProvider')
-  }
-
-  return context
+  const ctx = useContext(SnackBarContext)
+  if (!ctx) throw new Error('useSnackBar must be used within a SnackBarProvider')
+  return ctx
 }
 
 export { SnackBarProvider, useSnackBar }

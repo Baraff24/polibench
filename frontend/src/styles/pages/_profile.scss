@@ -1,0 +1,65 @@
+// =============================================================================
+// Page: Profile  (BEM: .profile)
+// =============================================================================
+
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins' as *;
+
+.profile {
+  padding: $space-12 $space-6;
+  max-width: $container-narrow;
+  margin: 0 auto;
+
+  &__header {
+    @include flex-column;
+    align-items: center;
+    gap: $space-4;
+    margin-bottom: $space-10;
+    text-align: center;
+  }
+
+  &__name {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-semibold;
+  }
+
+  &__email {
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+  }
+
+  &__section {
+    @include card-surface;
+    padding: $space-6;
+    margin-bottom: $space-6;
+  }
+
+  &__section-title {
+    font-size: $font-size-base;
+    font-weight: $font-weight-semibold;
+    margin-bottom: $space-5;
+    padding-bottom: $space-3;
+    border-bottom: 1px solid $color-border;
+  }
+
+  &__danger-zone {
+    @include card-surface;
+    padding: $space-6;
+    border-color: $color-error;
+    background: $color-error-bg;
+  }
+
+  &__danger-title {
+    font-size: $font-size-base;
+    font-weight: $font-weight-semibold;
+    color: $color-error;
+    margin-bottom: $space-3;
+  }
+
+  &__danger-desc {
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    margin-bottom: $space-4;
+  }
+}
+

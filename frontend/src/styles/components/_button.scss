@@ -1,0 +1,98 @@
+// =============================================================================
+// Component: Button  (BEM: .btn)
+// =============================================================================
+
+@use 'sass:color';
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins' as *;
+
+.btn {
+  @include button-base;
+
+  // --- Variants ---
+  &--primary {
+    background-color: $color-primary;
+    border-color: $color-primary;
+    color: $color-text-inverse;
+
+    &:hover:not(:disabled) {
+      background-color: $color-primary-dark;
+      border-color: $color-primary-dark;
+    }
+  }
+
+  &--accent {
+    background-color: $color-accent;
+    border-color: $color-accent;
+    color: $color-text-inverse;
+
+    &:hover:not(:disabled) {
+      background-color: $color-accent-dark;
+      border-color: $color-accent-dark;
+    }
+  }
+
+  &--outline {
+    background-color: transparent;
+    border-color: $color-border;
+    color: $color-text;
+
+    &:hover:not(:disabled) {
+      background-color: $color-bg;
+      border-color: $color-primary;
+      color: $color-primary;
+    }
+  }
+
+  &--ghost {
+    background-color: transparent;
+    border-color: transparent;
+    color: $color-text-muted;
+
+    &:hover:not(:disabled) {
+      background-color: $color-bg;
+      color: $color-text;
+    }
+  }
+
+  &--danger {
+    background-color: $color-error;
+    border-color: $color-error;
+    color: $color-text-inverse;
+
+    &:hover:not(:disabled) {
+      background-color: color.adjust($color-error, $lightness: -8%);
+    }
+  }
+
+  // --- Sizes ---
+  &--sm {
+    padding: $space-2 $space-4;
+    font-size: $font-size-sm;
+    border-radius: $radius-sm;
+  }
+
+  &--lg {
+    padding: $space-4 $space-8;
+    font-size: $font-size-md;
+  }
+
+  // --- Full width ---
+  &--full {
+    width: 100%;
+  }
+
+  // --- Icon-only ---
+  &--icon {
+    padding: $space-2;
+    border-radius: $radius-full;
+  }
+
+  // Icona SVG inline
+  &__icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+}
+

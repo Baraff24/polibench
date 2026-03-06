@@ -1,0 +1,42 @@
+// =============================================================================
+// Layout: Page shell  (BEM: .layout)
+// =============================================================================
+
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins' as *;
+
+.layout {
+  @include flex-column;
+  min-height: 100vh;
+
+  &__main {
+    flex: 1;
+    padding-top: $navbar-height;
+  }
+}
+
+// Contenitore di pagina con max-width centrato
+.container {
+  width: 100%;
+  max-width: $container-max;
+  margin: 0 auto;
+  padding: 0 $space-6;
+
+  &--narrow {
+    max-width: $container-narrow;
+  }
+
+  &--wide {
+    max-width: $container-wide;
+  }
+}
+
+// Pagina con padding verticale standard
+.page {
+  padding: $space-12 $space-6;
+
+  @include respond-to(md) {
+    padding: $space-16 $space-6;
+  }
+}
+

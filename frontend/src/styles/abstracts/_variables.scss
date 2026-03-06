@@ -1,0 +1,109 @@
+// =============================================================================
+// Variables
+// =============================================================================
+
+// --- Colors ---
+$color-primary:        #455a64;
+$color-primary-light:  #718792;
+$color-primary-dark:   #1c313a;
+
+$color-accent:         #1976d2;
+$color-accent-light:   #63a4ff;
+$color-accent-dark:    #004ba0;
+
+$color-white:          #ffffff;
+$color-black:          #111111;
+
+$color-bg:             #f5f6f7;
+$color-bg-card:        #ffffff;
+$color-bg-input:       #f9fafb;
+
+$color-text:           #1a1a2e;
+$color-text-muted:     #637381;
+$color-text-inverse:   #ffffff;
+
+$color-border:         #dde1e7;
+$color-border-focus:   $color-accent;
+
+$color-success:        #2e7d32;
+$color-success-bg:     #e8f5e9;
+$color-error:          #c62828;
+$color-error-bg:       #ffebee;
+$color-warning:        #e65100;
+$color-warning-bg:     #fff3e0;
+$color-info:           #0277bd;
+$color-info-bg:        #e1f5fe;
+
+// --- Typography ---
+$font-family-base:     'Inter', system-ui, -apple-system, sans-serif;
+$font-family-mono:     'JetBrains Mono', 'Fira Code', monospace;
+
+$font-size-xs:         0.75rem;   // 12px
+$font-size-sm:         0.875rem;  // 14px
+$font-size-base:       1rem;      // 16px
+$font-size-md:         1.125rem;  // 18px
+$font-size-lg:         1.25rem;   // 20px
+$font-size-xl:         1.5rem;    // 24px
+$font-size-2xl:        1.875rem;  // 30px
+$font-size-3xl:        2.25rem;   // 36px
+
+$font-weight-regular:  400;
+$font-weight-medium:   500;
+$font-weight-semibold: 600;
+$font-weight-bold:     700;
+
+$line-height-tight:    1.25;
+$line-height-base:     1.6;
+$line-height-relaxed:  1.75;
+
+// --- Spacing (base 4px = 0.25rem) ---
+$space-1:  0.25rem;   // 4px
+$space-2:  0.5rem;    // 8px
+$space-3:  0.75rem;   // 12px
+$space-4:  1rem;      // 16px
+$space-5:  1.25rem;   // 20px
+$space-6:  1.5rem;    // 24px
+$space-8:  2rem;      // 32px
+$space-10: 2.5rem;    // 40px
+$space-12: 3rem;      // 48px
+$space-16: 4rem;      // 64px
+$space-20: 5rem;      // 80px
+
+// --- Border radius ---
+$radius-sm:   0.25rem;   // 4px
+$radius-md:   0.5rem;    // 8px
+$radius-lg:   0.75rem;   // 12px
+$radius-xl:   1rem;      // 16px
+$radius-full: 9999px;    // pill — px è corretto qui
+
+// --- Shadows (offset/blur in rem, spread e colore invariati) ---
+$shadow-sm:  0 0.0625rem 0.1875rem rgba(0, 0, 0, 0.08);
+$shadow-md:  0 0.25rem   0.75rem   rgba(0, 0, 0, 0.10);
+$shadow-lg:  0 0.5rem    1.5rem    rgba(0, 0, 0, 0.12);
+$shadow-xl:  0 1rem      2.5rem    rgba(0, 0, 0, 0.14);
+
+// --- Transitions ---
+$transition-fast:    0.15s ease;
+$transition-base:    0.25s ease;
+$transition-slow:    0.4s ease;
+
+// --- Layout ---
+$navbar-height:      4rem;      // 64px
+$container-max:      75rem;     // 1200px
+$container-narrow:   45rem;     // 720px
+$container-wide:     90rem;     // 1440px
+
+// --- Z-index ---
+$z-dropdown:    100;
+$z-sticky:      200;
+$z-navbar:      300;
+$z-modal-bg:    400;
+$z-modal:       500;
+$z-toast:       600;
+
+// --- Breakpoints (px restano px: media query non scalano con font-size) ---
+$bp-sm:  36rem;    // 576px
+$bp-md:  48rem;    // 768px
+$bp-lg:  62rem;    // 992px
+$bp-xl:  75rem;    // 1200px
+$bp-2xl: 90rem;    // 1440px
