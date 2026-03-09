@@ -24,6 +24,9 @@ export default function UserProfile({ userProfile, onUserUpdated, allowDelete }:
   const { user: currentUser, setUser, logout } = useAuth()
   const { showSnackBar } = useSnackBar()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordLoading, setPasswordLoading] = useState(false)
 
   useEffect(() => {
     reset(userProfile)
@@ -54,6 +57,30 @@ export default function UserProfile({ userProfile, onUserUpdated, allowDelete }:
     }
   }
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (newPassword.length < 6) {
+      showSnackBar('Password must be at least 6 characters.', 'error')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      showSnackBar('Passwords do not match.', 'error')
+      return
+    }
+    setPasswordLoading(true)
+    try {
+      const updated = await userService.updateProfile({ ...userProfile, password: newPassword })
+      setUser(updated)
+      setNewPassword('')
+      setConfirmPassword('')
+      showSnackBar('Password changed successfully.', 'success')
+    } catch {
+      showSnackBar('Error changing password.', 'error')
+    } finally {
+      setPasswordLoading(false)
+    }
+  }
+
   const handleConfirmDelete = async () => {
     setConfirmOpen(false)
     await userService.deleteSelf()
@@ -72,6 +99,9 @@ export default function UserProfile({ userProfile, onUserUpdated, allowDelete }:
     emailClass = 'field__input field__input--error'
   }
 
+  const isOwnProfile = currentUser?.uuid === userProfile.uuid
+  const isSSOUser = userProfile.provider !== undefined && userProfile.provider !== null
+
   return (
     <div className='profile'>
       {/* Header */}
@@ -85,6 +115,43 @@ export default function UserProfile({ userProfile, onUserUpdated, allowDelete }:
         {fullName && <p className='profile__name'>{fullName}</p>}
         <p className='profile__email'>{userProfile.email}</p>
       </div>
+
+      {/* Account info */}
+      <section className='profile__section'>
+        <h2 className='profile__section-title'>Account details</h2>
+        <div className='profile__info-grid'>
+          <div className='profile__info-item'>
+            <span className='profile__info-label'>UUID</span>
+            <span className='profile__info-value profile__info-value--mono'>
+              {userProfile.uuid}
+            </span>
+          </div>
+          <div className='profile__info-item'>
+            <span className='profile__info-label'>Status</span>
+            <span className='profile__info-value'>
+              {userProfile.is_active ? '✓ Active' : '✕ Inactive'}
+            </span>
+          </div>
+          <div className='profile__info-item'>
+            <span className='profile__info-label'>Email verified</span>
+            <span className='profile__info-value'>
+              {userProfile.is_verified ? '✓ Verified' : '✕ Not verified'}
+            </span>
+          </div>
+          <div className='profile__info-item'>
+            <span className='profile__info-label'>Role</span>
+            <span className='profile__info-value'>
+              {userProfile.is_superuser ? 'Admin' : 'Researcher'}
+            </span>
+          </div>
+          {isSSOUser && (
+            <div className='profile__info-item'>
+              <span className='profile__info-label'>Login provider</span>
+              <span className='profile__info-value'>{userProfile.provider}</span>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Edit section */}
       <section className='profile__section'>
@@ -129,6 +196,60 @@ export default function UserProfile({ userProfile, onUserUpdated, allowDelete }:
           </div>
         </form>
       </section>
+
+      {/* Change password — only for non-SSO users on their own profile */}
+      {isOwnProfile && !isSSOUser && (
+        <section className='profile__section'>
+          <h2 className='profile__section-title'>Change password</h2>
+          <form className='form' onSubmit={handleChangePassword}>
+            <div className='field'>
+              <label className='field__label' htmlFor='new-password'>
+                New password
+              </label>
+              <input
+                id='new-password'
+                type='password'
+                className='field__input'
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                minLength={6}
+                required
+              />
+            </div>
+
+            <div className='field'>
+              <label className='field__label' htmlFor='confirm-password'>
+                Confirm new password
+              </label>
+              <input
+                id='confirm-password'
+                type='password'
+                className='field__input'
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                minLength={6}
+                required
+              />
+            </div>
+
+            <div className='form__actions'>
+              <button type='submit' className='btn btn--primary' disabled={passwordLoading}>
+                {passwordLoading ? 'Changing...' : 'Change password'}
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
+
+      {isSSOUser && isOwnProfile && (
+        <section className='profile__section'>
+          <h2 className='profile__section-title'>Change password</h2>
+          <p className='text-muted'>
+            You signed in with {userProfile.provider}. Password management is handled by your
+            provider.
+          </p>
+        </section>
+      )}
 
       {/* Danger zone */}
       {allowDelete && (
