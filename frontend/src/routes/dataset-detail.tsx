@@ -12,13 +12,15 @@ export async function loader({ params }: { params: Params }) {
 export default function DatasetDetail() {
   const { dataset } = useLoaderData() as { dataset: DatasetPublic }
 
+  let visibilityVariant: 'success' | 'warning' = 'warning'
+  if (dataset.visibility === 'public') {
+    visibilityVariant = 'success'
+  }
+
   return (
     <div className='page container'>
       <PageHeader title={dataset.name}>
-        <Badge
-          text={dataset.visibility}
-          variant={dataset.visibility === 'public' ? 'success' : 'warning'}
-        />
+        <Badge text={dataset.visibility} variant={visibilityVariant} />
       </PageHeader>
 
       {/* Stats */}

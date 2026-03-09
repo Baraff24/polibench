@@ -190,6 +190,7 @@ def _model_to_public(model: MLModel, creator: User | None = None) -> MLModelPubl
         family=model.family,
         paper_url=model.paper_url,
         implementation=model.implementation,
+        hyperparams=model.hyperparams,
         created_by_user_uuid=creator.uuid if creator else None,
         created_at=model.created_at,
     )
