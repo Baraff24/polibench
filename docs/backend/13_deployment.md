@@ -115,7 +115,12 @@ MONGO_EXPRESS_PASSWORD=changeme-in-production
 ```
 
 Le variabili opzionali (SMTP, SSO, CORS, FRONTEND_URL) hanno valori di default sicuri per lo sviluppo ma devono essere
-configurate esplicitamente in produzione. Vedi [07_configuration.md](./07_configuration.md) per la lista completa.
+configurate esplicitamente in produzione. Vedi [07_configuration.md](./07_configuration.md) per la lista completa,
+incluse le istruzioni per **Gmail** (STARTTLS porta 587) e **Aruba** (SSL porta 465).
+
+> ⚠️ **Importante**: configura `MONGO_USER` e `MONGO_PASSWORD` **prima** del primo `docker compose up`.
+> MongoDB inizializza l'utente root solo alla creazione del volume. Se il volume esiste già senza credenziali,
+> l'autenticazione fallirà. In quel caso esegui `docker compose down -v` per rimuovere il volume e ripartire.
 
 ---
 
@@ -301,4 +306,57 @@ Vedi [08_testing.md](./08_testing.md) per la strategia di test completa.
 
 Le variabili d'ambiente per i test sono configurate tramite `pytest-env` o direttamente nel `conftest.py`.
 Non è necessario un file `.env` reale: le `Settings` usano valori di default accettabili per i test.
+
+---
+
+## Troubleshooting
+
+### 502 Bad Gateway su tutte le richieste
+
+Il backend non è in esecuzione o non è ancora pronto.
+
+**Cause comuni**:
+
+1. Il container `backend` non è partito perché MongoDB non era healthy (controlla con `docker compose ps`)
+2. Il `.env` era incompleto o mancava `DOMAIN` / `STACK_NAME` (variabili required dal compose)
+3. Il volume MongoDB è corrotto (vedi sotto)
+
+**Verifica rapida**:
+
+```bash
+docker compose ps                        # tutti i container devono essere "Up"
+docker compose logs backend --tail 30    # cerca errori di connessione a MongoDB
+```
+
+---
+
+### AuthenticationFailed su mongo-express (o backend)
+
+```
+MongoServerError: Authentication failed.
+```
+
+**Causa**: il volume MongoDB `app-db-data` è stato inizializzato **prima** che venissero impostate le credenziali
+(`MONGO_USER` / `MONGO_PASSWORD`) nel `.env`. MongoDB ha creato il database senza utenti, e ora rifiuta le credenziali
+perché non le riconosce.
+
+Questo accade tipicamente quando:
+
+- il primo `docker compose up` è stato fatto con `MONGO_USER`/`MONGO_PASSWORD` commentati nel `.env`
+- poi si decommenta le credenziali e si riavvia senza rimuovere il volume
+
+**Soluzione** (distruttiva — cancella i dati esistenti):
+
+```bash
+# 1. Ferma tutto e rimuovi i volumi
+docker compose down -v
+
+# 2. Verifica che .env abbia MONGO_USER e MONGO_PASSWORD settati
+cat .env | grep MONGO
+
+# 3. Riavvia da zero — MongoDB viene inizializzato con le credenziali corrette
+docker compose up -d --build
+```
+
+> ⚠️ `docker compose down -v` rimuove **tutti i dati** del database. In produzione, esegui un backup prima.
 

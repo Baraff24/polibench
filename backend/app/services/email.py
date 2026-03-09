@@ -97,10 +97,15 @@ def send_verification_email(to_email: str, token: str) -> None:
     msg.attach(MIMEText(html_body, "html"))
 
     try:
-        if settings.SMTP_TLS:
+        if settings.SMTP_SSL:
+            # SSL diretto — porta 465 (Aruba, alcuni provider)
+            server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT)
+        elif settings.SMTP_TLS:
+            # STARTTLS — porta 587 (Gmail, Outlook, la maggior parte)
             server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
             server.starttls()
         else:
+            # Nessuna cifratura — solo per test interni
             server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
 
         if settings.SMTP_USER and settings.SMTP_PASSWORD:

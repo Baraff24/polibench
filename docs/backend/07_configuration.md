@@ -105,17 +105,53 @@ rispondono HTTP 400.
 
 ### Email (SMTP)
 
-| Variabile         | Tipo   | Default | Obbligatoria | Descrizione                                     |
-|-------------------|--------|---------|--------------|-------------------------------------------------|
-| `SMTP_HOST`       | `str`  | `None`  | ❌            | Hostname del server SMTP (es. `smtp.gmail.com`) |
-| `SMTP_PORT`       | `int`  | `587`   | ❌            | Porta SMTP                                      |
-| `SMTP_USER`       | `str`  | `None`  | ❌            | Username per autenticazione SMTP                |
-| `SMTP_PASSWORD`   | `str`  | `None`  | ❌            | Password per autenticazione SMTP                |
-| `SMTP_FROM_EMAIL` | `str`  | `None`  | ❌            | Indirizzo mittente (fallback su `SMTP_USER`)    |
-| `SMTP_TLS`        | `bool` | `True`  | ❌            | Abilita STARTTLS                                |
+| Variabile         | Tipo   | Default | Obbligatoria | Descrizione                                                        |
+|-------------------|--------|---------|--------------|--------------------------------------------------------------------|
+| `SMTP_HOST`       | `str`  | `None`  | ❌            | Hostname del server SMTP (es. `smtp.gmail.com`)                    |
+| `SMTP_PORT`       | `int`  | `587`   | ❌            | Porta SMTP                                                         |
+| `SMTP_USER`       | `str`  | `None`  | ❌            | Username per autenticazione SMTP                                   |
+| `SMTP_PASSWORD`   | `str`  | `None`  | ❌            | Password per autenticazione SMTP                                   |
+| `SMTP_FROM_EMAIL` | `str`  | `None`  | ❌            | Indirizzo mittente (fallback su `SMTP_USER`)                       |
+| `SMTP_TLS`        | `bool` | `True`  | ❌            | Abilita STARTTLS — usato con porta 587 (Gmail, Outlook, ecc.)      |
+| `SMTP_SSL`        | `bool` | `False` | ❌            | Abilita SSL diretto — usato con porta 465 (Aruba, alcuni provider) |
 
 Se `SMTP_HOST` non è configurato, le email di verifica **non vengono inviate** e il link di verifica viene loggato
 nella console del backend. Questo permette di lavorare in sviluppo locale senza un server SMTP.
+
+#### Provider consigliati
+
+**Gmail** (STARTTLS, porta 587):
+
+La password normale Gmail non funziona via SMTP. Bisogna generare un'**App Password**:
+
+1. Attivare la verifica in due passaggi su [myaccount.google.com/security](https://myaccount.google.com/security)
+2. Andare su [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+3. Creare una nuova App Password con nome "Polibench"
+4. Copiare la password di 16 caratteri (rimuovere gli spazi)
+
+```dotenv
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=tua-email@gmail.com
+SMTP_PASSWORD=apppassword16caratteri
+SMTP_FROM_EMAIL=tua-email@gmail.com
+SMTP_TLS=true
+SMTP_SSL=false
+```
+
+**Aruba Webmail** (SSL diretto, porta 465):
+
+Aruba usa SSL diretto sulla porta 465, non STARTTLS. Usare `SMTP_SSL=true` e `SMTP_TLS=false`.
+
+```dotenv
+SMTP_HOST=smtps.aruba.it
+SMTP_PORT=465
+SMTP_USER=tua-email@tuodominio.it
+SMTP_PASSWORD=la-tua-password-aruba
+SMTP_FROM_EMAIL=tua-email@tuodominio.it
+SMTP_TLS=false
+SMTP_SSL=true
+```
 
 ### Frontend URL
 

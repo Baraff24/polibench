@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str | None = None
     SMTP_FROM_EMAIL: str | None = None
     SMTP_TLS: bool = True
+    # True = STARTTLS (porta 587, Gmail, la maggior parte dei provider)
+    # False + SMTP_SSL=True = SSL diretto (porta 465, Aruba, alcuni provider)
+    SMTP_SSL: bool = False
 
     # Frontend URL (used to build verification links)
     FRONTEND_URL: str = "http://localhost:5173"
