@@ -35,6 +35,12 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
     navigate('/')
   }
 
+  const closeSidebarOnMobile = () => {
+    if (window.innerWidth < 768) {
+      onToggleSidebar()
+    }
+  }
+
   let initials = 'P'
   if (user?.first_name) {
     initials = user.first_name[0].toUpperCase()
@@ -56,6 +62,12 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
 
   return (
     <>
+      {/* Mobile overlay */}
+      <div
+        className={sidebarOpen ? 'sidebar-overlay sidebar-overlay--visible' : 'sidebar-overlay'}
+        onClick={onToggleSidebar}
+      />
+
       {/* Sidebar */}
       <aside className={sidebarClass}>
         <div className='sidebar__brand'>
@@ -80,7 +92,12 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
         <nav className='sidebar__nav'>
           <div className='sidebar__section-label'>Menu</div>
 
-          <NavLink to='/' end className={({ isActive }) => navItemClass(isActive)}>
+          <NavLink
+            to='/'
+            end
+            className={({ isActive }) => navItemClass(isActive)}
+            onClick={closeSidebarOnMobile}
+          >
             <svg
               className='sidebar__item-icon'
               viewBox='0 0 24 24'
@@ -94,7 +111,11 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
             Home
           </NavLink>
 
-          <NavLink to='/leaderboard' className={({ isActive }) => navItemClass(isActive)}>
+          <NavLink
+            to='/leaderboard'
+            className={({ isActive }) => navItemClass(isActive)}
+            onClick={closeSidebarOnMobile}
+          >
             <svg
               className='sidebar__item-icon'
               viewBox='0 0 24 24'
@@ -107,7 +128,11 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
             Leaderboard
           </NavLink>
 
-          <NavLink to='/datasets' className={({ isActive }) => navItemClass(isActive)}>
+          <NavLink
+            to='/datasets'
+            className={({ isActive }) => navItemClass(isActive)}
+            onClick={closeSidebarOnMobile}
+          >
             <svg
               className='sidebar__item-icon'
               viewBox='0 0 24 24'
@@ -122,7 +147,11 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
             Datasets
           </NavLink>
 
-          <NavLink to='/models' className={({ isActive }) => navItemClass(isActive)}>
+          <NavLink
+            to='/models'
+            className={({ isActive }) => navItemClass(isActive)}
+            onClick={closeSidebarOnMobile}
+          >
             <svg
               className='sidebar__item-icon'
               viewBox='0 0 24 24'
@@ -140,7 +169,11 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
           {/* Guest */}
           {user === undefined && (
             <>
-              <NavLink to='/login' className={({ isActive }) => navItemClass(isActive)}>
+              <NavLink
+                to='/login'
+                className={({ isActive }) => navItemClass(isActive)}
+                onClick={closeSidebarOnMobile}
+              >
                 <svg
                   className='sidebar__item-icon'
                   viewBox='0 0 24 24'
@@ -154,7 +187,11 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
                 </svg>
                 Login
               </NavLink>
-              <NavLink to='/register' className={({ isActive }) => navItemClass(isActive)}>
+              <NavLink
+                to='/register'
+                className={({ isActive }) => navItemClass(isActive)}
+                onClick={closeSidebarOnMobile}
+              >
                 <svg
                   className='sidebar__item-icon'
                   viewBox='0 0 24 24'
@@ -176,7 +213,11 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
           {user?.is_superuser && (
             <>
               <div className='sidebar__section-label'>Admin</div>
-              <NavLink to='/users' className={({ isActive }) => navItemClass(isActive)}>
+              <NavLink
+                to='/users'
+                className={({ isActive }) => navItemClass(isActive)}
+                onClick={closeSidebarOnMobile}
+              >
                 <svg
                   className='sidebar__item-icon'
                   viewBox='0 0 24 24'

@@ -14,6 +14,7 @@ import Models, { loader as modelsLoader } from './routes/models'
 import ModelDetail, { loader as modelDetailLoader } from './routes/model-detail'
 import ExperimentDetail, { loader as experimentDetailLoader } from './routes/experiment-detail'
 import Leaderboard from './routes/leaderboard'
+import { RequireAuth } from './components'
 
 export const routes = [
   {
@@ -29,7 +30,11 @@ export const routes = [
       },
       {
         path: 'profile',
-        Component: Profile,
+        element: (
+          <RequireAuth>
+            <Profile />
+          </RequireAuth>
+        ),
       },
       {
         path: 'login',
@@ -41,7 +46,11 @@ export const routes = [
       },
       {
         path: 'users',
-        Component: Users,
+        element: (
+          <RequireAuth adminOnly>
+            <Users />
+          </RequireAuth>
+        ),
         HydrateFallback: HydrateFallback,
         loader: usersLoader,
       },
@@ -75,7 +84,11 @@ export const routes = [
       },
       {
         path: 'experiments/:uuid',
-        Component: ExperimentDetail,
+        element: (
+          <RequireAuth>
+            <ExperimentDetail />
+          </RequireAuth>
+        ),
         HydrateFallback: HydrateFallback,
         loader: experimentDetailLoader,
       },

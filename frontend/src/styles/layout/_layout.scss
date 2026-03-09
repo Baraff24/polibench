@@ -14,6 +14,10 @@
     margin-left: $sidebar-width;
     padding-top: $topbar-height;
     transition: margin-left 0.2s ease;
+
+    @media (max-width: $bp-md) {
+      margin-left: 0;
+    }
   }
 
   &--collapsed &__main {

@@ -74,6 +74,11 @@ h1, h2, h3, h4, h5, h6 {
   padding-top: 4.375rem;
   transition: margin-left 0.2s ease;
 }
+@media (max-width: 48rem) {
+  .layout__main {
+    margin-left: 0;
+  }
+}
 .layout--collapsed .layout__main {
   margin-left: 0;
 }
@@ -185,6 +190,28 @@ h1, h2, h3, h4, h5, h6 {
   height: 1.125rem;
   flex-shrink: 0;
 }
+@media (max-width: 48rem) {
+  .sidebar {
+    width: 100%;
+    z-index: 500;
+  }
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 17, 23, 0.75);
+  z-index: 400;
+}
+.sidebar-overlay--visible {
+  display: block;
+}
+@media (min-width: 48rem) {
+  .sidebar-overlay {
+    display: none !important;
+  }
+}
 
 .topbar {
   position: fixed;
@@ -203,6 +230,11 @@ h1, h2, h3, h4, h5, h6 {
 }
 .topbar--full {
   left: 0;
+}
+@media (max-width: 48rem) {
+  .topbar {
+    left: 0;
+  }
 }
 .topbar__toggle {
   display: flex;
@@ -795,25 +827,41 @@ h1, h2, h3, h4, h5, h6 {
   padding: 5rem 1.5rem 3rem;
   text-align: center;
 }
+.hero__badge {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7b72cc;
+  background: rgba(86, 74, 177, 0.15);
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  margin-bottom: 1.5rem;
+}
 .hero__title {
   font-size: 2.25rem;
   font-weight: 700;
   color: #e9ecef;
   margin-bottom: 1rem;
+  line-height: 1.25;
+}
+.hero__title--accent {
+  color: #7b72cc;
 }
 .hero__subtitle {
   font-size: 1rem;
   color: #6c757d;
-  max-width: 35rem;
+  max-width: 38rem;
   margin: 0 auto 2rem;
   line-height: 1.6;
 }
-.hero__stack {
+.hero__actions {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 .hero__stack-item {
   display: inline-flex;
@@ -827,26 +875,120 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-.features {
+.how {
   padding: 4rem 1.5rem;
   max-width: 75rem;
   margin: 0 auto;
 }
-.features__header {
+.how__header {
   text-align: center;
   margin-bottom: 3rem;
 }
-.features__title {
+.how__title {
   font-size: 1.75rem;
   font-weight: 700;
   color: #e9ecef;
   margin-bottom: 0.75rem;
 }
-.features__desc {
+.how__desc {
   font-size: 0.9375rem;
   color: #6c757d;
-  max-width: 30rem;
+}
+.how__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+}
+@media (min-width: 48rem) {
+  .how__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.how__step {
+  text-align: center;
+}
+.how__step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background: rgba(86, 74, 177, 0.15);
+  color: #7b72cc;
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+.how__step-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e9ecef;
+  margin-bottom: 0.5rem;
+}
+.how__step-desc {
+  font-size: 0.8125rem;
+  color: #6c757d;
+  line-height: 1.6;
+  max-width: 22rem;
   margin: 0 auto;
+}
+
+.highlights {
+  padding: 3rem 1.5rem 4rem;
+  max-width: 75rem;
+  margin: 0 auto;
+}
+.highlights__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+@media (min-width: 48rem) {
+  .highlights__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.highlights__card {
+  background: #1a1d27;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+}
+.highlights__icon {
+  width: 2rem;
+  height: 2rem;
+  color: #7b72cc;
+  margin-bottom: 1rem;
+}
+.highlights__card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e9ecef;
+  margin-bottom: 0.5rem;
+}
+.highlights__card-desc {
+  font-size: 0.8125rem;
+  color: #6c757d;
+  line-height: 1.6;
+}
+
+.stack-section {
+  padding: 2rem 1.5rem 5rem;
+  text-align: center;
+}
+.stack-section__title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: #e9ecef;
+  margin-bottom: 1.5rem;
+}
+.stack-section__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
 .auth {
