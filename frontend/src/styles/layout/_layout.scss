@@ -44,6 +44,7 @@
 .page-header {
   display: flex;
   align-items: center;
+  gap: $space-4;
   justify-content: space-between;
   margin-bottom: $space-8;
 
@@ -51,5 +52,12 @@
     font-size: $font-size-xl;
     font-weight: $font-weight-bold;
     color: $color-text-strong;
+    flex: 1;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
   }
 }
