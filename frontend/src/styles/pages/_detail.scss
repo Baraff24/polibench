@@ -8,6 +8,7 @@
 .detail-section {
   @include card;
   padding: $space-6;
+  margin-top: $space-6;
   margin-bottom: $space-6;
 
   &__title {
