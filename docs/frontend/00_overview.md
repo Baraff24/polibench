@@ -48,10 +48,13 @@ frontend/
     │       ├── EmptyState.tsx
     │       ├── LoadingSpinner.tsx
     │       ├── PageHeader.tsx
+    │       ├── RequireAuth.tsx
     │       └── StatCard.tsx
     ├── contexts/            ← React Context (stato globale)
     │   ├── auth.tsx
     │   └── snackbar.tsx
+    ├── hooks/               ← custom React hooks
+    │   └── useDocumentTitle.ts
     ├── models/              ← interfacce TypeScript
     │   ├── user.ts
     │   ├── dataset.ts
@@ -73,7 +76,8 @@ frontend/
     │   ├── dataset-detail.tsx
     │   ├── models.tsx
     │   ├── model-detail.tsx
-    │   └── experiment-detail.tsx
+    │   ├── experiment-detail.tsx
+    │   └── verify-email.tsx
     ├── services/            ← chiamate HTTP al backend
     │   ├── auth.service.ts
     │   ├── user.service.ts
@@ -95,20 +99,21 @@ frontend/
 
 ## Route disponibili
 
-| Path                  | Componente         | Accesso     |
-|-----------------------|--------------------|-------------|
-| `/`                   | `Home`             | Pubblico    |
-| `/login`              | `Login`            | Guest       |
-| `/register`           | `Register`         | Guest       |
-| `/sso-login-callback` | `SSOLogin`         | Sistema     |
-| `/profile`            | `Profile`          | Autenticato |
-| `/leaderboard`        | `Leaderboard`      | Pubblico    |
-| `/datasets`           | `Datasets`         | Pubblico    |
-| `/datasets/:uuid`     | `DatasetDetail`    | Pubblico    |
-| `/models`             | `Models`           | Pubblico    |
-| `/models/:uuid`       | `ModelDetail`      | Pubblico    |
-| `/experiments/:uuid`  | `ExperimentDetail` | Autenticato |
-| `/users`              | `Users`            | Admin       |
+| Path                  | Componente         | Accesso     | Guard                   |
+|-----------------------|--------------------|-------------|-------------------------|
+| `/`                   | `Home`             | Pubblico    | —                       |
+| `/login`              | `Login`            | Guest       | —                       |
+| `/register`           | `Register`         | Guest       | —                       |
+| `/verify-email`       | `VerifyEmail`      | Pubblico    | —                       |
+| `/sso-login-callback` | `SSOLogin`         | Sistema     | —                       |
+| `/profile`            | `Profile`          | Autenticato | `RequireAuth`           |
+| `/leaderboard`        | `Leaderboard`      | Pubblico    | —                       |
+| `/datasets`           | `Datasets`         | Pubblico    | —                       |
+| `/datasets/:uuid`     | `DatasetDetail`    | Pubblico    | —                       |
+| `/models`             | `Models`           | Pubblico    | —                       |
+| `/models/:uuid`       | `ModelDetail`      | Pubblico    | —                       |
+| `/experiments/:uuid`  | `ExperimentDetail` | Autenticato | `RequireAuth`           |
+| `/users`              | `Users`            | Admin       | `RequireAuth adminOnly` |
 
 ---
 

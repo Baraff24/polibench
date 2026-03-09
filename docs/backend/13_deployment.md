@@ -40,22 +40,24 @@ Docker sincronizza automaticamente il file nel container senza ricostruire l'imm
 
 ### Servizi avviati in sviluppo locale
 
-| Servizio   | Porta locale | Nota                                                   |
-|------------|--------------|--------------------------------------------------------|
-| `proxy`    | `80`         | Traefik in modalità insecure (dashboard su `8090`)     |
-| `db`       | `27017`      | MongoDB con volume persistente `app-db-data`           |
-| `backend`  | `8000`       | FastAPI con `--reload` (auto-riavvio su modifica file) |
-| `frontend` | `5173`       | Vite dev server con HMR (Hot Module Replacement)       |
+| Servizio        | Porta locale  | Nota                                                   |
+|-----------------|---------------|--------------------------------------------------------|
+| `proxy`         | `80`          | Traefik in modalità insecure (dashboard su `8090`)     |
+| `db`            | `27017`       | MongoDB con volume persistente `app-db-data`           |
+| `mongo-express` | (via Traefik) | Pannello web MongoDB (stile Django admin)              |
+| `backend`       | `8000`        | FastAPI con `--reload` (auto-riavvio su modifica file) |
+| `frontend`      | `5173`        | Vite dev server con HMR (Hot Module Replacement)       |
 
 ### URL locali
 
-| Risorsa           | URL                        |
-|-------------------|----------------------------|
-| Frontend          | `http://localhost/`        |
-| Backend API       | `http://localhost/api/v1/` |
-| Swagger UI        | `http://localhost/docs`    |
-| ReDoc             | `http://localhost/redoc`   |
-| Traefik Dashboard | `http://localhost:8090`    |
+| Risorsa           | URL                              |
+|-------------------|----------------------------------|
+| Frontend          | `http://localhost/`              |
+| Backend API       | `http://localhost/api/v1/`       |
+| Swagger UI        | `http://localhost/docs`          |
+| ReDoc             | `http://localhost/redoc`         |
+| Mongo Express     | `http://localhost/mongo-express` |
+| Traefik Dashboard | `http://localhost:8090`          |
 
 Il routing da porta 80 verso i singoli servizi è gestito da **Traefik** tramite le label Docker:
 
@@ -166,14 +168,67 @@ docker compose -f docker-compose.prod.yml up -d --build
 Traefik gestisce il routing tramite label Docker sui servizi:
 
 ```
-https://polibench.example.com/api/*    → backend (FastAPI)
-https://polibench.example.com/docs     → backend (Swagger UI)
-https://polibench.example.com/redoc    → backend (ReDoc)
-https://polibench.example.com/*        → frontend (Nginx)
+https://polibench.example.com/api/*           → backend (FastAPI)
+https://polibench.example.com/docs            → backend (Swagger UI)
+https://polibench.example.com/redoc           → backend (ReDoc)
+https://polibench.example.com/mongo-express   → mongo-express (pannello DB)
+https://polibench.example.com/*               → frontend (Nginx)
 ```
 
 I certificati TLS sono gestiti automaticamente da Traefik tramite Let's Encrypt (challenge TLS-ALPN-01).
 I certificati sono persistiti nel volume `./letsencrypt/acme.json`.
+
+---
+
+## Mongo Express — Pannello web MongoDB
+
+Mongo Express è un'interfaccia web per ispezionare e modificare i dati MongoDB, simile al Django admin panel.
+È presente sia nel compose di sviluppo che in quello di produzione.
+
+### Cosa permette di fare
+
+- Visualizzare tutte le **collezioni** del database (`users`, `datasets`, `experiments`, `metrics`, ecc.)
+- **Leggere, modificare e cancellare** singoli documenti
+- **Creare** nuovi documenti manualmente
+- Eseguire **query** di ricerca e filtro
+- Vedere la struttura dei dati grezzi (inclusi ObjectId, campi denormalizzati)
+
+### URL di accesso
+
+| Ambiente   | URL                               |
+|------------|-----------------------------------|
+| Sviluppo   | `http://localhost/mongo-express`  |
+| Produzione | `https://<dominio>/mongo-express` |
+
+### Autenticazione
+
+Mongo Express è protetto da **HTTP Basic Auth**. Le credenziali sono configurate nel `.env`:
+
+```dotenv
+MONGO_EXPRESS_USER=admin
+MONGO_EXPRESS_PASSWORD=admin   # CAMBIARE in produzione!
+```
+
+### Differenze con il Django admin
+
+| Django admin                         | Mongo Express                          |
+|--------------------------------------|----------------------------------------|
+| CRUD su modelli ORM con form         | CRUD su documenti JSON grezzi          |
+| Validazione automatica               | Nessuna validazione — documento grezzo |
+| Form generati da modelli             | Editor JSON diretto                    |
+| Azioni bulk personalizzate           | Query filter di base                   |
+| Gestione utenti e permessi integrata | Solo visualizzazione/modifica dati     |
+
+> **Nota**: Mongo Express mostra i dati **interni** (ObjectId, campi denormalizzati, campi non esposti dall'API).
+> È uno strumento di **debug e amministrazione**, non un pannello utente.
+
+### Sicurezza in produzione
+
+In produzione, mongo-express è accessibile solo via HTTPS (TLS tramite Traefik/Let's Encrypt) e protetto da
+Basic Auth. Si consiglia di:
+
+- usare credenziali forti per `MONGO_EXPRESS_USER` e `MONGO_EXPRESS_PASSWORD`
+- eventualmente aggiungere un middleware Traefik di IP whitelist per limitare l'accesso a soli IP fidati
 
 ### Persistenza dei dati
 

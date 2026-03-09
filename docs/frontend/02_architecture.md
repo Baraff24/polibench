@@ -183,7 +183,12 @@ export default function Root() {
 - brand link (`.sidebar__brand`, `.sidebar__brand-name`)
 - link di navigazione con NavLink attivo (`.sidebar__item`, `.sidebar__item--active`)
 - bottone chiudi sidebar X (`.sidebar__close`) e bottone hamburger (`.topbar__toggle`)
-- avatar button con dropdown accessibile via `aria-expanded` e click-outside handler
+- **dropdown utente autenticato**: avatar/iniziale + nome, link Profile, bottone Logout
+- **dropdown guest**: icona profilo SVG con voci Login e Register
+- overlay backdrop su mobile (`.sidebar-overlay`) che chiude la sidebar al click
+- chiusura automatica della sidebar al click di un link su mobile (`closeSidebarOnMobile`)
+- sidebar **fullscreen** su viewport < 768px (z-index modale)
+- sidebar chiusa di default su mobile (`useState(() => window.innerWidth >= 768)`)
 - SVG inline al posto di librerie di icone esterne
 
 Il dropdown si chiude automaticamente cliccando fuori grazie a un `mousedown` listener su `document` (pulito nel

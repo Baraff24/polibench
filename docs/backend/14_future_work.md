@@ -14,6 +14,7 @@ Il sistema di autenticazione attuale supporta:
 
 - JWT con email/password
 - Google OAuth2 (SSO)
+- Verifica email con token JWT e invio SMTP
 - Ruoli utente: `admin`, `researcher`, `viewer`
 - Flag `is_superuser` per operazioni amministrative
 
@@ -24,6 +25,8 @@ Il sistema di autenticazione attuale supporta:
 - Non esiste una distinzione tra Dataset `public` e `private` a livello di enforcement negli endpoint (il campo
   `visibility` è dichiarato nel modello ma non filtrato nei query).
 - Non esiste un meccanismo di invito o approvazione per i team.
+- `is_verified` non è ancora usato come gate obbligatorio per operazioni sensibili (submission di experiment).
+  Attualmente è informativo.
 
 **Impatto attuale**: in un contesto accademico controllato con pochi utenti fidati, questo non è un problema
 operativo. Diventa rilevante se la piattaforma venisse aperta a utenti esterni non verificati.

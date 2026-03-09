@@ -30,15 +30,16 @@ src/styles/
 │   └── _empty-state.scss ← .empty-state
 ├── layout/
 │   ├── _layout.scss      ← .layout, .container, .page, .page-header
-│   └── _navbar.scss      ← .sidebar, .topbar, .dropdown
+│   └── _navbar.scss      ← .sidebar, .topbar, .dropdown, .sidebar-overlay
 └── pages/
-    ├── _home.scss        ← .hero, .features
+    ├── _home.scss        ← .hero, .how, .highlights, .stack-section
     ├── _auth.scss        ← .auth
     ├── _profile.scss     ← .profile
     ├── _users.scss       ← .users-layout, .user-list
     ├── _leaderboard.scss ← .leaderboard-filters, .leaderboard-rank
     ├── _datasets.scss    ← .dataset-card
-    └── _detail.scss      ← .detail-section, .detail-grid, .detail-field
+    ├── _detail.scss      ← .detail-section, .detail-grid, .detail-field
+    └── _verify-email.scss← .verify-email
 ```
 
 ### Regola fondamentale
@@ -67,8 +68,16 @@ BEM (Block Element Modifier) organizza i nomi di classe in tre livelli:
 
 ```scss
 .card {
-  &__title { ... }        // .card__title
-  &--compact { ... }      // .card--compact
+  &__title {
+    ...
+  }
+
+  // .card__title
+  &--compact {
+    ...
+  }
+
+  // .card--compact
 }
 ```
 
@@ -172,7 +181,7 @@ La scala è basata su incrementi di `0.25rem` (4px):
 ### Transizioni
 
 ```scss
-$transition: 0.15s ease;  // usato per hover, focus, open/close
+$transition: 0.15s ease; // usato per hover, focus, open/close
 ```
 
 ---
@@ -208,9 +217,17 @@ Applica lo stile base di un campo input (display, padding, font, colori, focus):
   border: 1px solid $color-border;
   border-radius: $radius-lg;
   transition: border-color $transition;
-  &::placeholder { color: $color-text-muted; }
-  &:focus { outline: none; border-color: $color-accent; }
-  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  &::placeholder {
+    color: $color-text-muted;
+  }
+  &:focus {
+    outline: none;
+    border-color: $color-accent;
+  }
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 }
 ```
 
@@ -226,26 +243,27 @@ Pulsante base con varianti di stile e dimensione.
 
 ```scss
 // Varianti di stile
-.btn--primary   // sfondo accent, testo bianco
-.btn--outline   // bordo visibile, sfondo trasparente
-.btn--ghost     // nessun bordo, hover sottile
-.btn--danger    // sfondo error
+.btn--primary // sfondo accent, testo bianco
+.btn--outline // bordo visibile, sfondo trasparente
+.btn--ghost // nessun bordo, hover sottile
+.btn--danger // sfondo error
+  // Varianti di dimensione
+.btn--sm // padding ridotto, font-size xs
+.btn--lg // padding aumentato, font-size md
+.btn--full // width: 100%
+  // Elemento interno
+.btn__icon
 
-// Varianti di dimensione
-.btn--sm        // padding ridotto, font-size xs
-.btn--lg        // padding aumentato, font-size md
-.btn--full      // width: 100%
-
-// Elemento interno
-.btn__icon      // SVG 1.125rem
+// SVG 1.125rem
 ```
 
 Esempio:
 
 ```tsx
 <button className='btn btn--primary btn--full'>
-  <svg className='btn__icon' …/>
-  Save
+    <svg className='btn__icon'
+    …/>
+    Save
 </button>
 ```
 
@@ -257,17 +275,18 @@ Struttura di un form con campi, divisore, footer e azioni.
 
 ```scss
 .form
-.form__title      // titolo centrato
-.form__subtitle   // sottotitolo centrato
-.form__footer     // testo in fondo (link registrazione)
-.form__divider    // separatore "or" con linee laterali
-.form__actions    // wrapper per i bottoni di submit
-
+.form__title // titolo centrato
+.form__subtitle // sottotitolo centrato
+.form__footer // testo in fondo (link registrazione)
+.form__divider // separatore "or" con linee laterali
+.form__actions // wrapper per i bottoni di submit
 .field
-.field__label     // label del campo
-.field__input     // input (usa @mixin input)
-.field__input--error  // bordo rosso in stato di errore
-.field__error     // messaggio di errore sotto il campo
+.field__label // label del campo
+.field__input // input (usa @mixin input)
+.field__input--error // bordo rosso in stato di errore
+.field__error
+
+// messaggio di errore sotto il campo
 ```
 
 ---
@@ -278,13 +297,14 @@ Card generica con media, corpo, footer. La griglia adatta il numero di colonne a
 
 ```scss
 .card
-.card__media   // immagine/header visivo (height: 8rem, object-fit: contain)
-.card__body    // contenuto principale (padding, flex: 1)
-.card__title   // titolo bold
-.card__desc    // descrizione muted
-.card__footer  // area azioni in fondo (border-top)
+.card__media // immagine/header visivo (height: 8rem, object-fit: contain)
+.card__body // contenuto principale (padding, flex: 1)
+.card__title // titolo bold
+.card__desc // descrizione muted
+.card__footer // area azioni in fondo (border-top)
+.card-grid
 
-.card-grid     // griglia responsive: 1 col mobile, 2 col ≥768px, 3 col ≥1200px
+// griglia responsive: 1 col mobile, 2 col ≥768px, 3 col ≥1200px
 ```
 
 ---
@@ -294,12 +314,14 @@ Card generica con media, corpo, footer. La griglia adatta il numero di colonne a
 Badge inline con varianti semantiche.
 
 ```scss
-.badge             // base (inline-block, padding, border-radius small)
-.badge--success    // verde
-.badge--error      // rosso
-.badge--warning    // giallo
-.badge--info       // azzurro
-.badge--neutral    // grigio muted
+.badge // base (inline-block, padding, border-radius small)
+.badge--success // verde
+.badge--error // rosso
+.badge--warning // giallo
+.badge--info // azzurro
+.badge--neutral
+
+// grigio muted
 ```
 
 Esempio:
@@ -315,11 +337,13 @@ Esempio:
 Tabella dati con intestazione, righe, bordi e righe cliccabili.
 
 ```scss
-.table-wrap              // contenitore (usa @mixin card, overflow-x: auto)
-.table                   // <table> a larghezza piena
-.table__th               // intestazione: muted, uppercase, xs
-.table__td               // cella: padding, bordo-bottom
-.table__tr--clickable    // cursore pointer + hover highlight
+.table-wrap // contenitore (usa @mixin card, overflow-x: auto)
+.table // <table> a larghezza piena
+.table__th // intestazione: muted, uppercase, xs
+.table__td // cella: padding, bordo-bottom
+.table__tr--clickable
+
+// cursore pointer + hover highlight
 ```
 
 ---
@@ -329,13 +353,14 @@ Tabella dati con intestazione, righe, bordi e righe cliccabili.
 Card KPI con icona, valore grande e label.
 
 ```scss
-.stat-card          // usa @mixin card + flex row
-.stat-card__icon    // contenitore icona (sfondo accent 15%, bordo-radius lg)
-.stat-card__body    // flex column
-.stat-card__value   // numero grande (font-size-xl, bold)
-.stat-card__label   // label uppercase muted xs
+.stat-card // usa @mixin card + flex row
+.stat-card__icon // contenitore icona (sfondo accent 15%, bordo-radius lg)
+.stat-card__body // flex column
+.stat-card__value // numero grande (font-size-xl, bold)
+.stat-card__label // label uppercase muted xs
+.stat-grid
 
-.stat-grid          // griglia: auto-fill con min 14rem per colonna
+// griglia: auto-fill con min 14rem per colonna
 ```
 
 ---
@@ -345,8 +370,10 @@ Card KPI con icona, valore grande e label.
 Spinner di caricamento animato.
 
 ```scss
-.spinner          // wrapper centrato con padding
-.spinner__circle  // cerchio con border-top accent + animazione spin
+.spinner // wrapper centrato con padding
+.spinner__circle
+
+// cerchio con border-top accent + animazione spin
 ```
 
 ---
@@ -357,8 +384,10 @@ Stato vuoto centrato con titolo e descrizione.
 
 ```scss
 .empty-state
-.empty-state__title   // testo muted, font-weight medium
-.empty-state__desc    // testo muted, font-size sm
+.empty-state__title // testo muted, font-weight medium
+.empty-state__desc
+
+// testo muted, font-size sm
 ```
 
 ---
@@ -368,12 +397,14 @@ Stato vuoto centrato con titolo e descrizione.
 Avatar circolare con varianti di dimensione.
 
 ```scss
-.avatar        // base circolare
-.avatar--sm    // 2rem
-.avatar--md    // 2.5rem
-.avatar--lg    // 3rem
-.avatar--xl    // 4.5rem
-.avatar__img   // immagine interna
+.avatar // base circolare
+.avatar--sm // 2rem
+.avatar--md // 2.5rem
+.avatar--lg // 3rem
+.avatar--xl // 4.5rem
+.avatar__img
+
+// immagine interna
 ```
 
 ---
@@ -383,12 +414,17 @@ Avatar circolare con varianti di dimensione.
 Messaggi inline e notifiche a scomparsa.
 
 ```scss
-.alert                   // messaggio inline
-.alert--success/error/warning/info
+.alert // messaggio inline
+.alert--success /error/ warning
 
-.toast-container         // fixed bottom-right, z-index toast
-.toast                   // singola notifica
-.toast--success/error/warning/info
+/
+info
+.toast-container // fixed bottom-right, z-index toast
+.toast // singola notifica
+.toast--success /error/ warning
+
+/
+info
 ```
 
 ---
@@ -398,8 +434,8 @@ Messaggi inline e notifiche a scomparsa.
 Modale con backdrop.
 
 ```scss
-.dialog-backdrop   // overlay scuro (rgba, z-index modal-bg)
-.dialog            // pannello centrato (z-index modal)
+.dialog-backdrop // overlay scuro (rgba, z-index modal-bg)
+.dialog // pannello centrato (z-index modal)
 .dialog__header
 .dialog__title
 .dialog__body
@@ -415,21 +451,24 @@ Modale con backdrop.
 Shell principale dell'applicazione.
 
 ```scss
-.layout           // flex row, min-height: 100vh
-.layout__main     // area destra con margin-left = sidebar-width e padding-top = topbar-height
-.layout--collapsed // sidebar nascosta: margin-left: 0
+.layout // flex row, min-height: 100vh
+.layout__main // area destra con margin-left = sidebar-width e padding-top = topbar-height
+.layout--collapsed
+
+// sidebar nascosta: margin-left: 0
 ```
 
 ### `.page` / `.container` / `.page-header`
 
 ```scss
-.page               // padding standard (space-8 space-6)
-.container          // max-width: 75rem, centrato
-.container--narrow  // max-width: 45rem (pagine auth)
+.page // padding standard (space-8 space-6)
+.container // max-width: 75rem, centrato
+.container--narrow // max-width: 45rem (pagine auth)
+.page-header // flex row, space-between, margin-bottom space-8
+.page-header__title // font-size-xl, bold, text-strong
+.page-header__actions
 
-.page-header            // flex row, space-between, margin-bottom space-8
-.page-header__title     // font-size-xl, bold, text-strong
-.page-header__actions   // area destra per bottoni/badge
+// area destra per bottoni/badge
 ```
 
 ---
@@ -439,19 +478,19 @@ Shell principale dell'applicazione.
 Sidebar verticale fissa a sinistra.
 
 ```scss
-.sidebar              // fixed left, full height, z-index sidebar
-.sidebar--hidden      // translateX(-100%) — nascosta
-
-.sidebar__brand       // area brand (logo + bottone chiudi)
-.sidebar__brand-link  // link al brand
-.sidebar__brand-name  // nome app
-.sidebar__close       // bottone X per chiudere la sidebar
-
-.sidebar__nav         // area link di navigazione
+.sidebar // fixed left, full height, z-index sidebar
+.sidebar--hidden // translateX(-100%) — nascosta
+.sidebar__brand // area brand (logo + bottone chiudi)
+.sidebar__brand-link // link al brand
+.sidebar__brand-name // nome app
+.sidebar__close // bottone X per chiudere la sidebar
+.sidebar__nav // area link di navigazione
 .sidebar__section-label // etichetta sezione (es. "Menu", "Admin")
-.sidebar__item        // link di navigazione (flex row, icona + testo)
+.sidebar__item // link di navigazione (flex row, icona + testo)
 .sidebar__item--active // stato attivo (sfondo accent 10%, testo accent-light)
-.sidebar__item-icon   // SVG 1.125rem
+.sidebar__item-icon
+
+// SVG 1.125rem
 ```
 
 ### `.topbar` — `_navbar.scss`
@@ -459,12 +498,14 @@ Sidebar verticale fissa a sinistra.
 Barra orizzontale fissa in alto.
 
 ```scss
-.topbar            // fixed top, left = sidebar-width, z-index topbar
-.topbar--full      // left: 0 (sidebar nascosta)
-.topbar__toggle    // bottone hamburger (visibile solo senza sidebar)
-.topbar__right     // area destra (avatar, dropdown)
+.topbar // fixed top, left = sidebar-width, z-index topbar
+.topbar--full // left: 0 (sidebar nascosta)
+.topbar__toggle // bottone hamburger (visibile solo senza sidebar)
+.topbar__right // area destra (avatar, dropdown)
 .topbar__avatar-btn // bottone avatar con nome utente
-.topbar__user-name // nome utente (nascosto su mobile)
+.topbar__user-name
+
+// nome utente (nascosto su mobile)
 ```
 
 ### `.dropdown` — `_navbar.scss`
@@ -472,12 +513,14 @@ Barra orizzontale fissa in alto.
 Menu a tendina per l'account utente.
 
 ```scss
-.dropdown           // position: relative
-.dropdown__menu     // hidden by default (display: none)
+.dropdown // position: relative
+.dropdown__menu // hidden by default (display: none)
 .dropdown__menu--open // display: block
-.dropdown__item     // voce di menu (link o button)
+.dropdown__item // voce di menu (link o button)
 .dropdown__item--danger // colore error (logout)
-.dropdown__divider  // linea separatrice
+.dropdown__divider
+
+// linea separatrice
 ```
 
 ---
@@ -503,16 +546,17 @@ Layout admin users: due pannelli affiancati (lista a sinistra, dettaglio a destr
 ### `.leaderboard-filters` / `.leaderboard-rank` — `_leaderboard.scss`
 
 ```scss
-.leaderboard-filters          // flex wrap con gap
-.leaderboard-filters__field   // colonna (label + controllo)
-.leaderboard-filters__label   // label uppercase xs muted
-.leaderboard-filters__select  // select stilizzata dark
-.leaderboard-filters__input   // input testuale stilizzato dark
+.leaderboard-filters // flex wrap con gap
+.leaderboard-filters__field // colonna (label + controllo)
+.leaderboard-filters__label // label uppercase xs muted
+.leaderboard-filters__select // select stilizzata dark
+.leaderboard-filters__input // input testuale stilizzato dark
+.leaderboard-rank // cerchio numerato per posizione
+.leaderboard-rank--gold // #1 — sfondo/testo dorato
+.leaderboard-rank--silver // #2 — sfondo/testo argentato
+.leaderboard-rank--bronze
 
-.leaderboard-rank             // cerchio numerato per posizione
-.leaderboard-rank--gold       // #1 — sfondo/testo dorato
-.leaderboard-rank--silver     // #2 — sfondo/testo argentato
-.leaderboard-rank--bronze     // #3 — sfondo/testo bronzo
+// #3 — sfondo/testo bronzo
 ```
 
 ### `.dataset-card` — `_datasets.scss`
@@ -520,10 +564,12 @@ Layout admin users: due pannelli affiancati (lista a sinistra, dettaglio a destr
 Card cliccabile per la lista dataset.
 
 ```scss
-.dataset-card               // usa @mixin card + cursor pointer + hover border accent
-.dataset-card__header       // flex row space-between (nome + badge visibilità)
-.dataset-card__name         // nome dataset, semibold
-.dataset-card__meta         // versione + task, xs muted
+.dataset-card // usa @mixin card + cursor pointer + hover border accent
+.dataset-card__header // flex row space-between (nome + badge visibilità)
+.dataset-card__name // nome dataset, semibold
+.dataset-card__meta
+
+// versione + task, xs muted
 ```
 
 ### `.detail-section` / `.detail-grid` / `.detail-field` — `_detail.scss`
@@ -531,14 +577,14 @@ Card cliccabile per la lista dataset.
 Layout generico per le pagine dettaglio (dataset, model, experiment).
 
 ```scss
-.detail-section          // usa @mixin card + padding + margin-bottom
-.detail-section__title   // titolo sezione, semibold
+.detail-section // usa @mixin card + padding + margin-bottom
+.detail-section__title // titolo sezione, semibold
+.detail-grid // griglia auto-fill, min 12rem per colonna
+.detail-field // singolo campo chiave-valore
+.detail-field__label // chiave: uppercase, xs, muted
+.detail-field__value
 
-.detail-grid             // griglia auto-fill, min 12rem per colonna
-
-.detail-field            // singolo campo chiave-valore
-.detail-field__label     // chiave: uppercase, xs, muted
-.detail-field__value     // valore: sm, text normale
+// valore: sm, text normale
 ```
 
 ---

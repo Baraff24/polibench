@@ -199,6 +199,65 @@ Se `GOOGLE_CLIENT_ID` o `GOOGLE_CLIENT_SECRET` non sono impostati, gli endpoint 
 
 ---
 
+## Verifica email
+
+### Flusso di verifica
+
+Alla registrazione, l'utente viene creato con `is_verified=False`. Per verificare il proprio indirizzo email,
+il sistema implementa il seguente flusso:
+
+```
+Client (frontend)          Backend                         Email provider
+  │                           │                                │
+  │  POST /users (register)   │                                │
+  │ ─────────────────────────►│                                │
+  │                           │  Crea utente (is_verified=False)
+  │                           │  Genera token JWT di verifica  │
+  │                           │  Invia email ──────────────────►
+  │  ◄─────────────────────── │  (200 + user)                  │
+  │                           │                                │
+  │  Utente clicca link       │                                │
+  │  GET /verify-email?token= │                                │
+  │  (pagina frontend)        │                                │
+  │ ─────────────────────────►│                                │
+  │                           │  GET /users/verify/{token}     │
+  │                           │  Verifica JWT                  │
+  │                           │  is_verified = True            │
+  │  ◄─────────────────────── │  (200 + messaggio)             │
+```
+
+### Token di verifica
+
+Il token è un **JWT** generato dalla funzione `create_verification_token()` in `services/email.py`:
+
+```python
+to_encode = {
+    "exp": expire,  # scadenza: 48 ore
+    "sub": str(user_uuid),  # subject: UUID dell'utente
+    "purpose": "email-verification",  # distingue dai token di login
+}
+```
+
+Il campo `purpose` serve a impedire che un token di login venga usato come token di verifica e viceversa.
+
+### Invio email
+
+La funzione `send_verification_email()` costruisce un'email HTML con un link di conferma:
+
+```
+{FRONTEND_URL}/verify-email?token={jwt_token}
+```
+
+Se `SMTP_HOST` non è configurato (tipico in sviluppo locale), il link viene **loggato nella console** del backend
+anziché inviato. Questo permette di completare il flusso anche senza un server SMTP.
+
+### Reinvio email
+
+L'endpoint `POST /users/resend-verification` permette di reinviare l'email di verifica dato un indirizzo email.
+Se l'utente è già verificato, ritorna un messaggio di conferma senza inviare l'email.
+
+---
+
 ## Riepilogo degli endpoint di autenticazione
 
 | Endpoint                        | Metodo | Auth richiesta | Descrizione              |

@@ -28,6 +28,7 @@ Il service layer risolve questo problema:
 services/
 ├── __init__.py
 ├── datasets.py      ← Dataset + MLModel (creazione, listing, dettaglio)
+├── email.py         ← Token di verifica email e invio SMTP
 ├── experiments.py   ← Experiment (creazione, lettura, conversione UUID)
 ├── metrics.py       ← Metric (batch insert, raggruppamento per split)
 └── leaderboard.py   ← Query leaderboard top-N
@@ -44,7 +45,6 @@ async def get_dataset_by_uuid(dataset_uuid: UUID) -> Dataset
 
 
     async def get_ml_model_by_uuid(model_uuid: UUID) -> MLModel
-
 
     async def get_team_by_uuid(team_uuid: UUID) -> Team
 ```
@@ -94,8 +94,7 @@ Poi chiama `_dataset_to_public` con i Document già risolti.
 Le funzioni `create_ml_model`, `list_ml_models`, `get_ml_model_public_by_uuid` seguono lo stesso pattern
 del Dataset. `_model_to_public` e `_model_to_summary` sono le funzioni di conversione analoghe.
 
-> **Nota**: `_model_to_public` **non include** il campo `hyperparams` nella risposta pubblica per semplicità
-> dell'attuale implementazione. Se necessario, può essere aggiunto a `MLModelPublic`.
+> **Nota**: `_model_to_public` include il campo `hyperparams` nella risposta pubblica `MLModelPublic`.
 
 ---
 
@@ -244,4 +243,40 @@ Le funzioni `_xxx_to_public` e `_xxx_to_summary` sono funzioni pure (nessuna que
 - nessun side effect
 
 Questo le rende facilmente testabili in isolamento.
+
+---
+
+## services/email.py
+
+Gestisce la generazione dei token di verifica email e l'invio tramite SMTP.
+
+### Funzioni principali
+
+```python
+def create_verification_token(user_uuid: UUID) -> str
+```
+
+Genera un JWT con `purpose: email-verification`, `sub: user.uuid` e scadenza di 48 ore. Usa la stessa `SECRET_KEY`
+dei token di login, ma si distingue per il campo `purpose`.
+
+```python
+def verify_email_token(token: str) -> UUID | None
+```
+
+Decodifica il token, verifica che `purpose == "email-verification"` e ritorna lo UUID dell'utente. Ritorna `None`
+se il token è scaduto, malformato o non ha il purpose corretto.
+
+```python
+def send_verification_email(to_email: str, token: str) -> None
+```
+
+Costruisce un'email HTML con il link di verifica (`{FRONTEND_URL}/verify-email?token={token}`) e la invia via SMTP.
+
+**Fallback senza SMTP**: se `SMTP_HOST` non è configurato, la funzione logga il link di verifica nella console
+del backend tramite `logger.warning()` e ritorna senza errore. Questo permette di completare il flusso di
+registrazione anche in sviluppo locale senza un server SMTP.
+
+### Configurazione SMTP
+
+Vedi [07_configuration.md](./07_configuration.md) per la lista completa delle variabili d'ambiente SMTP.
 

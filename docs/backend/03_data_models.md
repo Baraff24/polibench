@@ -55,21 +55,22 @@ L'indice unico su `uuid` garantisce che non possano esistere due documenti con l
 
 Rappresenta un utente della piattaforma.
 
-| Campo             | Tipo               | Indice | Note                             |
-|-------------------|--------------------|--------|----------------------------------|
-| `uuid`            | `UUID`             | unique | Identificatore pubblico          |
-| `email`           | `EmailStr`         | unique | Validata da Pydantic             |
-| `first_name`      | `str \| None`      | —      | Opzionale                        |
-| `last_name`       | `str \| None`      | —      | Opzionale                        |
-| `hashed_password` | `str \| None`      | —      | `None` per utenti SSO            |
-| `provider`        | `str \| None`      | —      | Es. `"google"` per SSO           |
-| `picture`         | `str \| None`      | —      | URL avatar (da SSO)              |
-| `role`            | `UserRole`         | —      | `admin`, `researcher`, `viewer`  |
-| `team_uuid`       | `UUID \| None`     | sì     | Riferimento al Team tramite UUID |
-| `is_active`       | `bool`             | —      | Default `True`                   |
-| `is_superuser`    | `bool`             | —      | Default `False`                  |
-| `created_at`      | `datetime`         | —      | Timestamp creazione              |
-| `last_login_at`   | `datetime \| None` | —      | Ultimo accesso                   |
+| Campo             | Tipo               | Indice | Note                                  |
+|-------------------|--------------------|--------|---------------------------------------|
+| `uuid`            | `UUID`             | unique | Identificatore pubblico               |
+| `email`           | `EmailStr`         | unique | Validata da Pydantic                  |
+| `first_name`      | `str \| None`      | —      | Opzionale                             |
+| `last_name`       | `str \| None`      | —      | Opzionale                             |
+| `hashed_password` | `str \| None`      | —      | `None` per utenti SSO                 |
+| `provider`        | `str \| None`      | —      | Es. `"google"` per SSO                |
+| `picture`         | `str \| None`      | —      | URL avatar (da SSO)                   |
+| `role`            | `UserRole`         | —      | `admin`, `researcher`, `viewer`       |
+| `team_uuid`       | `UUID \| None`     | sì     | Riferimento al Team tramite UUID      |
+| `is_active`       | `bool`             | —      | Default `True`                        |
+| `is_verified`     | `bool`             | —      | Default `False`, confermato via email |
+| `is_superuser`    | `bool`             | —      | Default `False`                       |
+| `created_at`      | `datetime`         | —      | Timestamp creazione                   |
+| `last_login_at`   | `datetime \| None` | —      | Ultimo accesso                        |
 
 **Note di progettazione**:
 

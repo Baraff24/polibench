@@ -72,8 +72,37 @@ POST /api/v1/users
 - **Output**: `schemas.User`
 - **Errori**: HTTP 400 se email già in uso (`DuplicateKeyError` da MongoDB)
 
-Crea un nuovo utente con password hashata. L'utente viene creato con `is_active=True` e `is_superuser=False` per
-default.
+Crea un nuovo utente con password hashata. L'utente viene creato con `is_active=True`, `is_verified=False` e
+`is_superuser=False`. Dopo la creazione, viene generato un **token JWT di verifica** e inviata un'email con un link
+di conferma. L'utente deve confermare l'email cliccando il link prima di poter operare come utente verificato.
+
+Se SMTP non è configurato (sviluppo locale), il link di verifica viene loggato nella console del backend.
+
+### Verifica email
+
+```
+GET /api/v1/users/verify/{token}
+```
+
+- **Auth**: nessuna (endpoint pubblico — il token è nel path)
+- **Output**: `{"message": "Email verificata con successo."}`
+- **Errori**: HTTP 400 se il token è scaduto o non valido; HTTP 404 se l'utente non esiste
+
+Il token è un JWT con `purpose: email-verification`, `sub: user.uuid` e scadenza di 48 ore. Il frontend
+costruisce la richiesta dalla pagina `/verify-email?token=...`.
+
+### Reinvio email di verifica
+
+```
+POST /api/v1/users/resend-verification
+```
+
+- **Auth**: nessuna (endpoint pubblico)
+- **Input**: `{"email": "user@example.com"}`
+- **Output**: `{"message": "Email di verifica reinviata."}`
+- **Errori**: HTTP 404 se l'utente non esiste
+
+Se l'utente è già verificato, ritorna un messaggio di conferma senza inviare l'email.
 
 ### Lista utenti
 
@@ -230,27 +259,29 @@ quindi la query è un semplice `find()` su indice composto `{dataset_id, metric,
 
 ## Riepilogo completo endpoint
 
-| Endpoint                                  | Metodo | Auth      | Descrizione                        |
-|-------------------------------------------|--------|-----------|------------------------------------|
-| `GET  /api/v1/`                           | GET    | no        | Health check                       |
-| `POST /api/v1/login/access-token`         | POST   | no        | Login email/password               |
-| `GET  /api/v1/login/test-token`           | GET    | JWT       | Verifica token                     |
-| `POST /api/v1/users`                      | POST   | no        | Registrazione utente               |
-| `GET  /api/v1/users`                      | GET    | superuser | Lista utenti                       |
-| `GET  /api/v1/users/me`                   | GET    | attivo    | Profilo corrente                   |
-| `PATCH /api/v1/users/me`                  | PATCH  | attivo    | Aggiorna profilo corrente          |
-| `DELETE /api/v1/users/me`                 | DELETE | attivo    | Cancella account                   |
-| `GET  /api/v1/users/{uuid}`               | GET    | superuser | Profilo utente per UUID            |
-| `PATCH /api/v1/users/{uuid}`              | PATCH  | superuser | Aggiorna utente                    |
-| `DELETE /api/v1/users/{uuid}`             | DELETE | superuser | Cancella utente                    |
-| `POST /api/v1/datasets`                   | POST   | attivo    | Crea Dataset                       |
-| `GET  /api/v1/datasets`                   | GET    | no        | Lista Dataset                      |
-| `GET  /api/v1/datasets/{uuid}`            | GET    | no        | Dettaglio Dataset                  |
-| `POST /api/v1/ml-models`                  | POST   | attivo    | Registra MLModel                   |
-| `GET  /api/v1/ml-models`                  | GET    | no        | Lista MLModel                      |
-| `GET  /api/v1/ml-models/{uuid}`           | GET    | no        | Dettaglio MLModel                  |
-| `POST /api/v1/experiments`                | POST   | attivo    | Sottomette Experiment (UUID input) |
-| `GET  /api/v1/experiments/{uuid}`         | GET    | attivo    | Dettaglio Experiment               |
-| `POST /api/v1/experiments/{uuid}/metrics` | POST   | attivo    | Sottomette metriche batch          |
-| `GET  /api/v1/experiments/{uuid}/metrics` | GET    | no        | Metriche raggruppate per split     |
-| `GET  /api/v1/leaderboard`                | GET    | no        | Top-N per (dataset, metric, split) |
+| Endpoint                                  | Metodo | Auth      | Descrizione                             |
+|-------------------------------------------|--------|-----------|-----------------------------------------|
+| `GET  /api/v1/`                           | GET    | no        | Health check                            |
+| `POST /api/v1/login/access-token`         | POST   | no        | Login email/password                    |
+| `GET  /api/v1/login/test-token`           | GET    | JWT       | Verifica token                          |
+| `POST /api/v1/users`                      | POST   | no        | Registrazione utente (+ email verifica) |
+| `GET  /api/v1/users/verify/{token}`       | GET    | no        | Verifica email (token JWT)              |
+| `POST /api/v1/users/resend-verification`  | POST   | no        | Reinvia email di verifica               |
+| `GET  /api/v1/users`                      | GET    | superuser | Lista utenti                            |
+| `GET  /api/v1/users/me`                   | GET    | attivo    | Profilo corrente                        |
+| `PATCH /api/v1/users/me`                  | PATCH  | attivo    | Aggiorna profilo corrente               |
+| `DELETE /api/v1/users/me`                 | DELETE | attivo    | Cancella account                        |
+| `GET  /api/v1/users/{uuid}`               | GET    | superuser | Profilo utente per UUID                 |
+| `PATCH /api/v1/users/{uuid}`              | PATCH  | superuser | Aggiorna utente                         |
+| `DELETE /api/v1/users/{uuid}`             | DELETE | superuser | Cancella utente                         |
+| `POST /api/v1/datasets`                   | POST   | attivo    | Crea Dataset                            |
+| `GET  /api/v1/datasets`                   | GET    | no        | Lista Dataset                           |
+| `GET  /api/v1/datasets/{uuid}`            | GET    | no        | Dettaglio Dataset                       |
+| `POST /api/v1/ml-models`                  | POST   | attivo    | Registra MLModel                        |
+| `GET  /api/v1/ml-models`                  | GET    | no        | Lista MLModel                           |
+| `GET  /api/v1/ml-models/{uuid}`           | GET    | no        | Dettaglio MLModel                       |
+| `POST /api/v1/experiments`                | POST   | attivo    | Sottomette Experiment (UUID input)      |
+| `GET  /api/v1/experiments/{uuid}`         | GET    | attivo    | Dettaglio Experiment                    |
+| `POST /api/v1/experiments/{uuid}/metrics` | POST   | attivo    | Sottomette metriche batch               |
+| `GET  /api/v1/experiments/{uuid}/metrics` | GET    | no        | Metriche raggruppate per split          |
+| `GET  /api/v1/leaderboard`                | GET    | no        | Top-N per (dataset, metric, split)      |

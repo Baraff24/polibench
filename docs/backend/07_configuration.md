@@ -87,6 +87,38 @@ In ambiente Docker Compose, `MONGO_HOST` è `db` (il nome del servizio MongoDB n
 Se `GOOGLE_CLIENT_ID` o `GOOGLE_CLIENT_SECRET` sono assenti, gli endpoint `/login/google` e `/login/google/callback`
 rispondono HTTP 400.
 
+### Email (SMTP)
+
+| Variabile         | Tipo   | Default | Obbligatoria | Descrizione                                     |
+|-------------------|--------|---------|--------------|-------------------------------------------------|
+| `SMTP_HOST`       | `str`  | `None`  | ❌            | Hostname del server SMTP (es. `smtp.gmail.com`) |
+| `SMTP_PORT`       | `int`  | `587`   | ❌            | Porta SMTP                                      |
+| `SMTP_USER`       | `str`  | `None`  | ❌            | Username per autenticazione SMTP                |
+| `SMTP_PASSWORD`   | `str`  | `None`  | ❌            | Password per autenticazione SMTP                |
+| `SMTP_FROM_EMAIL` | `str`  | `None`  | ❌            | Indirizzo mittente (fallback su `SMTP_USER`)    |
+| `SMTP_TLS`        | `bool` | `True`  | ❌            | Abilita STARTTLS                                |
+
+Se `SMTP_HOST` non è configurato, le email di verifica **non vengono inviate** e il link di verifica viene loggato
+nella console del backend. Questo permette di lavorare in sviluppo locale senza un server SMTP.
+
+### Frontend URL
+
+| Variabile      | Tipo  | Default                 | Obbligatoria | Descrizione                                                   |
+|----------------|-------|-------------------------|--------------|---------------------------------------------------------------|
+| `FRONTEND_URL` | `str` | `http://localhost:5173` | ❌            | URL base del frontend, usato per costruire i link nelle email |
+
+Deve corrispondere all'URL effettivo del frontend. In produzione sarà `https://polibench.example.com`.
+
+### Mongo Express (pannello web MongoDB)
+
+| Variabile                | Tipo  | Default | Obbligatoria | Descrizione                           |
+|--------------------------|-------|---------|--------------|---------------------------------------|
+| `MONGO_EXPRESS_USER`     | `str` | `admin` | ❌            | Username per accedere a Mongo Express |
+| `MONGO_EXPRESS_PASSWORD` | `str` | `admin` | ❌            | Password per accedere a Mongo Express |
+
+Queste variabili configurano la Basic Auth del pannello web Mongo Express. In produzione **devono essere
+cambiate** con credenziali sicure.
+
 ---
 
 ## Logging
