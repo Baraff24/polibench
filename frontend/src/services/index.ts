@@ -1,2 +1,6 @@
 export { default as authService } from './auth.service'
 export { default as userService } from './user.service'
+export { default as datasetService } from './dataset.service'
+export { default as mlModelService } from './ml-model.service'
+export { default as experimentService } from './experiment.service'
+export { default as leaderboardService } from './leaderboard.service'

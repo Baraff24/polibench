@@ -21,10 +21,17 @@
 @use 'components/alert';
 @use 'components/avatar';
 @use 'components/dialog';
+@use 'components/table';
+@use 'components/badge';
+@use 'components/stat-card';
+@use 'components/spinner';
+@use 'components/empty-state';
 
 // 5. Pages
 @use 'pages/home';
 @use 'pages/auth';
 @use 'pages/profile';
 @use 'pages/users';
-
+@use 'pages/leaderboard';
+@use 'pages/datasets';
+@use 'pages/detail';

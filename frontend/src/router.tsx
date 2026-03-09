@@ -8,6 +8,12 @@ import Register from './routes/register'
 import Root from './routes/root'
 import SSOLogin, { loader as ssoLoader } from './routes/sso.login'
 import Users, { loader as usersLoader } from './routes/users'
+import Datasets, { loader as datasetsLoader } from './routes/datasets'
+import DatasetDetail, { loader as datasetDetailLoader } from './routes/dataset-detail'
+import Models, { loader as modelsLoader } from './routes/models'
+import ModelDetail, { loader as modelDetailLoader } from './routes/model-detail'
+import ExperimentDetail, { loader as experimentDetailLoader } from './routes/experiment-detail'
+import Leaderboard from './routes/leaderboard'
 
 export const routes = [
   {
@@ -38,6 +44,40 @@ export const routes = [
         Component: Users,
         HydrateFallback: HydrateFallback,
         loader: usersLoader,
+      },
+      {
+        path: 'leaderboard',
+        Component: Leaderboard,
+      },
+      {
+        path: 'datasets',
+        Component: Datasets,
+        HydrateFallback: HydrateFallback,
+        loader: datasetsLoader,
+      },
+      {
+        path: 'datasets/:uuid',
+        Component: DatasetDetail,
+        HydrateFallback: HydrateFallback,
+        loader: datasetDetailLoader,
+      },
+      {
+        path: 'models',
+        Component: Models,
+        HydrateFallback: HydrateFallback,
+        loader: modelsLoader,
+      },
+      {
+        path: 'models/:uuid',
+        Component: ModelDetail,
+        HydrateFallback: HydrateFallback,
+        loader: modelDetailLoader,
+      },
+      {
+        path: 'experiments/:uuid',
+        Component: ExperimentDetail,
+        HydrateFallback: HydrateFallback,
+        loader: experimentDetailLoader,
       },
     ],
   },
