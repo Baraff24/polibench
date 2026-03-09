@@ -66,8 +66,6 @@ services:
       - app-db-data:/data/db
     env_file:
       - .env
-    ports:
-      - "${MONGO_PORT}:${MONGO_PORT}"
     environment:
       - "MONGO_INITDB_DATABASE=${MONGO_DB}"
       - "MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}"
@@ -99,7 +97,9 @@ services:
       - traefik.http.services.${STACK_NAME?Variable not set}-mongo-express.loadbalancer.server.port=8081
 
   backend:
-    image: '${DOCKER_PACKAGE_REPOSITORY?Variable not set}/${DOCKER_IMAGE_BACKEND?Variable not set}:${TAG-latest}'
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     depends_on:
       db:
         condition: service_healthy
@@ -107,41 +107,36 @@ services:
       - .env
     environment:
       - MONGO_HOST=db
-    volumes:
-      - app-static-data:/app/static
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    restart: unless-stopped
     labels:
       - traefik.enable=true
-      - traefik.http.routers.${STACK_NAME?Variable not set}-backend-http.rule=PathPrefix(`/api`) || PathPrefix(`/docs`) || PathPrefix(`/redoc`)
+      - traefik.http.routers.${STACK_NAME?Variable not set}-backend-http.rule=Host(`${DOMAIN?Variable not set}`) && (PathPrefix(`/api`) || PathPrefix(`/docs`) || PathPrefix(`/redoc`))
+      - traefik.http.routers.${STACK_NAME?Variable not set}-backend-http.entrypoints=websecure
       - traefik.http.routers.${STACK_NAME?Variable not set}-backend-http.tls=true
       - traefik.http.routers.${STACK_NAME?Variable not set}-backend-http.tls.certresolver=le
-      # - traefik.http.services.${STACK_NAME?Variable not set}-backend.loadbalancer.server.port=80
+      - traefik.http.services.${STACK_NAME?Variable not set}-backend.loadbalancer.server.port=8000
 
   frontend:
-    image: '${DOCKER_PACKAGE_REPOSITORY?Variable not set}/${DOCKER_IMAGE_FRONTEND?Variable not set}:${TAG-latest}'
     build:
       context: ./frontend
+      dockerfile: Dockerfile
       args:
-        - FRONTEND_ENV=${FRONTEND_ENV-production}
         - VITE_BACKEND_API_URL
-        - VITE_GA_TRACKING_ID
         - VITE_PWD_SIGNUP_ENABLED
     env_file:
       - .env
+    restart: unless-stopped
     labels:
       - traefik.enable=true
-      - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.rule=PathPrefix(`/`)
+      - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.rule=Host(`${DOMAIN?Variable not set}`) && PathPrefix(`/`)
+      - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.entrypoints=websecure
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.tls=true
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.tls.certresolver=le
-      # - traefik.http.services.${STACK_NAME?Variable not set}-frontend.loadbalancer.server.port=80
+      - traefik.http.services.${STACK_NAME?Variable not set}-frontend.loadbalancer.server.port=80
 
 volumes:
   app-db-data:
-  app-static-data:
 
 networks:
   traefik-public:
-    # Allow setting it to false for testing
     external: true

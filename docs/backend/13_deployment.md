@@ -154,45 +154,64 @@ creato al primo avvio. Questa operazione è sicura da eseguire su database già 
 ### Prerequisiti
 
 - Server Linux con Docker Engine e Docker Compose v2
-- DNS configurato per puntare al server (es. `polibench.example.com`)
+- DNS configurato per puntare al server (`polibench.raffaelegrieco.it → IP del server`)
 - Porta 80 e 443 aperte nel firewall
 
-### Avvio in produzione
+### Avvio in produzione (build locale sul server)
+
+Il `docker-compose.prod.yml` fa il build delle immagini direttamente sul server, senza richiedere una registry Docker
+remota. È la modalità più semplice per un deploy diretto.
 
 ```bash
-# 1. Copia e configura il file .env
-cp .env.example .env
-# Imposta SECRET_KEY con un valore casuale sicuro
-# Imposta DOMAIN, TRAEFIK_TLS_EMAIL, credenziali MongoDB
+# 1. Clona il repo sul server
+git clone https://github.com/baraff/polibench.git
+cd polibench
 
-# 2. Crea la rete esterna Traefik (una tantum)
+# 2. Crea il file .env.production (NON va in git)
+cp .env.example .env.production
+# Poi modifica .env.production con i valori reali (dominio, password, SMTP…)
+# Oppure copia il file .env.production già preparato
+
+# 3. Crea la rete esterna Traefik (operazione una tantum per server)
 docker network create traefik-public
 
-# 3. Build e avvio
-docker compose -f docker-compose.prod.yml up -d --build
+# 4. Build e avvio
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+> **Nota `--env-file`**: il flag `--env-file .env.production` indica a Docker Compose quale file `.env` usare.
+> Il flag `--build` forza la ricostruzione delle immagini ad ogni avvio (necessario dopo un `git pull`).
+
+### Aggiornamento del deploy (dopo modifiche al codice)
+
+```bash
+cd polibench
+git pull
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 ```
 
 ### Differenze rispetto allo sviluppo
 
-| Aspetto             | Sviluppo                | Produzione                                       |
-|---------------------|-------------------------|--------------------------------------------------|
-| HTTPS               | No (HTTP puro)          | Sì (Let's Encrypt TLS automatico)                |
-| Backend command     | `fastapi run --reload`  | `fastapi run` (senza reload)                     |
-| Frontend build      | Vite dev server (HMR)   | Nginx serve build statica (`npm run build`)      |
-| Immagini Docker     | Build locale            | Build e push su GHCR (GitHub Container Registry) |
-| Rete Traefik        | Rete interna al compose | Rete Docker esterna (`traefik-public`)           |
-| Redirect HTTP→HTTPS | No                      | Sì (redirect automatico via Traefik)             |
+| Aspetto             | Sviluppo                | Produzione                                  |
+|---------------------|-------------------------|---------------------------------------------|
+| HTTPS               | No (HTTP puro)          | Sì (Let's Encrypt TLS automatico)           |
+| Backend command     | `fastapi run --reload`  | `fastapi run --workers 4` (senza reload)    |
+| Frontend build      | Vite dev server (HMR)   | Nginx serve build statica (`npm run build`) |
+| Immagini Docker     | Build locale            | Build locale sul server (`--build`)         |
+| Rete Traefik        | Rete interna al compose | Rete Docker esterna (`traefik-public`)      |
+| Redirect HTTP→HTTPS | No                      | Sì (redirect automatico via Traefik)        |
+| File env            | `.env`                  | `.env.production`                           |
 
 ### Routing Traefik in produzione
 
 Traefik gestisce il routing tramite label Docker sui servizi:
 
 ```
-https://polibench.example.com/api/*           → backend (FastAPI)
-https://polibench.example.com/docs            → backend (Swagger UI)
-https://polibench.example.com/redoc           → backend (ReDoc)
-https://polibench.example.com/mongo-express   → mongo-express (pannello DB)
-https://polibench.example.com/*               → frontend (Nginx)
+https://polibench.raffaelegrieco.it/api/*           → backend (FastAPI, porta 8000)
+https://polibench.raffaelegrieco.it/docs            → backend (Swagger UI)
+https://polibench.raffaelegrieco.it/redoc           → backend (ReDoc)
+https://polibench.raffaelegrieco.it/mongo-express   → mongo-express (pannello DB)
+https://polibench.raffaelegrieco.it/*               → frontend (Nginx, porta 80)
 ```
 
 I certificati TLS sono gestiti automaticamente da Traefik tramite Let's Encrypt (challenge TLS-ALPN-01).

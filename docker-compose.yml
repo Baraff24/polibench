@@ -66,7 +66,9 @@ services:
       - traefik.http.services.${STACK_NAME?Variable not set}-mongo-express.loadbalancer.server.port=8081
 
   backend:
-    image: '${DOCKER_IMAGE_BACKEND?Variable not set}:${TAG-latest}'
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     depends_on:
       db:
         condition: service_healthy
@@ -76,9 +78,6 @@ services:
       - "8000:8000"
     environment:
       - MONGO_HOST=db
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
     command:
       - fastapi
       - run
@@ -100,16 +99,15 @@ services:
       - traefik.http.services.${STACK_NAME?Variable not set}-backend.loadbalancer.server.port=8000
 
   frontend:
-    image: '${DOCKER_IMAGE_FRONTEND?Variable not set}:${TAG-latest}'
-    env_file:
-      - .env
-    ports:
-      - "5173:5173"
     build:
       context: ./frontend
       dockerfile: Dockerfile.development
       args:
         FRONTEND_ENV: dev
+    env_file:
+      - .env
+    ports:
+      - "5173:5173"
     command: npm run dev -- --host
     develop:
       watch:

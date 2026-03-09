@@ -5,3 +5,6 @@
 .idea
 .qodo
 .env
+.env.production
+letsencrypt/
+

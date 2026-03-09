@@ -11,8 +11,6 @@ COPY ./ /app/
 ARG FRONTEND_ENV=production
 ARG VITE_BACKEND_API_URL
 ARG VITE_PWD_SIGNUP_ENABLED
-ARG VITE_GA_TRACKING_ID
-
 ENV VITE_APP_ENV=${FRONTEND_ENV}
 
 # Comment out the next line to disable tests
