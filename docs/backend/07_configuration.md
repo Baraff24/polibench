@@ -42,6 +42,22 @@ non parte.
 
 ## Variabili d'ambiente
 
+### Docker e Infrastruttura
+
+Queste variabili sono usate da Docker Compose e Traefik. Non vengono lette dall'applicazione backend, ma sono
+necessarie per far partire lo stack correttamente.
+
+| Variabile                   | Default       | Obbligatoria | Descrizione                                                                  |
+|-----------------------------|---------------|--------------|------------------------------------------------------------------------------|
+| `DOMAIN`                    | —             | ✅            | Dominio del server (es. `localhost` in dev, `polibench.example.com` in prod) |
+| `STACK_NAME`                | —             | ✅            | Nome univoco usato da Traefik per i nomi delle router (es. `polibench`)      |
+| `ENVIRONMENT`               | `development` | ❌            | `development` o `production`                                                 |
+| `TRAEFIK_TLS_EMAIL`         | —             | prod only    | Email per Let's Encrypt (solo `docker-compose.prod.yml`)                     |
+| `DOCKER_IMAGE_BACKEND`      | —             | ✅            | Nome dell'immagine Docker del backend                                        |
+| `DOCKER_IMAGE_FRONTEND`     | —             | ✅            | Nome dell'immagine Docker del frontend                                       |
+| `DOCKER_PACKAGE_REPOSITORY` | —             | prod only    | Registry Docker (es. `ghcr.io/username`) — solo in produzione                |
+| `TAG`                       | `latest`      | ❌            | Tag dell'immagine da usare in produzione                                     |
+
 ### Applicazione
 
 | Variabile                     | Tipo               | Default            | Obbligatoria | Descrizione                                                         |

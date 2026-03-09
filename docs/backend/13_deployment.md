@@ -84,22 +84,37 @@ path relativo `"../.env"`.
 Le variabili obbligatorie (senza le quali l'app non parte) sono:
 
 ```dotenv
+# Infrastruttura (Docker Compose / Traefik)
+DOMAIN=localhost
+STACK_NAME=polibench
+
 # Applicazione
-PROJECT_NAME=Polibench
+PROJECT_NAME=polibench
 
 # Superutente iniziale (creato automaticamente al primo avvio)
-FIRST_SUPERUSER=admin@example.com
+FIRST_SUPERUSER=admin@polibench.com
 FIRST_SUPERUSER_PASSWORD=changeme
+
+# JWT — generare con: openssl rand -hex 32
+SECRET_KEY=changeme-generate-with-openssl-rand-hex-32
 
 # Database MongoDB
 MONGO_HOST=db           # "db" in Docker, "localhost" in locale senza Docker
 MONGO_PORT=27017
 MONGO_DB=polibench
-MONGO_USER=mongo
-MONGO_PASSWORD=changeme
+MONGO_USER=mongodbadmin
+MONGO_PASSWORD=changeme-strong-password
+
+# Mongo Express Basic Auth
+MONGO_EXPRESS_USER=admin
+MONGO_EXPRESS_PASSWORD=changeme-in-production
+# Nota: la connection string MongoDB per mongo-express viene costruita
+# automaticamente dal compose come:
+#   mongodb://${MONGO_USER}:${MONGO_PASSWORD}@db:${MONGO_PORT}/
+# Non è necessario impostarla manualmente.
 ```
 
-Le variabili opzionali (SSO, CORS, chiave JWT) hanno valori di default sicuri per lo sviluppo ma devono essere
+Le variabili opzionali (SMTP, SSO, CORS, FRONTEND_URL) hanno valori di default sicuri per lo sviluppo ma devono essere
 configurate esplicitamente in produzione. Vedi [07_configuration.md](./07_configuration.md) per la lista completa.
 
 ---
@@ -208,6 +223,17 @@ Mongo Express è protetto da **HTTP Basic Auth**. Le credenziali sono configurat
 MONGO_EXPRESS_USER=admin
 MONGO_EXPRESS_PASSWORD=admin   # CAMBIARE in produzione!
 ```
+
+### Connessione a MongoDB
+
+La connection string per mongo-express viene costruita **automaticamente da Docker Compose**:
+
+```
+mongodb://${MONGO_USER}:${MONGO_PASSWORD}@db:${MONGO_PORT}/
+```
+
+Non è necessario impostare variabili aggiuntive — basta che `MONGO_USER`, `MONGO_PASSWORD` e `MONGO_PORT` siano
+presenti nel `.env`. L'immagine usata è `mongo-express:1.0.2` (versione stabile, non `latest`).
 
 ### Differenze con il Django admin
 
