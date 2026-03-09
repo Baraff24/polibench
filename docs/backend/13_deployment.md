@@ -159,48 +159,61 @@ creato al primo avvio. Questa operazione è sicura da eseguire su database già 
 
 ### Avvio in produzione (build locale sul server)
 
-Il `docker-compose.prod.yml` fa il build delle immagini direttamente sul server, senza richiedere una registry Docker
-remota. È la modalità più semplice per un deploy diretto.
+Sia in sviluppo che in produzione si usa **sempre un unico file `.env`**. Non esiste un file separato `.env.production`:
+tu prepari il `.env` con i valori giusti per l'ambiente e lo porti sul server. Nessuna registry Docker remota è
+richiesta — le immagini vengono buildate direttamente sul server.
 
 ```bash
 # 1. Clona il repo sul server
 git clone https://github.com/baraff/polibench.git
 cd polibench
 
-# 2. Crea il file .env.production (NON va in git)
-cp .env.example .env.production
-# Poi modifica .env.production con i valori reali (dominio, password, SMTP…)
-# Oppure copia il file .env.production già preparato
+# 2. Crea il file .env (NON va in git — già in .gitignore)
+cp .env.example .env
+# Modifica .env con i valori di produzione:
+#   DOMAIN=polibench.raffaelegrieco.it
+#   ENVIRONMENT=production
+#   SECRET_KEY=<genera con: openssl rand -hex 32>
+#   FIRST_SUPERUSER_PASSWORD=<password sicura>
+#   MONGO_PASSWORD=<password sicura>
+#   MONGO_EXPRESS_PASSWORD=<password sicura>
+#   TRAEFIK_TLS_EMAIL=<tua email per Let's Encrypt>
+#   BACKEND_CORS_ORIGINS=["https://polibench.raffaelegrieco.it"]
+#   VITE_BACKEND_API_URL=https://polibench.raffaelegrieco.it/api/v1/
+#   FRONTEND_URL=https://polibench.raffaelegrieco.it
+#   SSO_CALLBACK_HOSTNAME=https://polibench.raffaelegrieco.it
+#   SSO_LOGIN_CALLBACK_URL=https://polibench.raffaelegrieco.it/sso-login-callback
+#   SMTP_* (se vuoi email di verifica)
 
 # 3. Crea la rete esterna Traefik (operazione una tantum per server)
 docker network create traefik-public
 
 # 4. Build e avvio
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-> **Nota `--env-file`**: il flag `--env-file .env.production` indica a Docker Compose quale file `.env` usare.
-> Il flag `--build` forza la ricostruzione delle immagini ad ogni avvio (necessario dopo un `git pull`).
+Il flag `--build` forza la ricostruzione delle immagini (necessario dopo un `git pull`).
 
 ### Aggiornamento del deploy (dopo modifiche al codice)
 
 ```bash
 cd polibench
 git pull
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 ### Differenze rispetto allo sviluppo
 
-| Aspetto             | Sviluppo                | Produzione                                  |
-|---------------------|-------------------------|---------------------------------------------|
-| HTTPS               | No (HTTP puro)          | Sì (Let's Encrypt TLS automatico)           |
-| Backend command     | `fastapi run --reload`  | `fastapi run --workers 4` (senza reload)    |
-| Frontend build      | Vite dev server (HMR)   | Nginx serve build statica (`npm run build`) |
-| Immagini Docker     | Build locale            | Build locale sul server (`--build`)         |
-| Rete Traefik        | Rete interna al compose | Rete Docker esterna (`traefik-public`)      |
-| Redirect HTTP→HTTPS | No                      | Sì (redirect automatico via Traefik)        |
-| File env            | `.env`                  | `.env.production`                           |
+| Aspetto             | Sviluppo               | Produzione                                  |
+|---------------------|------------------------|---------------------------------------------|
+| HTTPS               | No (HTTP puro)         | Sì (Let's Encrypt TLS automatico)           |
+| Backend command     | `fastapi run --reload` | `fastapi run --workers 4` (senza reload)    |
+| Frontend build      | Vite dev server (HMR)  | Nginx serve build statica (`npm run build`) |
+| Immagini Docker     | Build locale           | Build locale sul server (`--build`)         |
+| Rete Traefik        | Interna al compose     | Rete Docker esterna (`traefik-public`)      |
+| Redirect HTTP→HTTPS | No                     | Sì (redirect automatico via Traefik)        |
+| File env            | `.env` (valori locali) | `.env` (valori produzione, stesso file)     |
+| Docker registry     | Non necessaria         | Non necessaria                              |
 
 ### Routing Traefik in produzione
 
