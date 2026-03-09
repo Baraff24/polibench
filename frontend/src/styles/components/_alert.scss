@@ -24,13 +24,13 @@
 .toast-container {
   position: fixed;
   bottom: $space-6;
-  left: 50%;
-  transform: translateX(-50%);
+  right: $space-6;
   z-index: $z-toast;
   display: flex;
   flex-direction: column;
   gap: $space-3;
   pointer-events: none;
+  align-items: flex-end;
 }
 
 .toast {
