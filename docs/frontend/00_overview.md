@@ -17,7 +17,7 @@ Al momento dello sviluppo (marzo 2026), il frontend implementa:
 - submission di experiment con selezione dataset/model
 - submission batch di metriche con form tabellare
 - dettaglio degli experiment con metriche per split
-- leaderboard con filtri interattivi (dataset, metric, split, top N)
+- leaderboard con filtri interattivi (dataset, metric, split, top N, chart mode), ordinamento per colonna (asc/desc) e grafico adattivo (linee AUC/Logloss per CTR, barre o linee per altri task in base alla modalità)
 - route protette con guard `RequireAuth`
 - titolo scheda dinamico per route
 

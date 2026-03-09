@@ -4,7 +4,7 @@ import { PageHeader, EmptyState, DataTable } from '../components'
 import type { Column } from '../components'
 import { datasetService, leaderboardService } from '../services'
 import type { DatasetSummary, MultiMetricLeaderboardEntry, Split } from '../models'
-import LeaderboardChart from '../components/leaderboard/LeaderboardChart'
+import LeaderboardChart, { type LeaderboardChartMode } from '../components/leaderboard/LeaderboardChart'
 
 function rankClass(rank: number | null): string {
   if (rank === 1) return 'leaderboard-rank leaderboard-rank--gold'
@@ -44,6 +44,7 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(false)
   const [metricNames, setMetricNames] = useState<string[]>([])
   const [sortBy, setSortBy] = useState('')
+  const [chartMode, setChartMode] = useState<LeaderboardChartMode>('auto')
   const [tableSort, setTableSort] = useState<{ key: string; order: SortOrder } | null>(null)
 
   // Load datasets on mount
@@ -269,11 +270,24 @@ export default function Leaderboard() {
             onChange={(e) => setTopN(Number(e.target.value))}
           />
         </div>
+
+        <div className='leaderboard-filters__field'>
+          <label className='leaderboard-filters__label'>Chart mode</label>
+          <select
+            className='leaderboard-filters__select'
+            value={chartMode}
+            onChange={(e) => setChartMode(e.target.value as LeaderboardChartMode)}
+          >
+            <option value='auto'>Auto</option>
+            <option value='line'>Line</option>
+            <option value='bar'>Bars</option>
+          </select>
+        </div>
       </div>
 
       {/* Chart */}
       {!loading && entries.length > 0 && (
-        <LeaderboardChart entries={entries} metrics={metricNames} />
+        <LeaderboardChart entries={entries} metrics={metricNames} mode={chartMode} />
       )}
 
       {/* Results */}

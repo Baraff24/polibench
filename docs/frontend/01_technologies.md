@@ -55,7 +55,7 @@ Struttura delle route:
 /profile             → Profilo utente (autenticato)
 /users               → Lista utenti (admin)
 /sso-login-callback  → Callback dopo Google SSO
-/leaderboard         → Classifica run (filtri dataset/metric/split/top_n)
+/leaderboard         → Classifica run (filtri dataset/metric/split/top_n + chart mode + ordinamento colonne asc/desc)
 /datasets            → Lista dataset
 /datasets/:uuid      → Dettaglio dataset (splits, info, descrizione)
 /models              → Lista modelli ML
@@ -121,7 +121,7 @@ src/styles/
 │   ├── _alert.scss       ← .alert (inline), .toast (notifica a scomparsa)
 │   ├── _avatar.scss      ← .avatar con varianti di dimensione
 │   ├── _dialog.scss      ← .dialog, .dialog-backdrop
-│   ├── _table.scss       ← .table-wrap, .table, righe cliccabili
+│   ├── _table.scss       ← .table-wrap, .table, righe cliccabili, header ordinabili
 │   ├── _badge.scss       ← .badge con varianti semantiche (success/error/…)
 │   ├── _stat-card.scss   ← .stat-card, .stat-grid (card KPI)
 │   ├── _spinner.scss     ← .spinner (animazione di caricamento)
@@ -163,6 +163,9 @@ L'interceptor aggiunge automaticamente il token JWT (salvato in `localStorage`) 
 richiesta. Questo centralizza la logica di autenticazione HTTP: i service non devono preoccuparsi di aggiungere il token
 manualmente.
 
+`src/main.tsx` importa `src/axios.ts` come side-effect (`import './axios'`) per garantire che gli interceptor siano
+registrati una sola volta all'avvio dell'app, prima delle chiamate API di bootstrap (es. `GET /users/me`).
+
 L'URL base del backend è letto dalla variabile d'ambiente `VITE_BACKEND_API_URL`, dichiarata nel file `.env` del
 frontend e iniettata da Vite a compile-time.
 
@@ -182,13 +185,15 @@ React e D3.js, con licenza MIT (completamente gratuita).
 
 Nel progetto viene usata per:
 
-- **Leaderboard chart**: un grafico a barre che mostra le metriche (es. AUC e LogLoss) per ogni modello, sopra la
-  tabella leaderboard. Ispirato alla leaderboard BARS CTR Leaderboard di OpenBenchmark.
+- **Leaderboard chart** con selettore UI sempre visibile `Chart mode` (`Auto`, `Line`, `Bars`):
+  - `Auto`: se presenti `auc + logloss`, usa line chart dual-axis stile benchmark CTR; altrimenti grouped bars;
+  - `Line`: forza una vista a linee (dual-axis per `auc+logloss`, single-axis per gli altri set di metriche);
+  - `Bars`: forza sempre il grouped bar chart multi-metrica.
 
 Il componente `LeaderboardChart` si trova in `src/components/leaderboard/LeaderboardChart.tsx` e usa:
 
-- `<BarChart>` con `<ResponsiveContainer>` per adattarsi alla larghezza
-- `<Bar>` con colori distinti per ogni metrica
+- `<LineChart>` (dual-axis o single-axis in base alla modalità/metrica)
+- `<BarChart>` per la modalità `Bars` e fallback `Auto`
 - `<Tooltip>` stilizzato in tema dark per coerenza con il design system
 - `<Legend>` per identificare le metriche
 

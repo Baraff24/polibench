@@ -340,6 +340,9 @@ Tabella dati con intestazione, righe, bordi e righe cliccabili.
 .table-wrap // contenitore (usa @mixin card, overflow-x: auto)
 .table // <table> a larghezza piena
 .table__th // intestazione: muted, uppercase, xs
+.table__sort-btn // bottone header ordinabile (stile trasparente)
+.table__sort-btn--active // header attivo evidenziato
+.table__sort-indicator // freccia ↕ / ↑ / ↓
 .table__td // cella: padding, bordo-bottom
 .table__tr--clickable
 
@@ -546,7 +549,7 @@ Layout admin users: due pannelli affiancati (lista a sinistra, dettaglio a destr
 ### `.leaderboard-filters` / `.leaderboard-rank` — `_leaderboard.scss`
 
 ```scss
-.leaderboard-filters // flex wrap con gap
+.leaderboard-filters // flex wrap con gap (dataset/split/sort/top-n/chart mode)
 .leaderboard-filters__field // colonna (label + controllo)
 .leaderboard-filters__label // label uppercase xs muted
 .leaderboard-filters__select // select stilizzata dark
@@ -557,6 +560,9 @@ Layout admin users: due pannelli affiancati (lista a sinistra, dettaglio a destr
 .leaderboard-rank--bronze
 
 // #3 — sfondo/testo bronzo
+.leaderboard-chart // card contenitore grafico (line chart CTR / bar chart fallback)
+.leaderboard-chart__title // titolo del grafico
+.leaderboard-chart__container // area responsive chart
 ```
 
 ### `.dataset-card` — `_datasets.scss`
@@ -631,4 +637,3 @@ Layout generico per le pagine dettaglio (dataset, model, experiment).
 - **Non scrivere stili inline** nei componenti React
 - **Non importare SCSS nei componenti React**: tutti gli stili passano per `main.scss`
 - Il modifier `--active` e `--error` vanno sempre aggiunti **insieme** al block/element: mai da soli
-

@@ -58,7 +58,7 @@ src/
     ├── profile.tsx
     ├── users.tsx         ← admin only
     ├── sso.login.tsx
-    ├── leaderboard.tsx   ← filtri + tabella risultati
+    ├── leaderboard.tsx   ← filtri + grafico + tabella ordinabile
     ├── datasets.tsx      ← griglia card dataset
     ├── dataset-detail.tsx
     ├── models.tsx        ← tabella modelli ML
@@ -105,6 +105,7 @@ Ogni strato dipende solo dagli strati sottostanti, mai da quelli superiori.
 
 ```tsx
 import './styles/main.scss'   // unico import CSS globale
+import './axios'              // bootstrap interceptor JWT globale
 
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
@@ -119,6 +120,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
 `main.scss` è l'unico foglio di stile importato. Non esistono import CSS nei singoli componenti: tutti gli stili
 sono centralizati nella cartella `styles/` e compilati da Vite in un unico bundle CSS ottimizzato.
+
+`axios.ts` viene importato in bootstrap per registrare subito gli interceptor request/response: tutte le chiamate API
+successive (incluso `GET /users/me` all'avvio) ereditano automaticamente l'header `Authorization`.
 
 ---
 
@@ -314,6 +318,19 @@ Tutti i service sono accessibili tramite il barrel `services/index.ts`.
 | Metodo                               | Endpoint               | Descrizione              |
 |--------------------------------------|------------------------|--------------------------|
 | `get(datasetUuid, metric, split, n)` | `GET /leaderboard?...` | Top-N risultati filtrati |
+| `getMultiMetric(datasetUuid, metrics, split, sortBy, n)` | `GET /leaderboard/multi?...` | Leaderboard multi-metrica |
+
+### Comportamento `routes/leaderboard.tsx`
+
+- filtri server-side: `dataset`, `split`, `sort_by`, `top_n` (`leaderboard/multi`)
+- filtro client-side sempre visibile: `chart_mode` (`auto` | `line` | `bar`)
+- tabella con sort client-side su header cliccabili (`#`, `Model`, metriche, `Running Steps`)
+- toggle asc/desc per ogni colonna; icona direzione nell'intestazione
+- ranking visuale ricalcolato in base all'ordine corrente della tabella
+- grafico adattivo:
+  - modalità `auto`: CTR (`auc` + `logloss`) → line chart dual-axis ordinato per AUC; altrimenti grouped bars
+  - modalità `line`: line chart sempre attivo (dual-axis per CTR, single-axis negli altri casi)
+  - modalità `bar`: grouped bars sempre attivo
 
 ---
 
@@ -445,6 +462,18 @@ interface LeaderboardEntry {
     direction;
     rank?
 }
+
+interface MultiMetricLeaderboardEntry {
+    experiment_uuid;
+    model_uuid;
+    model_name?;
+    dataset_uuid;
+    split;
+    metrics: Record<string, number>;
+    directions: Record<string, Direction>;
+    repo_url?;
+    rank?
+}
 ```
 
 ---
@@ -459,4 +488,3 @@ interface LeaderboardEntry {
 5. Il componente `SSOLogin` (con loader) chiama `authService.refreshToken()` che legge il JWT dal cookie e lo salva in
    `localStorage`
 6. L'utente viene rediretto alla home autenticato
-
