@@ -31,6 +31,15 @@
   gap: $space-3;
   pointer-events: none;
   align-items: flex-end;
+  max-width: calc(100vw - #{$space-12});
+
+  @media (max-width: 480px) {
+    right: $space-3;
+    left: $space-3;
+    bottom: $space-4;
+    align-items: stretch;
+    max-width: none;
+  }
 }
 
 .toast {
@@ -43,9 +52,12 @@
   font-weight: $font-weight-medium;
   box-shadow: $shadow;
   pointer-events: auto;
+  word-break: break-word;
 
-  &--success { background: $color-success; color: $color-white; }
-  &--error   { background: $color-error;   color: $color-white; }
-  &--warning { background: $color-warning; color: $color-white; }
-  &--info    { background: $color-info;    color: $color-white; }
+  @media (max-width: 480px) {
+    border-radius: $radius-md;
+    justify-content: center;
+  }
+
+  // ...existing code...
 }

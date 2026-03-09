@@ -562,6 +562,16 @@ h1, h2, h3, h4, h5, h6 {
   gap: 0.75rem;
   pointer-events: none;
   align-items: flex-end;
+  max-width: calc(100vw - 3rem);
+}
+@media (max-width: 480px) {
+  .toast-container {
+    right: 0.75rem;
+    left: 0.75rem;
+    bottom: 1rem;
+    align-items: stretch;
+    max-width: none;
+  }
 }
 
 .toast {
@@ -574,22 +584,13 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 500;
   box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.4);
   pointer-events: auto;
+  word-break: break-word;
 }
-.toast--success {
-  background: #0ab39c;
-  color: #ffffff;
-}
-.toast--error {
-  background: #f06548;
-  color: #ffffff;
-}
-.toast--warning {
-  background: #f7b84b;
-  color: #ffffff;
-}
-.toast--info {
-  background: #4bc8ef;
-  color: #ffffff;
+@media (max-width: 480px) {
+  .toast {
+    border-radius: 0.375rem;
+    justify-content: center;
+  }
 }
 
 .avatar {
