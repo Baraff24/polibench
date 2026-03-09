@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router'
 import { PageHeader, EmptyState, DataTable } from '../components'
 import type { Column } from '../components'
@@ -26,6 +26,8 @@ const METRIC_PRESETS: Record<string, { metrics: string[]; sortBy: string }> = {
   rating_prediction: { metrics: ['rmse', 'mae'], sortBy: 'rmse' },
 }
 
+type SortOrder = 'asc' | 'desc'
+
 export async function loader() {
   const datasets = await datasetService.getAll()
   return { datasets }
@@ -42,6 +44,7 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(false)
   const [metricNames, setMetricNames] = useState<string[]>([])
   const [sortBy, setSortBy] = useState('')
+  const [tableSort, setTableSort] = useState<{ key: string; order: SortOrder } | null>(null)
 
   // Load datasets on mount
   useEffect(() => {
@@ -58,6 +61,7 @@ export default function Leaderboard() {
     const preset = METRIC_PRESETS[ds.task] || METRIC_PRESETS['ranking']
     setMetricNames(preset.metrics)
     setSortBy(preset.sortBy)
+    setTableSort(null)
   }
 
   // Fetch multi-metric leaderboard when filters change
@@ -76,25 +80,110 @@ export default function Leaderboard() {
     if (ds) selectDataset(ds)
   }
 
-  // Direzioni per le intestazioni colonna
   const firstEntry = entries.length > 0 ? entries[0] : null
+
+  useEffect(() => {
+    if (entries.length === 0) return
+    const validKeys = new Set(['rank', 'model', 'running_steps', ...metricNames])
+    if (tableSort && validKeys.has(tableSort.key)) return
+    setTableSort({
+      key: sortBy || 'rank',
+      order: firstEntry?.directions[sortBy] === 'min' ? 'asc' : 'desc',
+    })
+  }, [entries, firstEntry, metricNames, sortBy, tableSort])
+
+  function sortIndicator(key: string): string {
+    if (!tableSort || tableSort.key !== key) return '↕'
+    return tableSort.order === 'asc' ? '↑' : '↓'
+  }
+
+  function toggleSort(key: string) {
+    setTableSort((prev) => {
+      if (!prev || prev.key !== key) {
+        if (key === 'rank' || key === 'model' || key === 'running_steps') {
+          return { key, order: 'asc' }
+        }
+        return {
+          key,
+          order: firstEntry?.directions[key] === 'min' ? 'asc' : 'desc',
+        }
+      }
+      return { key, order: prev.order === 'asc' ? 'desc' : 'asc' }
+    })
+  }
+
+  function sortableHeader(label: string, key: string) {
+    const active = tableSort?.key === key
+    const nextOrder = !active || tableSort.order === 'desc' ? 'asc' : 'desc'
+    return (
+      <button
+        type='button'
+        className={`table__sort-btn${active ? ' table__sort-btn--active' : ''}`}
+        onClick={() => toggleSort(key)}
+        aria-label={`Sort by ${label} (${nextOrder})`}
+      >
+        <span>{label}</span>
+        <span className='table__sort-indicator'>{sortIndicator(key)}</span>
+      </button>
+    )
+  }
+
+  const sortedEntries = useMemo(() => {
+    if (!tableSort) return entries
+    const rows = [...entries]
+    const directionFactor = tableSort.order === 'asc' ? 1 : -1
+
+    rows.sort((a, b) => {
+      if (tableSort.key === 'rank') {
+        const aRank = a.rank ?? Number.MAX_SAFE_INTEGER
+        const bRank = b.rank ?? Number.MAX_SAFE_INTEGER
+        return (aRank - bRank) * directionFactor
+      }
+
+      if (tableSort.key === 'model') {
+        const aModel = (a.model_name || a.model_uuid).toLowerCase()
+        const bModel = (b.model_name || b.model_uuid).toLowerCase()
+        return aModel.localeCompare(bModel) * directionFactor
+      }
+
+      if (tableSort.key === 'running_steps') {
+        const aRepo = a.repo_url || ''
+        const bRepo = b.repo_url || ''
+        const aHasRepo = aRepo !== ''
+        const bHasRepo = bRepo !== ''
+        if (aHasRepo !== bHasRepo) {
+          return (Number(aHasRepo) - Number(bHasRepo)) * directionFactor
+        }
+        return aRepo.localeCompare(bRepo) * directionFactor
+      }
+
+      const aVal = a.metrics[tableSort.key]
+      const bVal = b.metrics[tableSort.key]
+      if (aVal === undefined && bVal === undefined) return 0
+      if (aVal === undefined) return 1
+      if (bVal === undefined) return -1
+      return (aVal - bVal) * directionFactor
+    })
+
+    return rows
+  }, [entries, tableSort])
 
   // Colonne dinamiche
   const columns: Column<MultiMetricLeaderboardEntry>[] = [
     {
       key: 'rank',
-      header: '#',
-      render: (e) => <span className={rankClass(e.rank)}>{e.rank}</span>,
+      header: sortableHeader('#', 'rank'),
+      render: (_e, rowIndex) => <span className={rankClass(rowIndex + 1)}>{rowIndex + 1}</span>,
     },
     {
       key: 'model',
-      header: 'Model',
+      header: sortableHeader('Model', 'model'),
       render: (e) => <span className='leaderboard-model'>{e.model_name || e.model_uuid}</span>,
     },
     // Una colonna per ogni metrica richiesta
     ...metricNames.map((m) => ({
       key: m,
-      header: m.toUpperCase() + directionArrow(firstEntry?.directions[m]),
+      header: sortableHeader(m.toUpperCase() + directionArrow(firstEntry?.directions[m]), m),
       render: (e: MultiMetricLeaderboardEntry) => {
         const val = e.metrics[m]
         if (val === undefined) return '—'
@@ -103,7 +192,7 @@ export default function Leaderboard() {
     })),
     {
       key: 'running_steps',
-      header: 'Running Steps',
+      header: sortableHeader('Running Steps', 'running_steps'),
       render: (e) =>
         e.repo_url ? (
           <a
@@ -195,7 +284,7 @@ export default function Leaderboard() {
       {!loading && entries.length > 0 && (
         <DataTable
           columns={columns}
-          rows={entries}
+          rows={sortedEntries}
           rowKey={(e) => e.experiment_uuid}
           onRowClick={(e) => navigate(`/experiments/${e.experiment_uuid}`)}
         />

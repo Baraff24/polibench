@@ -25,6 +25,32 @@
     border-bottom: 1px solid $color-border;
   }
 
+  &__sort-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+  }
+
+  &__sort-btn--active {
+    color: $color-text-strong;
+  }
+
+  &__sort-indicator {
+    display: inline-block;
+    width: 0.9rem;
+    text-align: center;
+    font-size: $font-size-xs;
+    color: $color-accent-light;
+  }
+
   &__td {
     padding: $space-3 $space-5;
     font-size: $font-size-sm;
@@ -42,4 +68,3 @@
     }
   }
 }
-

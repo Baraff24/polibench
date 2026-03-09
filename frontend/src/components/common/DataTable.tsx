@@ -2,8 +2,8 @@ import type { ReactNode } from 'react'
 
 export type Column<T> = {
   key: string
-  header: string
-  render: (row: T) => ReactNode
+  header: ReactNode
+  render: (row: T, rowIndex: number) => ReactNode
 }
 
 type Props<T> = {
@@ -27,7 +27,7 @@ export default function DataTable<T>({ columns, rows, rowKey, onRowClick }: Prop
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => {
+          {rows.map((row, rowIndex) => {
             const clickable = onRowClick !== undefined
             let rowClass = 'table__tr'
             if (clickable) {
@@ -37,7 +37,7 @@ export default function DataTable<T>({ columns, rows, rowKey, onRowClick }: Prop
               <tr key={rowKey(row)} className={rowClass} onClick={() => onRowClick?.(row)}>
                 {columns.map((col) => (
                   <td key={col.key} className='table__td'>
-                    {col.render(row)}
+                    {col.render(row, rowIndex)}
                   </td>
                 ))}
               </tr>
