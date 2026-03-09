@@ -12,6 +12,17 @@ export interface Artifacts {
   predictions_path: string | null
 }
 
+export interface ExperimentCreate {
+  dataset_uuid: string
+  model_uuid: string
+  team_uuid?: string | null
+  run_name?: string | null
+  seed?: number | null
+  notes?: string | null
+  training_config?: Record<string, unknown> | null
+  code?: CodeInfo | null
+}
+
 export interface ExperimentPublic {
   uuid: string
   dataset_uuid: string

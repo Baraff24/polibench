@@ -9,7 +9,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
-from app.auth.auth import get_current_active_user
+from app.auth.auth import get_current_active_user, get_current_verified_user
 from app.models.metrics import Split
 from app.models.users import User
 from app.schemas.experiments import ExperimentCreate, ExperimentPublic
@@ -29,7 +29,7 @@ router = APIRouter()
 @router.post("/experiments", response_model=ExperimentPublic, tags=["experiments"])
 async def submit_experiment(
     data: ExperimentCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_verified_user),
 ) -> ExperimentPublic:
     """
     Sottomette un nuovo Experiment.
@@ -66,7 +66,7 @@ async def get_experiment(
 async def submit_metrics(
     experiment_uuid: UUID,
     data: MetricsBatchCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_verified_user),
 ) -> ExperimentMetrics:
     """
     Sottomette tutte le metriche di una run in batch.

@@ -8,6 +8,20 @@ export type {
   DatasetCreate,
 } from './dataset'
 export type { MLModelSummary, MLModelPublic, MLModelCreate } from './ml-model'
-export type { Status, CodeInfo, Artifacts, ExperimentPublic, ExperimentSummary } from './experiment'
-export type { Split, Direction, MetricPublic, ExperimentMetrics } from './metric'
+export type {
+  Status,
+  CodeInfo,
+  Artifacts,
+  ExperimentPublic,
+  ExperimentSummary,
+  ExperimentCreate,
+} from './experiment'
+export type {
+  Split,
+  Direction,
+  MetricCreate,
+  MetricsBatchCreate,
+  MetricPublic,
+  ExperimentMetrics,
+} from './metric'
 export type { LeaderboardEntry } from './leaderboard'

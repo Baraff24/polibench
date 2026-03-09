@@ -162,11 +162,11 @@ Contiene gli endpoint sia per `Dataset` che per `MLModel` (entità di "catalogo"
 
 ### Dataset
 
-| Endpoint                          | Metodo | Auth          | Input / Output                    | Note                                    |
-|-----------------------------------|--------|---------------|-----------------------------------|-----------------------------------------|
-| `/api/v1/datasets`                | POST   | utente attivo | `DatasetCreate` → `DatasetPublic` | Il server risolve `team_uuid → team_id` |
-| `/api/v1/datasets`                | GET    | pubblico      | — → `list[DatasetSummary]`        | Lista completa (senza filtri per ora)   |
-| `/api/v1/datasets/{dataset_uuid}` | GET    | pubblico      | — → `DatasetPublic`               | Dettaglio con risoluzione UUID          |
+| Endpoint                          | Metodo | Auth              | Input / Output                    | Note                                    |
+|-----------------------------------|--------|-------------------|-----------------------------------|-----------------------------------------|
+| `/api/v1/datasets`                | POST   | utente verificato | `DatasetCreate` → `DatasetPublic` | Il server risolve `team_uuid → team_id` |
+| `/api/v1/datasets`                | GET    | pubblico          | — → `list[DatasetSummary]`        | Lista completa (senza filtri per ora)   |
+| `/api/v1/datasets/{dataset_uuid}` | GET    | pubblico          | — → `DatasetPublic`               | Dettaglio con risoluzione UUID          |
 
 **Flusso POST `/datasets`**:
 
@@ -183,11 +183,11 @@ Contiene gli endpoint sia per `Dataset` che per `MLModel` (entità di "catalogo"
 
 ### MLModel
 
-| Endpoint                         | Metodo | Auth          | Input / Output                    | Note |
-|----------------------------------|--------|---------------|-----------------------------------|------|
-| `/api/v1/ml-models`              | POST   | utente attivo | `MLModelCreate` → `MLModelPublic` |      |
-| `/api/v1/ml-models`              | GET    | pubblico      | — → `list[MLModelSummary]`        |      |
-| `/api/v1/ml-models/{model_uuid}` | GET    | pubblico      | — → `MLModelPublic`               |      |
+| Endpoint                         | Metodo | Auth              | Input / Output                    | Note |
+|----------------------------------|--------|-------------------|-----------------------------------|------|
+| `/api/v1/ml-models`              | POST   | utente verificato | `MLModelCreate` → `MLModelPublic` |      |
+| `/api/v1/ml-models`              | GET    | pubblico          | — → `list[MLModelSummary]`        |      |
+| `/api/v1/ml-models/{model_uuid}` | GET    | pubblico          | — → `MLModelPublic`               |      |
 
 `MLModelSummary` espone solo `uuid`, `name`, `family`, `paper_url` (versione ridotta per le liste).
 `MLModelPublic` include anche `hyperparams` (configurazione canonica dell'algoritmo), `implementation`,
@@ -202,10 +202,10 @@ Contiene gli endpoint sia per `Dataset` che per `MLModel` (entità di "catalogo"
 
 ### Experiments
 
-| Endpoint                     | Metodo | Auth          | Input / Output                          | Note                                         |
-|------------------------------|--------|---------------|-----------------------------------------|----------------------------------------------|
-| `/api/v1/experiments`        | POST   | utente attivo | `ExperimentCreate` → `ExperimentPublic` | Risolve UUID → ObjectId; status parte QUEUED |
-| `/api/v1/experiments/{uuid}` | GET    | utente attivo | — → `ExperimentPublic`                  | Risolve tutti gli ObjectId interni in UUID   |
+| Endpoint                     | Metodo | Auth              | Input / Output                          | Note                                         |
+|------------------------------|--------|-------------------|-----------------------------------------|----------------------------------------------|
+| `/api/v1/experiments`        | POST   | utente verificato | `ExperimentCreate` → `ExperimentPublic` | Risolve UUID → ObjectId; status parte QUEUED |
+| `/api/v1/experiments/{uuid}` | GET    | utente attivo     | — → `ExperimentPublic`                  | Risolve tutti gli ObjectId interni in UUID   |
 
 **Flusso POST `/experiments`**:
 
@@ -224,10 +224,10 @@ Contiene gli endpoint sia per `Dataset` che per `MLModel` (entità di "catalogo"
 
 ### Metrics (submission batch)
 
-| Endpoint                             | Metodo | Auth          | Input / Output                             | Note                                             |
-|--------------------------------------|--------|---------------|--------------------------------------------|--------------------------------------------------|
-| `/api/v1/experiments/{uuid}/metrics` | POST   | utente attivo | `MetricsBatchCreate` → `ExperimentMetrics` | Denormalizza dataset_id/model_id dall'Experiment |
-| `/api/v1/experiments/{uuid}/metrics` | GET    | pubblico      | — → `ExperimentMetrics`                    | Raggruppato per split                            |
+| Endpoint                             | Metodo | Auth              | Input / Output                             | Note                                             |
+|--------------------------------------|--------|-------------------|--------------------------------------------|--------------------------------------------------|
+| `/api/v1/experiments/{uuid}/metrics` | POST   | utente verificato | `MetricsBatchCreate` → `ExperimentMetrics` | Denormalizza dataset_id/model_id dall'Experiment |
+| `/api/v1/experiments/{uuid}/metrics` | GET    | pubblico          | — → `ExperimentMetrics`                    | Raggruppato per split                            |
 
 **Flusso POST `/experiments/{uuid}/metrics`**:
 
@@ -259,29 +259,29 @@ quindi la query è un semplice `find()` su indice composto `{dataset_id, metric,
 
 ## Riepilogo completo endpoint
 
-| Endpoint                                  | Metodo | Auth      | Descrizione                             |
-|-------------------------------------------|--------|-----------|-----------------------------------------|
-| `GET  /api/v1/`                           | GET    | no        | Health check                            |
-| `POST /api/v1/login/access-token`         | POST   | no        | Login email/password                    |
-| `GET  /api/v1/login/test-token`           | GET    | JWT       | Verifica token                          |
-| `POST /api/v1/users`                      | POST   | no        | Registrazione utente (+ email verifica) |
-| `GET  /api/v1/users/verify/{token}`       | GET    | no        | Verifica email (token JWT)              |
-| `POST /api/v1/users/resend-verification`  | POST   | no        | Reinvia email di verifica               |
-| `GET  /api/v1/users`                      | GET    | superuser | Lista utenti                            |
-| `GET  /api/v1/users/me`                   | GET    | attivo    | Profilo corrente                        |
-| `PATCH /api/v1/users/me`                  | PATCH  | attivo    | Aggiorna profilo corrente               |
-| `DELETE /api/v1/users/me`                 | DELETE | attivo    | Cancella account                        |
-| `GET  /api/v1/users/{uuid}`               | GET    | superuser | Profilo utente per UUID                 |
-| `PATCH /api/v1/users/{uuid}`              | PATCH  | superuser | Aggiorna utente                         |
-| `DELETE /api/v1/users/{uuid}`             | DELETE | superuser | Cancella utente                         |
-| `POST /api/v1/datasets`                   | POST   | attivo    | Crea Dataset                            |
-| `GET  /api/v1/datasets`                   | GET    | no        | Lista Dataset                           |
-| `GET  /api/v1/datasets/{uuid}`            | GET    | no        | Dettaglio Dataset                       |
-| `POST /api/v1/ml-models`                  | POST   | attivo    | Registra MLModel                        |
-| `GET  /api/v1/ml-models`                  | GET    | no        | Lista MLModel                           |
-| `GET  /api/v1/ml-models/{uuid}`           | GET    | no        | Dettaglio MLModel                       |
-| `POST /api/v1/experiments`                | POST   | attivo    | Sottomette Experiment (UUID input)      |
-| `GET  /api/v1/experiments/{uuid}`         | GET    | attivo    | Dettaglio Experiment                    |
-| `POST /api/v1/experiments/{uuid}/metrics` | POST   | attivo    | Sottomette metriche batch               |
-| `GET  /api/v1/experiments/{uuid}/metrics` | GET    | no        | Metriche raggruppate per split          |
-| `GET  /api/v1/leaderboard`                | GET    | no        | Top-N per (dataset, metric, split)      |
+| Endpoint                                  | Metodo | Auth       | Descrizione                             |
+|-------------------------------------------|--------|------------|-----------------------------------------|
+| `GET  /api/v1/`                           | GET    | no         | Health check                            |
+| `POST /api/v1/login/access-token`         | POST   | no         | Login email/password                    |
+| `GET  /api/v1/login/test-token`           | GET    | JWT        | Verifica token                          |
+| `POST /api/v1/users`                      | POST   | no         | Registrazione utente (+ email verifica) |
+| `GET  /api/v1/users/verify/{token}`       | GET    | no         | Verifica email (token JWT)              |
+| `POST /api/v1/users/resend-verification`  | POST   | no         | Reinvia email di verifica               |
+| `GET  /api/v1/users`                      | GET    | superuser  | Lista utenti                            |
+| `GET  /api/v1/users/me`                   | GET    | attivo     | Profilo corrente                        |
+| `PATCH /api/v1/users/me`                  | PATCH  | attivo     | Aggiorna profilo corrente               |
+| `DELETE /api/v1/users/me`                 | DELETE | attivo     | Cancella account                        |
+| `GET  /api/v1/users/{uuid}`               | GET    | superuser  | Profilo utente per UUID                 |
+| `PATCH /api/v1/users/{uuid}`              | PATCH  | superuser  | Aggiorna utente                         |
+| `DELETE /api/v1/users/{uuid}`             | DELETE | superuser  | Cancella utente                         |
+| `POST /api/v1/datasets`                   | POST   | verificato | Crea Dataset                            |
+| `GET  /api/v1/datasets`                   | GET    | no         | Lista Dataset                           |
+| `GET  /api/v1/datasets/{uuid}`            | GET    | no         | Dettaglio Dataset                       |
+| `POST /api/v1/ml-models`                  | POST   | verificato | Registra MLModel                        |
+| `GET  /api/v1/ml-models`                  | GET    | no         | Lista MLModel                           |
+| `GET  /api/v1/ml-models/{uuid}`           | GET    | no         | Dettaglio MLModel                       |
+| `POST /api/v1/experiments`                | POST   | verificato | Sottomette Experiment (UUID input)      |
+| `GET  /api/v1/experiments/{uuid}`         | GET    | attivo     | Dettaglio Experiment                    |
+| `POST /api/v1/experiments/{uuid}/metrics` | POST   | verificato | Sottomette metriche batch               |
+| `GET  /api/v1/experiments/{uuid}/metrics` | GET    | no         | Metriche raggruppate per split          |
+| `GET  /api/v1/leaderboard`                | GET    | no         | Top-N per (dataset, metric, split)      |

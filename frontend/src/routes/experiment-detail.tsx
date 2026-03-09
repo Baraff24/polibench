@@ -1,4 +1,4 @@
-import { useLoaderData } from 'react-router'
+import { useLoaderData, useNavigate } from 'react-router'
 import { PageHeader, Badge, DataTable } from '../components'
 import type { Column } from '../components'
 import { experimentService } from '../services'
@@ -35,6 +35,7 @@ export default function ExperimentDetail() {
     experiment: ExperimentPublic
     metrics: ExperimentMetrics | null
   }
+  const navigate = useNavigate()
 
   const splitKeys: Split[] = []
   if (metrics) {
@@ -47,6 +48,12 @@ export default function ExperimentDetail() {
     <div className='page container'>
       <PageHeader title={experiment.run_name || 'Experiment'}>
         <Badge text={experiment.status} variant={statusVariant(experiment.status)} />
+        <button
+          className='btn btn--primary btn--sm'
+          onClick={() => navigate(`/experiments/${experiment.uuid}/metrics/new`)}
+        >
+          Submit Metrics
+        </button>
       </PageHeader>
 
       <section className='detail-section'>

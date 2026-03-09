@@ -9,7 +9,10 @@ const TITLES: Record<string, string> = {
   '/users': 'Users',
   '/leaderboard': 'Leaderboard',
   '/datasets': 'Datasets',
+  '/datasets/new': 'New Dataset',
   '/models': 'Models',
+  '/models/new': 'New Model',
+  '/experiments/new': 'Submit Experiment',
   '/verify-email': 'Verify Email',
 }
 

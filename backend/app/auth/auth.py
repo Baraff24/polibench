@@ -136,6 +136,18 @@ def get_current_active_user(
     return current_user
 
 
+def get_current_verified_user(
+    current_user: models.User = Depends(get_current_active_user),
+) -> models.User:
+    """Richiede che l'utente sia attivo E verificato via email."""
+    if not current_user.is_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Email not verified. Please check your inbox.",
+        )
+    return current_user
+
+
 def get_current_active_superuser(
     current_user: models.User = Depends(get_current_user),
 ) -> models.User:

@@ -8,14 +8,18 @@ Polibench. Comunica esclusivamente con il backend tramite la REST API esposta su
 Al momento dello sviluppo (marzo 2026), il frontend implementa:
 
 - autenticazione con email/password e Google SSO
-- registrazione di nuovi utenti
+- registrazione di nuovi utenti con verifica email
 - visualizzazione e modifica del profilo utente
 - lista degli utenti (solo per admin)
-- pagina home con presentazione dello stack tecnologico
-- lista e dettaglio dei dataset
-- lista e dettaglio dei modelli ML
+- pagina home con presentazione della piattaforma
+- lista e dettaglio dei dataset, con form di creazione
+- lista e dettaglio dei modelli ML, con form di registrazione
+- submission di experiment con selezione dataset/model
+- submission batch di metriche con form tabellare
 - dettaglio degli experiment con metriche per split
 - leaderboard con filtri interattivi (dataset, metric, split, top N)
+- route protette con guard `RequireAuth`
+- titolo scheda dinamico per route
 
 ---
 
@@ -77,7 +81,11 @@ frontend/
     │   ├── models.tsx
     │   ├── model-detail.tsx
     │   ├── experiment-detail.tsx
-    │   └── verify-email.tsx
+    │   ├── verify-email.tsx
+    │   ├── create-dataset.tsx
+    │   ├── create-model.tsx
+    │   ├── submit-experiment.tsx
+    │   └── submit-metrics.tsx
     ├── services/            ← chiamate HTTP al backend
     │   ├── auth.service.ts
     │   ├── user.service.ts
@@ -99,21 +107,25 @@ frontend/
 
 ## Route disponibili
 
-| Path                  | Componente         | Accesso     | Guard                   |
-|-----------------------|--------------------|-------------|-------------------------|
-| `/`                   | `Home`             | Pubblico    | —                       |
-| `/login`              | `Login`            | Guest       | —                       |
-| `/register`           | `Register`         | Guest       | —                       |
-| `/verify-email`       | `VerifyEmail`      | Pubblico    | —                       |
-| `/sso-login-callback` | `SSOLogin`         | Sistema     | —                       |
-| `/profile`            | `Profile`          | Autenticato | `RequireAuth`           |
-| `/leaderboard`        | `Leaderboard`      | Pubblico    | —                       |
-| `/datasets`           | `Datasets`         | Pubblico    | —                       |
-| `/datasets/:uuid`     | `DatasetDetail`    | Pubblico    | —                       |
-| `/models`             | `Models`           | Pubblico    | —                       |
-| `/models/:uuid`       | `ModelDetail`      | Pubblico    | —                       |
-| `/experiments/:uuid`  | `ExperimentDetail` | Autenticato | `RequireAuth`           |
-| `/users`              | `Users`            | Admin       | `RequireAuth adminOnly` |
+| Path                             | Componente         | Accesso     | Guard                   |
+|----------------------------------|--------------------|-------------|-------------------------|
+| `/`                              | `Home`             | Pubblico    | —                       |
+| `/login`                         | `Login`            | Guest       | —                       |
+| `/register`                      | `Register`         | Guest       | —                       |
+| `/verify-email`                  | `VerifyEmail`      | Pubblico    | —                       |
+| `/sso-login-callback`            | `SSOLogin`         | Sistema     | —                       |
+| `/profile`                       | `Profile`          | Autenticato | `RequireAuth`           |
+| `/leaderboard`                   | `Leaderboard`      | Pubblico    | —                       |
+| `/datasets`                      | `Datasets`         | Pubblico    | —                       |
+| `/datasets/new`                  | `CreateDataset`    | Autenticato | `RequireAuth`           |
+| `/datasets/:uuid`                | `DatasetDetail`    | Pubblico    | —                       |
+| `/models`                        | `Models`           | Pubblico    | —                       |
+| `/models/new`                    | `CreateModel`      | Autenticato | `RequireAuth`           |
+| `/models/:uuid`                  | `ModelDetail`      | Pubblico    | —                       |
+| `/experiments/new`               | `SubmitExperiment` | Autenticato | `RequireAuth`           |
+| `/experiments/:uuid`             | `ExperimentDetail` | Autenticato | `RequireAuth`           |
+| `/experiments/:uuid/metrics/new` | `SubmitMetrics`    | Autenticato | `RequireAuth`           |
+| `/users`                         | `Users`            | Admin       | `RequireAuth adminOnly` |
 
 ---
 

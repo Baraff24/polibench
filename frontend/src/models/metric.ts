@@ -1,6 +1,19 @@
 export type Split = 'validation' | 'test'
 export type Direction = 'max' | 'min'
 
+export interface MetricCreate {
+  split: Split
+  metric: string
+  k?: number | null
+  value: number
+  direction: Direction
+}
+
+export interface MetricsBatchCreate {
+  experiment_uuid: string
+  metrics: MetricCreate[]
+}
+
 export interface MetricPublic {
   uuid: string
   experiment_uuid: string

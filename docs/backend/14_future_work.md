@@ -25,8 +25,8 @@ Il sistema di autenticazione attuale supporta:
 - Non esiste una distinzione tra Dataset `public` e `private` a livello di enforcement negli endpoint (il campo
   `visibility` è dichiarato nel modello ma non filtrato nei query).
 - Non esiste un meccanismo di invito o approvazione per i team.
-- `is_verified` non è ancora usato come gate obbligatorio per operazioni sensibili (submission di experiment).
-  Attualmente è informativo.
+- `is_verified` è usato come gate obbligatorio per tutte le operazioni di scrittura (POST dataset,
+  POST ml-model, POST experiment, POST metrics) tramite `get_current_verified_user`.
 
 **Impatto attuale**: in un contesto accademico controllato con pochi utenti fidati, questo non è un problema
 operativo. Diventa rilevante se la piattaforma venisse aperta a utenti esterni non verificati.

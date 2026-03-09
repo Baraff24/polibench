@@ -2,6 +2,7 @@ import { useLoaderData, useNavigate } from 'react-router'
 import { PageHeader, EmptyState, DataTable } from '../components'
 import type { Column } from '../components'
 import { mlModelService } from '../services'
+import { useAuth } from '../contexts/auth'
 import type { MLModelSummary } from '../models'
 
 export async function loader() {
@@ -29,11 +30,18 @@ const columns: Column<MLModelSummary>[] = [
 export default function Models() {
   const { models } = useLoaderData() as { models: MLModelSummary[] }
   const navigate = useNavigate()
+  const { user } = useAuth()
+
+  const headerAction = user ? (
+    <button className='btn btn--primary btn--sm' onClick={() => navigate('/models/new')}>
+      + New Model
+    </button>
+  ) : undefined
 
   if (models.length === 0) {
     return (
       <div className='page container'>
-        <PageHeader title='Models' />
+        <PageHeader title='Models' action={headerAction} />
         <EmptyState title='No models yet' description='Register an algorithm to get started.' />
       </div>
     )
@@ -41,7 +49,7 @@ export default function Models() {
 
   return (
     <div className='page container'>
-      <PageHeader title='Models' />
+      <PageHeader title='Models' action={headerAction} />
       <DataTable
         columns={columns}
         rows={models}

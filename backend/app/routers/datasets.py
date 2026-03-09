@@ -9,7 +9,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
-from app.auth.auth import get_current_active_user
+from app.auth.auth import get_current_verified_user
 from app.models.users import User
 from app.schemas.datasets import DatasetCreate, DatasetPublic, DatasetSummary
 from app.schemas.ml_models import MLModelCreate, MLModelPublic, MLModelSummary
@@ -33,7 +33,7 @@ router = APIRouter()
 @router.post("/datasets", response_model=DatasetPublic, tags=["datasets"])
 async def create_dataset_endpoint(
     data: DatasetCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_verified_user),
 ) -> DatasetPublic:
     """Crea un nuovo Dataset. Richiede autenticazione."""
     return await create_dataset(data, current_user)
@@ -63,7 +63,7 @@ async def get_dataset_endpoint(dataset_uuid: UUID) -> DatasetPublic:
 @router.post("/ml-models", response_model=MLModelPublic, tags=["ml-models"])
 async def create_ml_model_endpoint(
     data: MLModelCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_verified_user),
 ) -> MLModelPublic:
     """Registra un nuovo algoritmo. Richiede autenticazione."""
     return await create_ml_model(data, current_user)

@@ -16,6 +16,10 @@ import ExperimentDetail, { loader as experimentDetailLoader } from './routes/exp
 import Leaderboard from './routes/leaderboard'
 import VerifyEmail from './routes/verify-email'
 import { RequireAuth } from './components'
+import CreateDataset from './routes/create-dataset.tsx'
+import CreateModel from './routes/create-model.tsx'
+import SubmitExperiment from './routes/submit-experiment.tsx'
+import SubmitMetrics from './routes/submit-metrics.tsx'
 
 export const routes = [
   {
@@ -70,6 +74,14 @@ export const routes = [
         loader: datasetsLoader,
       },
       {
+        path: 'datasets/new',
+        element: (
+          <RequireAuth>
+            <CreateDataset />
+          </RequireAuth>
+        ),
+      },
+      {
         path: 'datasets/:uuid',
         Component: DatasetDetail,
         HydrateFallback: HydrateFallback,
@@ -82,10 +94,26 @@ export const routes = [
         loader: modelsLoader,
       },
       {
+        path: 'models/new',
+        element: (
+          <RequireAuth>
+            <CreateModel />
+          </RequireAuth>
+        ),
+      },
+      {
         path: 'models/:uuid',
         Component: ModelDetail,
         HydrateFallback: HydrateFallback,
         loader: modelDetailLoader,
+      },
+      {
+        path: 'experiments/new',
+        element: (
+          <RequireAuth>
+            <SubmitExperiment />
+          </RequireAuth>
+        ),
       },
       {
         path: 'experiments/:uuid',
@@ -96,6 +124,14 @@ export const routes = [
         ),
         HydrateFallback: HydrateFallback,
         loader: experimentDetailLoader,
+      },
+      {
+        path: 'experiments/:uuid/metrics/new',
+        element: (
+          <RequireAuth>
+            <SubmitMetrics />
+          </RequireAuth>
+        ),
       },
     ],
   },

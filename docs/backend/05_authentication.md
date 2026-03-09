@@ -92,8 +92,8 @@ sicura nel `.env`.
 
 ## Dependency Injection per l'autenticazione
 
-FastAPI utilizza il sistema `Depends()` per iniettare l'utente autenticato negli endpoint. Sono definite tre dipendenze
-principali:
+FastAPI utilizza il sistema `Depends()` per iniettare l'utente autenticato negli endpoint. Sono definite quattro
+dipendenze principali:
 
 ```python
 # Legge il token dall'header Authorization: Bearer
@@ -108,9 +108,25 @@ async def get_current_user_from_cookie(token: str = Depends(oauth2_scheme_with_c
 def get_current_active_user(current_user=Depends(get_current_user)) -> models.User
 
 
+# Verifica che l'utente sia attivo E verificato via email
+def get_current_verified_user(current_user=Depends(get_current_active_user)) -> models.User
+
+
 # Verifica che l'utente sia superuser
 def get_current_active_superuser(current_user=Depends(get_current_user)) -> models.User
 ```
+
+### Quale dipendenza usare
+
+| Dipendenza                     | Quando usarla                                           |
+|--------------------------------|---------------------------------------------------------|
+| `get_current_active_user`      | Lettura (GET profilo, GET experiment detail)            |
+| `get_current_verified_user`    | Scrittura (POST dataset, POST experiment, POST metrics) |
+| `get_current_active_superuser` | Operazioni admin (gestione utenti, ecc.)                |
+
+Tutti gli endpoint di **creazione** (POST datasets, POST ml-models, POST experiments, POST metrics) richiedono
+`get_current_verified_user`. Questo impedisce agli utenti non verificati di creare risorse, incentivando la
+conferma dell'email.
 
 Esempio di uso in un router:
 
