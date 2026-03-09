@@ -102,3 +102,26 @@ class ExperimentMetrics(BaseModel):
 
     experiment_uuid: UUID
     metrics_by_split: dict[Split, list[MetricPublic]] = Field(default_factory=dict)
+
+
+class MultiMetricLeaderboardEntry(BaseModel):
+    """
+    Riga leaderboard multi-metrica (stile BARS CTR Leaderboard).
+
+    Ogni riga corrisponde a un (experiment, model) e contiene i valori
+    di tutte le metriche richieste in un dizionario.
+
+    Esempio:
+        metrics = {"auc": 0.8107, "logloss": 0.4412}
+        directions = {"auc": "max", "logloss": "min"}
+    """
+
+    experiment_uuid: UUID
+    model_uuid: UUID
+    model_name: str | None = None
+    dataset_uuid: UUID
+    split: Split
+    metrics: dict[str, float]  # metrica → valore (es. {"auc": 0.81, "logloss": 0.44})
+    directions: dict[str, Direction]  # metrica → direction
+    repo_url: str | None = None  # link al codice / running steps
+    rank: int | None = None

@@ -12,3 +12,15 @@ export interface LeaderboardEntry {
   direction: Direction
   rank: number | null
 }
+
+export interface MultiMetricLeaderboardEntry {
+  experiment_uuid: string
+  model_uuid: string
+  model_name: string | null
+  dataset_uuid: string
+  split: Split
+  metrics: Record<string, number>
+  directions: Record<string, Direction>
+  repo_url: string | null
+  rank: number | null
+}

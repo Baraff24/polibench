@@ -212,6 +212,31 @@ async def get_leaderboard(
 Non ci sono join (niente `$lookup`): `dataset_id` è già nel Metric per effetto della denormalizzazione.
 Il batch fetch di MLModel e Experiment avviene con `{"_id": {"$in": [...]}}` — una sola query per ciascuno.
 
+### get_multi_metric_leaderboard (stile BARS)
+
+```python
+async def get_multi_metric_leaderboard(
+        dataset_uuid: UUID,
+        metrics_list: list[str],
+        split: Split,
+        sort_by: str,
+        top_n: int = 20,
+) -> list[MultiMetricLeaderboardEntry]
+```
+
+**Flusso**:
+
+1. Risolve `dataset_uuid → Dataset` (404 se non esiste)
+2. Fetch tutte le `Metric` per `(dataset_id, split)` dove `metric ∈ metrics_list`
+3. Raggruppa per `experiment_id`: ogni experiment ottiene un dizionario `{metric_name: Metric}`
+4. Determina la `direction` della metrica `sort_by` (max → DESC, min → ASC)
+5. Ordina per il valore della metrica `sort_by` e limita a `top_n`
+6. Batch fetch di `Experiment` e `MLModel` per popolare `model_name`, `repo_url`
+7. Assembla `MultiMetricLeaderboardEntry` con `metrics: dict[str, float]`, `directions: dict[str, Direction]`
+
+Questo endpoint alimenta la leaderboard multi-colonna nel frontend (con grafico Recharts).
+È ispirato alla BARS CTR Leaderboard di OpenBenchmark.
+
 ---
 
 ## Pattern ricorrenti

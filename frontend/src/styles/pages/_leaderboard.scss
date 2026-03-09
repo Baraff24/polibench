@@ -83,3 +83,41 @@
   }
 }
 
+// --- Chart ---
+.leaderboard-chart {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $space-5 $space-6;
+  margin-bottom: $space-6;
+  box-shadow: $shadow;
+
+  &__title {
+    font-size: $font-size-base;
+    font-weight: $font-weight-semibold;
+    color: $color-text-strong;
+    margin-bottom: $space-4;
+  }
+
+  &__container {
+    width: 100%;
+    min-height: 20rem;
+  }
+}
+
+// --- Model name in table ---
+.leaderboard-model {
+  font-weight: $font-weight-semibold;
+  color: $color-text-strong;
+}
+
+// --- Running Steps link ---
+.leaderboard-link {
+  color: $color-accent-light;
+  font-size: $font-size-sm;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+    color: $color-accent;
+  }
+}

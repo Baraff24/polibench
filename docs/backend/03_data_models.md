@@ -105,18 +105,18 @@ Rappresenta un gruppo di ricerca. Gli utenti appartengono a un team tramite `Use
 
 Rappresenta un dataset di valutazione con le relative caratteristiche e partizioni.
 
-| Campo                | Tipo                       | Indice | Note                                  |
-|----------------------|----------------------------|--------|---------------------------------------|
-| `uuid`               | `UUID`                     | unique | Identificatore pubblico               |
-| `name`               | `str`                      | —      | Nome del dataset (es. "MovieLens-1M") |
-| `version`            | `str`                      | —      | Versione (es. "1.0")                  |
-| `task`               | `TaskType`                 | —      | `ranking` o `rating_prediction`       |
-| `description`        | `str \| None`              | —      | Descrizione opzionale                 |
-| `visibility`         | `Visibility`               | —      | `public` o `private`                  |
-| `splits`             | `Splits \| None`           | —      | Sotto-documento con conteggi          |
-| `team_id`            | `PydanticObjectId \| None` | sì     | FK verso Team                         |
-| `created_by_user_id` | `PydanticObjectId \| None` | sì     | FK verso User                         |
-| `created_at`         | `datetime`                 | —      | Timestamp creazione                   |
+| Campo                | Tipo                       | Indice | Note                                   |
+|----------------------|----------------------------|--------|----------------------------------------|
+| `uuid`               | `UUID`                     | unique | Identificatore pubblico                |
+| `name`               | `str`                      | —      | Nome del dataset (es. "MovieLens-1M")  |
+| `version`            | `str`                      | —      | Versione (es. "1.0")                   |
+| `task`               | `TaskType`                 | —      | `ranking`, `rating_prediction` o `ctr` |
+| `description`        | `str \| None`              | —      | Descrizione opzionale                  |
+| `visibility`         | `Visibility`               | —      | `public` o `private`                   |
+| `splits`             | `Splits \| None`           | —      | Sotto-documento con conteggi           |
+| `team_id`            | `PydanticObjectId \| None` | sì     | FK verso Team                          |
+| `created_by_user_id` | `PydanticObjectId \| None` | sì     | FK verso User                          |
+| `created_at`         | `datetime`                 | —      | Timestamp creazione                    |
 
 **Sotto-documento `Splits`** (classe `BaseModel`):
 
@@ -129,7 +129,7 @@ class Splits(BaseModel):
 
 **Enumerazioni**:
 
-- `TaskType`: `ranking` | `rating_prediction`
+- `TaskType`: `ranking` | `rating_prediction` | `ctr`
 - `Visibility`: `public` | `private`
 
 ---

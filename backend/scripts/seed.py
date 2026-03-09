@@ -82,6 +82,16 @@ DATASETS = [
         "visibility": Visibility.PUBLIC,
         "splits": Splits(train=80_000, validation=10_000, test=10_000),
     },
+    {
+        "name": "Criteo-x4",
+        "version": "1.0",
+        "task": TaskType.CTR,
+        "description": "Criteo display ad CTR dataset (x4 variant). "
+        "Standard benchmark for click-through rate prediction models. "
+        "Inspired by BARS CTR Leaderboard.",
+        "visibility": Visibility.PUBLIC,
+        "splits": Splits(train=33_003_326, validation=4_125_416, test=4_125_416),
+    },
 ]
 
 ML_MODELS = [
@@ -127,6 +137,68 @@ ML_MODELS = [
         "implementation": "https://github.com/hexiangnan/neural_collaborative_filtering",
         "hyperparams": {"layers": [64, 32, 16, 8], "lr": 0.001, "batch_size": 256},
     },
+    # --- CTR prediction models ---
+    {
+        "name": "DeepFM",
+        "family": "ctr-prediction",
+        "paper_url": "https://arxiv.org/abs/1703.04247",
+        "implementation": "https://github.com/reczoo/FuxiCTR",
+        "hyperparams": {"embedding_dim": 16, "hidden_units": [400, 400, 400], "lr": 1e-3},
+    },
+    {
+        "name": "DCNv2",
+        "family": "ctr-prediction",
+        "paper_url": "https://arxiv.org/abs/2008.13535",
+        "implementation": "https://github.com/reczoo/FuxiCTR",
+        "hyperparams": {
+            "embedding_dim": 16,
+            "cross_layers": 3,
+            "hidden_units": [400, 400],
+            "lr": 1e-3,
+        },
+    },
+    {
+        "name": "xDeepFM",
+        "family": "ctr-prediction",
+        "paper_url": "https://arxiv.org/abs/1803.05170",
+        "implementation": "https://github.com/reczoo/FuxiCTR",
+        "hyperparams": {"embedding_dim": 16, "cin_layers": [200, 200, 200], "lr": 1e-3},
+    },
+    {
+        "name": "AutoInt+",
+        "family": "ctr-prediction",
+        "paper_url": "https://arxiv.org/abs/1810.11921",
+        "implementation": "https://github.com/reczoo/FuxiCTR",
+        "hyperparams": {
+            "embedding_dim": 16,
+            "attention_layers": 3,
+            "num_heads": 2,
+            "lr": 1e-3,
+        },
+    },
+    {
+        "name": "FiBiNET",
+        "family": "ctr-prediction",
+        "paper_url": "https://arxiv.org/abs/1905.09433",
+        "implementation": "https://github.com/reczoo/FuxiCTR",
+        "hyperparams": {
+            "embedding_dim": 16,
+            "bilinear_type": "field_interaction",
+            "lr": 1e-3,
+        },
+    },
+    {
+        "name": "DLRM",
+        "family": "ctr-prediction",
+        "paper_url": "https://arxiv.org/abs/1906.00091",
+        "implementation": "https://github.com/facebookresearch/dlrm",
+        "hyperparams": {
+            "embedding_dim": 16,
+            "bottom_mlp": [128, 64, 16],
+            "top_mlp": [512, 256, 1],
+            "lr": 1e-3,
+        },
+    },
 ]
 
 # (dataset_name, model_name, run_name, seed, status, giorni fa)
@@ -143,6 +215,13 @@ EXPERIMENTS_PLAN = [
     ("MovieLens-100K", "SVD", "svd-baseline", 42, Status.FINISHED, 6),
     ("MovieLens-100K", "NeuMF", "neumf-baseline", 42, Status.FINISHED, 5),
     ("MovieLens-100K", "BPR", "bpr-ml100k", 7, Status.QUEUED, 0),
+    # --- CTR experiments on Criteo-x4 ---
+    ("Criteo-x4", "DeepFM", "deepfm-criteo-x4", 42, Status.FINISHED, 12),
+    ("Criteo-x4", "DCNv2", "dcnv2-criteo-x4", 42, Status.FINISHED, 11),
+    ("Criteo-x4", "xDeepFM", "xdeepfm-criteo-x4", 42, Status.FINISHED, 10),
+    ("Criteo-x4", "AutoInt+", "autoint-criteo-x4", 42, Status.FINISHED, 9),
+    ("Criteo-x4", "FiBiNET", "fibinet-criteo-x4", 42, Status.FINISHED, 8),
+    ("Criteo-x4", "DLRM", "dlrm-criteo-x4", 42, Status.FINISHED, 7),
 ]
 
 # Metriche realistiche per dataset di ranking (ndcg, recall, hit)
@@ -173,6 +252,16 @@ RATING_METRICS_BASE = {
     "SVD": {"rmse": 0.9341, "mae": 0.7382},
     "NeuMF": {"rmse": 0.9012, "mae": 0.7101},
     "BPR": {"rmse": 0.9721, "mae": 0.7612},
+}
+
+# Metriche CTR prediction (auc, logloss) — valori calibrati su BARS Criteo-x4 leaderboard
+CTR_METRICS_BASE = {
+    "DeepFM": {"auc": 0.8107, "logloss": 0.4408},
+    "DCNv2": {"auc": 0.8119, "logloss": 0.4395},
+    "xDeepFM": {"auc": 0.8113, "logloss": 0.4401},
+    "AutoInt+": {"auc": 0.8083, "logloss": 0.4427},
+    "FiBiNET": {"auc": 0.8105, "logloss": 0.4410},
+    "DLRM": {"auc": 0.8099, "logloss": 0.4417},
 }
 
 
@@ -317,6 +406,25 @@ async def seed(reset: bool = False) -> None:
                             k=k_val,
                             value=jitter(base_val),
                             direction=Direction.MAX,
+                        )
+                    )
+
+        elif ds_task == TaskType.CTR:
+            base = CTR_METRICS_BASE.get(model_name, {"auc": 0.80, "logloss": 0.45})
+            for split in (Split.TEST, Split.VALIDATION):
+                for metric_name, base_val in base.items():
+                    direction = Direction.MAX if metric_name == "auc" else Direction.MIN
+                    metrics_to_insert.append(
+                        Metric(
+                            experiment_id=exp.id,
+                            dataset_id=ds.id,
+                            model_id=ml.id,
+                            submitted_by_user_id=admin.id,
+                            split=split,
+                            metric=metric_name,
+                            k=None,
+                            value=jitter(base_val),
+                            direction=direction,
                         )
                     )
 

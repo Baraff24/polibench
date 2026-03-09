@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 class TaskType(str, Enum):
     RANKING = "ranking"
     RATING_PREDICTION = "rating_prediction"
+    CTR = "ctr"
 
 
 class Visibility(str, Enum):

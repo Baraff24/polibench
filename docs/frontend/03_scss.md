@@ -36,7 +36,7 @@ src/styles/
     ├── _auth.scss        ← .auth
     ├── _profile.scss     ← .profile
     ├── _users.scss       ← .users-layout, .user-list
-    ├── _leaderboard.scss ← .leaderboard-filters, .leaderboard-rank
+    ├── _leaderboard.scss ← .leaderboard-filters, .leaderboard-rank, .leaderboard-chart, .leaderboard-model, .leaderboard-link
     ├── _datasets.scss    ← .dataset-card
     ├── _detail.scss      ← .detail-section, .detail-grid, .detail-field
     └── _verify-email.scss← .verify-email

@@ -13,7 +13,12 @@ from app.auth.auth import get_current_active_user, get_current_verified_user
 from app.models.metrics import Split
 from app.models.users import User
 from app.schemas.experiments import ExperimentCreate, ExperimentPublic
-from app.schemas.metrics import ExperimentMetrics, LeaderboardEntry, MetricsBatchCreate
+from app.schemas.metrics import (
+    ExperimentMetrics,
+    LeaderboardEntry,
+    MetricsBatchCreate,
+    MultiMetricLeaderboardEntry,
+)
 from app.services import experiments as exp_service
 from app.services import leaderboard as lb_service
 from app.services import metrics as metric_service
@@ -111,3 +116,34 @@ async def get_leaderboard(
     - top_n: numero di risultati (default 10)
     """
     return await lb_service.get_leaderboard(dataset_uuid, metric, split, top_n)
+
+
+@router.get(
+    "/leaderboard/multi",
+    response_model=list[MultiMetricLeaderboardEntry],
+    tags=["leaderboard"],
+)
+async def get_multi_metric_leaderboard(
+    dataset_uuid: UUID,
+    metrics: str,
+    split: Split,
+    sort_by: str,
+    top_n: int = 20,
+) -> list[MultiMetricLeaderboardEntry]:
+    """
+    Leaderboard multi-metrica (stile BARS CTR Leaderboard).
+
+    Ritorna i top_n risultati per (dataset, split) con tutte le metriche
+    richieste aggregate per experiment/model.
+
+    Query params:
+    - dataset_uuid: UUID del dataset
+    - metrics: nomi delle metriche separati da virgola (es. "auc,logloss")
+    - split: "test" o "validation"
+    - sort_by: metrica primaria di ordinamento (es. "auc")
+    - top_n: numero di risultati (default 20)
+    """
+    metrics_list = [m.strip() for m in metrics.split(",") if m.strip()]
+    return await lb_service.get_multi_metric_leaderboard(
+        dataset_uuid, metrics_list, split, sort_by, top_n
+    )

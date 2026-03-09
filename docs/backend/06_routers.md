@@ -240,17 +240,31 @@ Contiene gli endpoint sia per `Dataset` che per `MLModel` (entità di "catalogo"
 
 ### Leaderboard
 
-| Endpoint              | Metodo | Auth     | Query params                                  | Output                   |
-|-----------------------|--------|----------|-----------------------------------------------|--------------------------|
-| `/api/v1/leaderboard` | GET    | pubblico | `dataset_uuid`, `metric`, `split`, `top_n=10` | `list[LeaderboardEntry]` |
+| Endpoint                    | Metodo | Auth     | Query params                                              | Output                              |
+|-----------------------------|--------|----------|-----------------------------------------------------------|-------------------------------------|
+| `/api/v1/leaderboard`       | GET    | pubblico | `dataset_uuid`, `metric`, `split`, `top_n=10`             | `list[LeaderboardEntry]`            |
+| `/api/v1/leaderboard/multi` | GET    | pubblico | `dataset_uuid`, `metrics`, `split`, `sort_by`, `top_n=20` | `list[MultiMetricLeaderboardEntry]` |
 
-**Flusso GET `/leaderboard`**:
+**Flusso GET `/leaderboard`** (single-metric):
 
 1. Risolve `dataset_uuid → Dataset` (404 se non esiste)
 2. Query su `Metric` per `(dataset_id, metric, split)`, ordinata per `value DESC`, limitata a `top_n`
 3. Batch fetch degli `MLModel` e degli `Experiment` distinti per risolvere `model_id → model.uuid / model.name`
    e `experiment_id → experiment.uuid`
 4. Assembla `LeaderboardEntry` con `rank` progressivo (1-based)
+
+**Flusso GET `/leaderboard/multi`** (multi-metric, stile BARS CTR Leaderboard):
+
+1. Risolve `dataset_uuid → Dataset` (404 se non esiste)
+2. Il parametro `metrics` è una stringa CSV (es. `"auc,logloss"`)
+3. Fetch tutte le `Metric` per `(dataset_id, split)` dove `metric ∈ metrics_list`
+4. Raggruppa per `experiment_id`: ogni experiment ottiene un dizionario `{metric_name: value}`
+5. Ordina per la metrica `sort_by` (ASC se `direction=min`, DESC se `direction=max`)
+6. Limit `top_n` e batch fetch `MLModel` + `Experiment` per popolare `model_name`, `repo_url`
+7. Assembla `MultiMetricLeaderboardEntry` con `metrics: dict[str, float]`, `directions: dict[str, Direction]`,
+   `repo_url`
+
+Questo endpoint alimenta la vista leaderboard multi-colonna nel frontend (con grafico Recharts).
 
 **Ottimizzazione**: le query sul leaderboard non fanno `$lookup` — `dataset_id` è denormalizzato in `Metric`,
 quindi la query è un semplice `find()` su indice composto `{dataset_id, metric, split, value: -1}`.
@@ -285,3 +299,4 @@ quindi la query è un semplice `find()` su indice composto `{dataset_id, metric,
 | `POST /api/v1/experiments/{uuid}/metrics` | POST   | verificato | Sottomette metriche batch               |
 | `GET  /api/v1/experiments/{uuid}/metrics` | GET    | no         | Metriche raggruppate per split          |
 | `GET  /api/v1/leaderboard`                | GET    | no         | Top-N per (dataset, metric, split)      |
+| `GET  /api/v1/leaderboard/multi`          | GET    | no         | Multi-metric leaderboard (stile BARS)   |

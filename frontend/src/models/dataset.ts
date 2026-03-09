@@ -1,4 +1,4 @@
-export type TaskType = 'ranking' | 'rating_prediction'
+export type TaskType = 'ranking' | 'rating_prediction' | 'ctr'
 export type Visibility = 'public' | 'private'
 
 export interface Splits {

@@ -220,6 +220,27 @@ class ExperimentMetrics(BaseModel):
     metrics_by_split: dict[Split, list[MetricPublic]]
 ```
 
+#### MultiMetricLeaderboardEntry
+
+Schema per la leaderboard multi-metrica (stile BARS CTR Leaderboard). Ogni riga corrisponde a un
+(experiment, model) e contiene i valori di tutte le metriche richieste in un dizionario.
+
+```python
+class MultiMetricLeaderboardEntry(BaseModel):
+    experiment_uuid: UUID
+    model_uuid: UUID
+    model_name: str | None = None
+    dataset_uuid: UUID
+    split: Split
+    metrics: dict[str, float]       # es. {"auc": 0.81, "logloss": 0.44}
+    directions: dict[str, Direction] # es. {"auc": "max", "logloss": "min"}
+    repo_url: str | None = None      # link al codice / running steps
+    rank: int | None = None
+```
+
+Questo schema è restituito dall'endpoint `GET /leaderboard/multi` e alimenta la vista
+leaderboard multi-colonna nel frontend (con grafico Recharts).
+
 ---
 
 ## Esportazioni pubbliche (`schemas/__init__.py`)

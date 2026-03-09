@@ -134,7 +134,7 @@ src/styles/
 │   ├── _auth.scss        ← .auth (login/register)
 │   ├── _profile.scss     ← .profile
 │   ├── _users.scss       ← .users-layout, .user-list
-│   ├── _leaderboard.scss ← .leaderboard-filters, .leaderboard-rank
+│   ├── _leaderboard.scss ← .leaderboard-filters, .leaderboard-rank, .leaderboard-chart, .leaderboard-link
 │   ├── _datasets.scss    ← .dataset-card
 │   └── _detail.scss      ← .detail-section, .detail-grid, .detail-field
 └── main.scss             ← entry point: importa tutto in ordine
@@ -172,6 +172,32 @@ frontend e iniettata da Vite a compile-time.
 
 **React Hook Form 7** gestisce i form di login e registrazione. A differenza di soluzioni come Formik, React Hook Form
 usa ref non controllati, minimizzando i re-render durante la digitazione.
+
+---
+
+## Grafici: Recharts
+
+**Recharts** è la libreria per la visualizzazione dati nel frontend. È una libreria dichiarativa basata su componenti
+React e D3.js, con licenza MIT (completamente gratuita).
+
+Nel progetto viene usata per:
+
+- **Leaderboard chart**: un grafico a barre che mostra le metriche (es. AUC e LogLoss) per ogni modello, sopra la
+  tabella leaderboard. Ispirato alla leaderboard BARS CTR Leaderboard di OpenBenchmark.
+
+Il componente `LeaderboardChart` si trova in `src/components/leaderboard/LeaderboardChart.tsx` e usa:
+
+- `<BarChart>` con `<ResponsiveContainer>` per adattarsi alla larghezza
+- `<Bar>` con colori distinti per ogni metrica
+- `<Tooltip>` stilizzato in tema dark per coerenza con il design system
+- `<Legend>` per identificare le metriche
+
+Recharts è stata scelta come alternativa gratuita a Plotly perché:
+
+- API dichiarativa e React-native (nessun wrapper imperativo)
+- Leggera e senza dipendenze pesanti
+- Personalizzazione completa dello stile (colori, font, bordi)
+- Licenza MIT
 
 ---
 

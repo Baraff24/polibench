@@ -74,7 +74,7 @@ class Dataset {
 }
 
 note right of Dataset
-  task enum: ranking | rating_prediction
+  task enum: ranking | rating_prediction | ctr
   visibility enum: public | private
   splits: { train: int?, test: int?, validation: int? }
   Unique identity: {name, version}

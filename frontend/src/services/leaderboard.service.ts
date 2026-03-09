@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { LeaderboardEntry, Split } from '../models'
+import type { LeaderboardEntry, MultiMetricLeaderboardEntry, Split } from '../models'
 
 const API_URL = import.meta.env.VITE_BACKEND_API_URL
 
@@ -17,6 +17,24 @@ class LeaderboardService {
       top_n: String(topN),
     })
     const response = await axios.get(API_URL + `leaderboard?${params}`)
+    return response.data
+  }
+
+  async getMultiMetric(
+    datasetUuid: string,
+    metrics: string[],
+    split: Split,
+    sortBy: string,
+    topN: number = 20,
+  ): Promise<MultiMetricLeaderboardEntry[]> {
+    const params = new URLSearchParams({
+      dataset_uuid: datasetUuid,
+      metrics: metrics.join(','),
+      split,
+      sort_by: sortBy,
+      top_n: String(topN),
+    })
+    const response = await axios.get(API_URL + `leaderboard/multi?${params}`)
     return response.data
   }
 }

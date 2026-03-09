@@ -24,4 +24,4 @@ export type {
   MetricPublic,
   ExperimentMetrics,
 } from './metric'
-export type { LeaderboardEntry } from './leaderboard'
+export type { LeaderboardEntry, MultiMetricLeaderboardEntry } from './leaderboard'
