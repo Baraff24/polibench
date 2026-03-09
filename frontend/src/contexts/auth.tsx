@@ -1,7 +1,6 @@
 import { createContext, FC, useState, ReactNode, useContext, useEffect } from 'react'
-import userService from '../services/user.service'
-import authService from '../services/auth.service'
-import { User } from '../models/user'
+import { userService, authService } from '../services'
+import type { User } from '../models'
 
 type AuthContextType = {
   user: User | undefined

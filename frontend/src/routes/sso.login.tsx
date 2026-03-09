@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
 import { redirect, useNavigate } from 'react-router'
 import { AxiosError } from 'axios'
-import authService from '../services/auth.service'
-import userService from '../services/user.service'
+import { authService, userService } from '../services'
 import { useSnackBar } from '../contexts/snackbar'
 import { useAuth } from '../contexts/auth'
 

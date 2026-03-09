@@ -3,8 +3,8 @@ import { SubmitHandler, useForm } from 'react-hook-form'
 import { Link as RouterLink, useNavigate } from 'react-router'
 import { useAuth } from '../contexts/auth'
 import { useSnackBar } from '../contexts/snackbar'
-import { User } from '../models/user'
-import authService from '../services/auth.service'
+import type { User } from '../models'
+import { authService } from '../services'
 
 export default function LoginForm() {
   const {
@@ -40,6 +40,15 @@ export default function LoginForm() {
 
   const handleGoogleLogin = () => {
     window.location.href = authService.getGoogleLoginUrl()
+  }
+
+  let emailClass = 'field__input'
+  if (errors.email) {
+    emailClass = 'field__input field__input--error'
+  }
+  let passwordClass = 'field__input'
+  if (errors.password) {
+    passwordClass = 'field__input field__input--error'
   }
 
   return (
@@ -79,7 +88,7 @@ export default function LoginForm() {
           id='email'
           type='email'
           autoComplete='email'
-          className={`field__input${errors.email ? ' field__input--error' : ''}`}
+          className={emailClass}
           {...register('email', { required: true })}
         />
         {errors.email && <span className='field__error'>Please provide an email address.</span>}
@@ -93,7 +102,7 @@ export default function LoginForm() {
           id='password'
           type='password'
           autoComplete='current-password'
-          className={`field__input${errors.password ? ' field__input--error' : ''}`}
+          className={passwordClass}
           {...register('password', { required: true })}
         />
         {errors.password && <span className='field__error'>Please provide a password.</span>}

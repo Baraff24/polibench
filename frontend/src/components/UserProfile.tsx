@@ -4,8 +4,8 @@ import { SubmitHandler, useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router'
 import { useAuth } from '../contexts/auth'
 import { useSnackBar } from '../contexts/snackbar'
-import { User } from '../models/user'
-import userService from '../services/user.service'
+import type { User } from '../models'
+import { userService } from '../services'
 
 interface UserProfileProps {
   userProfile: User
@@ -62,19 +62,25 @@ export default function UserProfile({ userProfile, onUserUpdated, allowDelete }:
     navigate('/')
   }
 
-  const initials = userProfile.first_name ? userProfile.first_name[0].toUpperCase() : 'P'
+  let initials = 'P'
+  if (userProfile.first_name) {
+    initials = userProfile.first_name[0].toUpperCase()
+  }
   const fullName = [userProfile.first_name, userProfile.last_name].filter(Boolean).join(' ')
+  let emailClass = 'field__input'
+  if (errors.email) {
+    emailClass = 'field__input field__input--error'
+  }
 
   return (
     <div className='profile'>
       {/* Header */}
       <div className='profile__header'>
         <div className='avatar avatar--xl'>
-          {userProfile.picture ? (
+          {userProfile.picture && (
             <img className='avatar__img' src={userProfile.picture} alt={fullName} />
-          ) : (
-            <span aria-hidden='true'>{initials}</span>
           )}
+          {!userProfile.picture && <span aria-hidden='true'>{initials}</span>}
         </div>
         {fullName && <p className='profile__name'>{fullName}</p>}
         <p className='profile__email'>{userProfile.email}</p>
@@ -110,7 +116,7 @@ export default function UserProfile({ userProfile, onUserUpdated, allowDelete }:
             <input
               id='email'
               type='email'
-              className={`field__input${errors.email ? ' field__input--error' : ''}`}
+              className={emailClass}
               {...register('email', { required: true })}
             />
             {errors.email && <span className='field__error'>Email is required.</span>}

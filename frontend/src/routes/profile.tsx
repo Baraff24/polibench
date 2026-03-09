@@ -1,7 +1,10 @@
-import UserProfile from '../components/UserProfile'
+import { UserProfile } from '../components'
 import { useAuth } from '../contexts/auth'
 
 export function Profile() {
   const { user } = useAuth()
-  return user ? <UserProfile userProfile={user} allowDelete={true} /> : null
+
+  if (!user) return null
+
+  return <UserProfile userProfile={user} allowDelete={true} />
 }

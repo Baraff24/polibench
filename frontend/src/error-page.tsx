@@ -10,11 +10,22 @@ interface RouteError {
 export default function ErrorPage() {
   const error = useRouteError() as RouteError
 
-  const status = isRouteErrorResponse(error) ? error.status : null
-  const title = status === 404 ? 'Page not found' : 'Unexpected error'
-  const message = isRouteErrorResponse(error)
-    ? error.statusText || error.data
-    : (error as { message?: string })?.message || 'Something went wrong.'
+  let status: number | null = null
+  if (isRouteErrorResponse(error)) {
+    status = error.status
+  }
+
+  let title = 'Unexpected error'
+  if (status === 404) {
+    title = 'Page not found'
+  }
+
+  let message = 'Something went wrong.'
+  if (isRouteErrorResponse(error)) {
+    message = error.statusText || error.data
+  } else if ((error as { message?: string })?.message) {
+    message = (error as { message: string }).message
+  }
 
   return (
     <div className='auth'>

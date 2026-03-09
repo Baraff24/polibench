@@ -7,6 +7,11 @@ type Props = {
   onToggleSidebar: () => void
 }
 
+function navItemClass(isActive: boolean): string {
+  if (isActive) return 'sidebar__item sidebar__item--active'
+  return 'sidebar__item'
+}
+
 export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
@@ -30,13 +35,29 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
     navigate('/')
   }
 
-  const initials = user?.first_name ? user.first_name[0].toUpperCase() : 'P'
+  let initials = 'P'
+  if (user?.first_name) {
+    initials = user.first_name[0].toUpperCase()
+  }
   const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ')
+
+  let sidebarClass = 'sidebar'
+  if (!sidebarOpen) {
+    sidebarClass = 'sidebar sidebar--hidden'
+  }
+  let topbarClass = 'topbar'
+  if (!sidebarOpen) {
+    topbarClass = 'topbar topbar--full'
+  }
+  let dropdownMenuClass = 'dropdown__menu'
+  if (menuOpen) {
+    dropdownMenuClass = 'dropdown__menu dropdown__menu--open'
+  }
 
   return (
     <>
       {/* Sidebar */}
-      <aside className={`sidebar${sidebarOpen ? '' : ' sidebar--hidden'}`}>
+      <aside className={sidebarClass}>
         <div className='sidebar__brand'>
           <NavLink to='/' className='sidebar__brand-link'>
             <span className='sidebar__brand-name'>Polibench</span>
@@ -59,11 +80,7 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
         <nav className='sidebar__nav'>
           <div className='sidebar__section-label'>Menu</div>
 
-          <NavLink
-            to='/'
-            end
-            className={({ isActive }) => `sidebar__item${isActive ? ' sidebar__item--active' : ''}`}
-          >
+          <NavLink to='/' end className={({ isActive }) => navItemClass(isActive)}>
             <svg
               className='sidebar__item-icon'
               viewBox='0 0 24 24'
@@ -80,12 +97,7 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
           {/* Guest */}
           {user === undefined && (
             <>
-              <NavLink
-                to='/login'
-                className={({ isActive }) =>
-                  `sidebar__item${isActive ? ' sidebar__item--active' : ''}`
-                }
-              >
+              <NavLink to='/login' className={({ isActive }) => navItemClass(isActive)}>
                 <svg
                   className='sidebar__item-icon'
                   viewBox='0 0 24 24'
@@ -99,12 +111,7 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
                 </svg>
                 Login
               </NavLink>
-              <NavLink
-                to='/register'
-                className={({ isActive }) =>
-                  `sidebar__item${isActive ? ' sidebar__item--active' : ''}`
-                }
-              >
+              <NavLink to='/register' className={({ isActive }) => navItemClass(isActive)}>
                 <svg
                   className='sidebar__item-icon'
                   viewBox='0 0 24 24'
@@ -126,12 +133,7 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
           {user?.is_superuser && (
             <>
               <div className='sidebar__section-label'>Admin</div>
-              <NavLink
-                to='/users'
-                className={({ isActive }) =>
-                  `sidebar__item${isActive ? ' sidebar__item--active' : ''}`
-                }
-              >
+              <NavLink to='/users' className={({ isActive }) => navItemClass(isActive)}>
                 <svg
                   className='sidebar__item-icon'
                   viewBox='0 0 24 24'
@@ -152,7 +154,7 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
       </aside>
 
       {/* Topbar */}
-      <header className={`topbar${sidebarOpen ? '' : ' topbar--full'}`}>
+      <header className={topbarClass}>
         {!sidebarOpen && (
           <button className='topbar__toggle' aria-label='Open sidebar' onClick={onToggleSidebar}>
             <svg
@@ -180,15 +182,14 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
                 aria-label='Account menu'
                 onClick={() => setMenuOpen((v) => !v)}
               >
-                {user.picture ? (
+                {user.picture && (
                   <img className='avatar avatar--sm' src={user.picture} alt={fullName} />
-                ) : (
-                  <span className='avatar avatar--sm'>{initials}</span>
                 )}
+                {!user.picture && <span className='avatar avatar--sm'>{initials}</span>}
                 <span className='topbar__user-name'>{fullName || 'Account'}</span>
               </button>
 
-              <div className={`dropdown__menu${menuOpen ? ' dropdown__menu--open' : ''}`}>
+              <div className={dropdownMenuClass}>
                 <NavLink
                   to='/profile'
                   className='dropdown__item'

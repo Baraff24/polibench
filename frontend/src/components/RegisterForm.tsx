@@ -2,8 +2,8 @@ import { AxiosError } from 'axios'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { Link as RouterLink, useNavigate } from 'react-router'
 import { useSnackBar } from '../contexts/snackbar'
-import { User } from '../models/user'
-import authService from '../services/auth.service'
+import type { User } from '../models'
+import { authService } from '../services'
 
 const SHOW_EMAIL_REGISTER_FORM: string = import.meta.env.VITE_PWD_SIGNUP_ENABLED
 
@@ -39,11 +39,28 @@ export default function RegisterForm() {
     window.location.href = authService.getGoogleLoginUrl()
   }
 
+  let firstNameClass = 'field__input'
+  if (errors.first_name) {
+    firstNameClass = 'field__input field__input--error'
+  }
+  let lastNameClass = 'field__input'
+  if (errors.last_name) {
+    lastNameClass = 'field__input field__input--error'
+  }
+  let emailClass = 'field__input'
+  if (errors.email) {
+    emailClass = 'field__input field__input--error'
+  }
+  let passwordClass = 'field__input'
+  if (errors.password) {
+    passwordClass = 'field__input field__input--error'
+  }
+
   return (
     <div className='form'>
       <h1 className='form__title'>Create account</h1>
       <p className='form__subtitle'>
-        No need to sign up — connect with Google and we'll import your profile.
+        No need to sign up — connect with Google and we&apos;ll import your profile.
       </p>
 
       <button type='button' className='btn btn--outline btn--full' onClick={handleGoogleLogin}>
@@ -80,7 +97,7 @@ export default function RegisterForm() {
               <input
                 id='first_name'
                 type='text'
-                className={`field__input${errors.first_name ? ' field__input--error' : ''}`}
+                className={firstNameClass}
                 {...register('first_name', { required: true })}
               />
               {errors.first_name && <span className='field__error'>First name is required.</span>}
@@ -93,7 +110,7 @@ export default function RegisterForm() {
               <input
                 id='last_name'
                 type='text'
-                className={`field__input${errors.last_name ? ' field__input--error' : ''}`}
+                className={lastNameClass}
                 {...register('last_name', { required: true })}
               />
               {errors.last_name && <span className='field__error'>Last name is required.</span>}
@@ -107,7 +124,7 @@ export default function RegisterForm() {
                 id='email'
                 type='email'
                 autoComplete='email'
-                className={`field__input${errors.email ? ' field__input--error' : ''}`}
+                className={emailClass}
                 {...register('email', { required: true })}
               />
               {errors.email && (
@@ -122,7 +139,7 @@ export default function RegisterForm() {
               <input
                 id='password'
                 type='password'
-                className={`field__input${errors.password ? ' field__input--error' : ''}`}
+                className={passwordClass}
                 {...register('password', { required: true })}
               />
               {errors.password && <span className='field__error'>Please provide a password.</span>}

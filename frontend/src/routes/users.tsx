@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { redirect, useLoaderData } from 'react-router'
-import UserProfile from '../components/UserProfile'
+import { UserProfile } from '../components'
 import { useAuth } from '../contexts/auth'
 import { useSnackBar } from '../contexts/snackbar'
-import { User } from '../models/user'
-import userService from '../services/user.service'
+import type { User } from '../models'
+import { userService } from '../services'
 
 export async function loader() {
   try {
@@ -25,7 +25,12 @@ export default function Users() {
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const handleUserUpdate = (updated: User) => {
-    setUsers((prev) => prev.map((u) => (u.uuid === updated.uuid ? updated : u)))
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.uuid === updated.uuid) return updated
+        return u
+      }),
+    )
   }
 
   const handleConfirmDelete = async () => {
@@ -45,28 +50,32 @@ export default function Users() {
         <div className='user-list-panel'>
           <ul className='user-list'>
             {users.map((u) => {
-              const initials = u.first_name
-                ? u.first_name[0].toUpperCase()
-                : u.email[0].toUpperCase()
+              let firstChar = u.email[0].toUpperCase()
+              if (u.first_name) {
+                firstChar = u.first_name[0].toUpperCase()
+              }
               const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email
               const isSelected = selectedUser?.uuid === u.uuid
+              let itemClass = 'user-list__item'
+              if (isSelected) {
+                itemClass = 'user-list__item user-list__item--selected'
+              }
+              const isSelf = currentUser?.uuid === u.uuid
+              let ariaCurrent: 'true' | undefined = undefined
+              if (isSelected) {
+                ariaCurrent = 'true'
+              }
 
               return (
-                <li
-                  key={u.uuid}
-                  className={`user-list__item${isSelected ? ' user-list__item--selected' : ''}`}
-                >
+                <li key={u.uuid} className={itemClass}>
                   <button
                     className='user-list__btn'
                     onClick={() => setSelectedUser(u)}
-                    aria-current={isSelected ? 'true' : undefined}
+                    aria-current={ariaCurrent}
                   >
                     <div className='avatar avatar--sm'>
-                      {u.picture ? (
-                        <img className='avatar__img' src={u.picture} alt={fullName} />
-                      ) : (
-                        <span>{initials}</span>
-                      )}
+                      {u.picture && <img className='avatar__img' src={u.picture} alt={fullName} />}
+                      {!u.picture && <span>{firstChar}</span>}
                     </div>
                     <div className='user-list__info'>
                       <span className='user-list__name'>{fullName}</span>
@@ -75,7 +84,7 @@ export default function Users() {
                   </button>
 
                   {/* Delete (only non-self) */}
-                  {currentUser?.uuid !== u.uuid && (
+                  {!isSelf && (
                     <button
                       className='btn btn--ghost btn--icon user-list__delete'
                       aria-label={`Delete ${fullName}`}
@@ -107,13 +116,14 @@ export default function Users() {
 
         {/* Right: user profile editor */}
         <div className='user-detail-panel'>
-          {selectedUser ? (
+          {selectedUser && (
             <UserProfile
               userProfile={selectedUser}
               onUserUpdated={handleUserUpdate}
               allowDelete={currentUser?.uuid === selectedUser.uuid}
             />
-          ) : (
+          )}
+          {!selectedUser && (
             <div className='user-detail-panel__empty'>
               <p className='text-muted'>Select a user to view details.</p>
             </div>

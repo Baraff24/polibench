@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { User } from '../models/user'
+import type { User } from '../models'
 
 const API_URL = import.meta.env.VITE_BACKEND_API_URL
 
