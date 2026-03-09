@@ -15,30 +15,55 @@ src/
 │   ├── main.scss         ← entry point: importa tutto in ordine
 │   ├── abstracts/        ← variabili e mixin (no output CSS)
 │   ├── base/             ← reset e tipografia
-│   ├── components/       ← btn, form, card, alert, avatar, dialog
-│   ├── layout/           ← navbar, layout shell, container
+│   ├── components/       ← btn, form, card, badge, table, stat-card…
+│   ├── layout/           ← sidebar, topbar, layout shell
 │   └── pages/            ← stili specifici per pagina
 ├── components/           ← componenti UI riutilizzabili
-│   ├── TopMenuBar.tsx
+│   ├── TopMenuBar.tsx    ← sidebar + topbar con navigazione completa
 │   ├── LoginForm.tsx
 │   ├── RegisterForm.tsx
-│   └── UserProfile.tsx
+│   ├── UserProfile.tsx
+│   ├── index.ts          ← barrel file (re-export tutto)
+│   └── common/           ← componenti generici riusabili
+│       ├── Badge.tsx         ← badge con varianti semantiche
+│       ├── DataTable.tsx     ← tabella generica tipizzata
+│       ├── EmptyState.tsx    ← stato vuoto con messaggio
+│       ├── LoadingSpinner.tsx
+│       ├── PageHeader.tsx    ← intestazione pagina (titolo + azioni)
+│       └── StatCard.tsx      ← card KPI (label + value + icona)
 ├── contexts/             ← stato globale (React Context)
 │   ├── auth.tsx
 │   └── snackbar.tsx
 ├── models/               ← interfacce TypeScript
-│   └── user.ts
+│   ├── user.ts
+│   ├── dataset.ts        ← DatasetSummary, DatasetPublic, TaskType…
+│   ├── ml-model.ts       ← MLModelSummary, MLModelPublic…
+│   ├── experiment.ts     ← ExperimentPublic, Status, CodeInfo…
+│   ├── metric.ts         ← MetricPublic, ExperimentMetrics, Split…
+│   ├── leaderboard.ts    ← LeaderboardEntry
+│   └── index.ts          ← barrel file (re-export tutto)
 ├── services/             ← client HTTP (chiamate al backend)
 │   ├── auth.service.ts
-│   └── user.service.ts
+│   ├── user.service.ts
+│   ├── dataset.service.ts
+│   ├── ml-model.service.ts
+│   ├── experiment.service.ts
+│   ├── leaderboard.service.ts
+│   └── index.ts          ← barrel file (re-export tutto)
 └── routes/               ← componenti di pagina (un file per route)
-    ├── root.tsx
+    ├── root.tsx          ← layout shell (TopMenuBar + Outlet)
     ├── home.tsx
     ├── login.tsx
     ├── register.tsx
     ├── profile.tsx
-    ├── users.tsx
-    └── sso.login.tsx
+    ├── users.tsx         ← admin only
+    ├── sso.login.tsx
+    ├── leaderboard.tsx   ← filtri + tabella risultati
+    ├── datasets.tsx      ← griglia card dataset
+    ├── dataset-detail.tsx
+    ├── models.tsx        ← tabella modelli ML
+    ├── model-detail.tsx
+    └── experiment-detail.tsx
 ```
 
 ---
@@ -48,25 +73,28 @@ src/
 Il frontend segue un'architettura a strati orizzontali con responsabilità separate:
 
 ```
-┌─────────────────────────────────────────┐
-│           Routes (pagine)               │  ← routes/
-│  home, login, register, profile, users  │
-├─────────────────────────────────────────┤
-│         Components (UI)                 │  ← components/
-│  LoginForm, TopMenuBar, UserProfile…    │
-├─────────────────────────────────────────┤
-│         Styles (SCSS + BEM)             │  ← styles/
-│  variables, mixins, components, pages  │
-├─────────────────────────────────────────┤
-│         Contexts (stato globale)        │  ← contexts/
-│  AuthContext, SnackBarContext           │
-├─────────────────────────────────────────┤
-│         Services (HTTP)                 │  ← services/
-│  auth.service, user.service             │
-├─────────────────────────────────────────┤
-│         Models (tipi TypeScript)        │  ← models/
-│  User                                   │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                    Routes (pagine)                      │  ← routes/
+│  home, login, register, profile, users,                 │
+│  leaderboard, datasets, dataset-detail,                 │
+│  models, model-detail, experiment-detail                │
+├─────────────────────────────────────────────────────────┤
+│                  Components (UI)                        │  ← components/
+│  TopMenuBar, LoginForm, UserProfile…                    │
+│  common/: Badge, DataTable, StatCard, PageHeader…       │
+├─────────────────────────────────────────────────────────┤
+│                Styles (SCSS + BEM)                      │  ← styles/
+│  variables, mixins, components, layout, pages           │
+├─────────────────────────────────────────────────────────┤
+│               Contexts (stato globale)                  │  ← contexts/
+│  AuthContext, SnackBarContext                           │
+├─────────────────────────────────────────────────────────┤
+│                 Services (HTTP)                         │  ← services/
+│  auth, user, dataset, ml-model, experiment, leaderboard │
+├─────────────────────────────────────────────────────────┤
+│               Models (tipi TypeScript)                  │  ← models/
+│  User, Dataset, MLModel, Experiment, Metric, Leaderboard│
+└─────────────────────────────────────────────────────────┘
 ```
 
 Ogni strato dipende solo dagli strati sottostanti, mai da quelli superiori.
@@ -79,13 +107,13 @@ Ogni strato dipende solo dagli strati sottostanti, mai da quelli superiori.
 import './styles/main.scss'   // unico import CSS globale
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <AuthProvider>
-      <SnackBarProvider>
-        <RouterProvider router={router} />
-      </SnackBarProvider>
-    </AuthProvider>
-  </React.StrictMode>,
+    <React.StrictMode>
+        <AuthProvider>
+            <SnackBarProvider>
+                <RouterProvider router={router}/>
+            </SnackBarProvider>
+        </AuthProvider>
+    </React.StrictMode>,
 )
 ```
 
@@ -100,19 +128,25 @@ Le route sono definite come array di oggetti e passate a `createBrowserRouter`:
 
 ```typescript
 export const routes = [
-  {
-    path: '/',
-    Component: Root,           // layout principale con TopMenuBar
-    errorElement: <ErrorPage />,
-    children: [
-      { index: true, Component: Home, loader: homeLoader },
-      { path: 'sso-login-callback', Component: SSOLogin, loader: ssoLoader },
-      { path: 'profile', Component: Profile },
-      { path: 'login', Component: Login },
-      { path: 'register', Component: Register },
-      { path: 'users', Component: Users, loader: usersLoader },
-    ],
-  },
+    {
+        path: '/',
+        Component: Root,           // layout principale con TopMenuBar
+        errorElement: <ErrorPage / >,
+        children: [
+            {index: true, Component: Home, loader: homeLoader},
+            {path: 'sso-login-callback', Component: SSOLogin, loader: ssoLoader},
+            {path: 'profile', Component: Profile},
+            {path: 'login', Component: Login},
+            {path: 'register', Component: Register},
+            {path: 'users', Component: Users, loader: usersLoader},
+            {path: 'leaderboard', Component: Leaderboard},
+            {path: 'datasets', Component: Datasets, loader: datasetsLoader},
+            {path: 'datasets/:uuid', Component: DatasetDetail, loader: datasetDetailLoader},
+            {path: 'models', Component: Models, loader: modelsLoader},
+            {path: 'models/:uuid', Component: ModelDetail, loader: modelDetailLoader},
+            {path: 'experiments/:uuid', Component: ExperimentDetail, loader: experimentDetailLoader},
+        ],
+    },
 ]
 ```
 
@@ -144,10 +178,11 @@ export default function Root() {
 }
 ```
 
-`TopMenuBar` (`components/TopMenuBar.tsx`) usa le classi BEM `.navbar` e `.dropdown`. Implementa:
+`TopMenuBar` (`components/TopMenuBar.tsx`) implementa sidebar e topbar. Implementa:
 
-- brand link a sinistra (`.navbar__brand`)
-- link di navigazione contestuali a destra (`.navbar__link`, `.navbar__link--active`)
+- brand link (`.sidebar__brand`, `.sidebar__brand-name`)
+- link di navigazione con NavLink attivo (`.sidebar__item`, `.sidebar__item--active`)
+- bottone chiudi sidebar X (`.sidebar__close`) e bottone hamburger (`.topbar__toggle`)
 - avatar button con dropdown accessibile via `aria-expanded` e click-outside handler
 - SVG inline al posto di librerie di icone esterne
 
@@ -167,11 +202,11 @@ applica classi BEM con `className`:
 // Block + Modifier
 <button className="btn btn--primary btn--full">
 
-// Block__Element
-<label className="field__label">
+    // Block__Element
+    <label className="field__label">
 
-// Block__Element con stato condizionale
-<input className={`field__input${errors.email ? ' field__input--error' : ''}`} />
+        // Block__Element con stato condizionale
+        <input className={`field__input${errors.email ? ' field__input--error' : ''}`}/>
 ```
 
 ### Variabili e mixin
@@ -179,26 +214,10 @@ applica classi BEM con `className`:
 Tutti i valori di design (colori, spaziature, breakpoint, tipografia) sono dichiarati in `_variables.scss` e usati
 tramite `@use '../abstracts/variables' as *`. Un cambio di colore primario si propaga automaticamente in tutto il CSS.
 
-I mixin riutilizzabili (`flex-center`, `card-surface`, `input-base`, `button-base`, `respond-to`) sono in
-`_mixins.scss` e riducono la duplicazione tra componenti.
+I mixin `card` e `input` in `_mixins.scss` riducono la duplicazione tra componenti: `@mixin card` applica sfondo,
+bordo e border-radius standard; `@mixin input` applica lo stile base di un campo di testo.
 
-### Responsive design
-
-Il breakpoint system usa `@include respond-to(md)` (mobile-first):
-
-```scss
-.card-grid {
-  grid-template-columns: 1fr;             // mobile
-
-  @include respond-to(sm) {
-    grid-template-columns: repeat(2, 1fr); // ≥576px
-  }
-
-  @include respond-to(lg) {
-    grid-template-columns: repeat(3, 1fr); // ≥992px
-  }
-}
-```
+Per la documentazione completa — variabili, mixin, blocchi BEM e regole per aggiornamenti — vedere `03_scss.md`.
 
 ---
 
@@ -210,10 +229,10 @@ Il contesto di autenticazione espone:
 
 ```typescript
 type AuthContextType = {
-  user: User | undefined
-  setUser: (user: User | undefined) => void
-  login: (data: FormData) => void
-  logout: () => void
+    user: User | undefined
+    setUser: (user: User | undefined) => void
+    login: (data: FormData) => void
+    logout: () => void
 }
 ```
 
@@ -229,7 +248,7 @@ usa `aria-live="polite"` per accessibilità.
 
 ```typescript
 type SnackBarContextActions = {
-  showSnackBar: (message: string, severity: Severity, timeout?: number) => void
+    showSnackBar: (message: string, severity: Severity, timeout?: number) => void
 }
 // severity: 'success' | 'error' | 'warning' | 'info'
 ```
@@ -239,6 +258,7 @@ type SnackBarContextActions = {
 ## Services: chiamate HTTP
 
 I service sono classi singleton che incapsulano le chiamate HTTP al backend. Non contengono logica UI.
+Tutti i service sono accessibili tramite il barrel `services/index.ts`.
 
 ### `auth.service.ts`
 
@@ -261,26 +281,166 @@ I service sono classi singleton che incapsulano le chiamate HTTP al backend. Non
 | `deleteUser(userId)`          | `DELETE /users/{id}` | Elimina utente (admin)   |
 | `deleteSelf()`                | `DELETE /users/me`   | Elimina account corrente |
 
+### `dataset.service.ts`
+
+| Metodo            | Endpoint               | Descrizione               |
+|-------------------|------------------------|---------------------------|
+| `getAll()`        | `GET /datasets`        | Lista tutti i dataset     |
+| `getByUuid(uuid)` | `GET /datasets/{uuid}` | Dettaglio singolo dataset |
+| `create(data)`    | `POST /datasets`       | Crea nuovo dataset        |
+
+### `ml-model.service.ts`
+
+| Metodo            | Endpoint                | Descrizione               |
+|-------------------|-------------------------|---------------------------|
+| `getAll()`        | `GET /ml-models`        | Lista tutti i modelli     |
+| `getByUuid(uuid)` | `GET /ml-models/{uuid}` | Dettaglio singolo modello |
+| `create(data)`    | `POST /ml-models`       | Registra nuovo modello    |
+
+### `experiment.service.ts`
+
+| Metodo             | Endpoint                          | Descrizione                    |
+|--------------------|-----------------------------------|--------------------------------|
+| `getByUuid(uuid)`  | `GET /experiments/{uuid}`         | Dettaglio singolo experiment   |
+| `getMetrics(uuid)` | `GET /experiments/{uuid}/metrics` | Metriche raggruppate per split |
+
+### `leaderboard.service.ts`
+
+| Metodo                               | Endpoint               | Descrizione              |
+|--------------------------------------|------------------------|--------------------------|
+| `get(datasetUuid, metric, split, n)` | `GET /leaderboard?...` | Top-N risultati filtrati |
+
 ---
 
-## Modelli TypeScript: `models/user.ts`
+## Modelli TypeScript
+
+Tutti i modelli si trovano in `models/` e sono re-esportati dal barrel `models/index.ts`.
+Ogni interfaccia rispecchia lo schema Pydantic corrispondente nel backend. I campi opzionali (`?`) corrispondono
+ai campi `Optional` di Pydantic. Gli identificatori esposti sono sempre **UUID**, mai ObjectId MongoDB.
+
+### `user.ts`
 
 ```typescript
-export interface User {
-  uuid: string
-  email: string
-  password?: string
-  first_name?: string
-  last_name?: string
-  provider?: string
-  picture?: string
-  is_active?: boolean
-  is_superuser?: boolean
+interface User {
+    uuid: string;
+    email: string;
+    first_name?: string;
+    last_name?: string
+    picture?: string;
+    is_active?: boolean;
+    is_superuser?: boolean
 }
 ```
 
-Questa interfaccia rispecchia lo schema `schemas.User` del backend. I campi opzionali (`?`) corrispondono ai campi
-`Optional` di Pydantic.
+### `dataset.ts`
+
+```typescript
+type TaskType = 'ranking' | 'rating_prediction'
+type Visibility = 'public' | 'private'
+
+interface DatasetSummary {
+    uuid;
+    name;
+    version;
+    task;
+    visibility
+}
+
+interface DatasetPublic {
+    uuid;
+    name;
+    version;
+    task;
+    description?;
+    visibility;
+    splits?;
+    created_at;
+    ...
+}
+```
+
+### `ml-model.ts`
+
+```typescript
+interface MLModelSummary {
+    uuid;
+    name;
+    family?;
+    paper_url?
+}
+
+interface MLModelPublic {
+    uuid;
+    name;
+    family?;
+    paper_url?;
+    implementation?;
+    hyperparams?;
+    created_at;
+    ...
+}
+```
+
+### `experiment.ts`
+
+```typescript
+type Status = 'queued' | 'running' | 'finished' | 'failed'
+
+interface ExperimentPublic {
+    uuid;
+    dataset_uuid;
+    model_uuid;
+    submitted_by_user_uuid;
+    status;
+    seed?;
+    notes?;
+    training_config?;
+    code?;
+    artifacts?;
+    created_at;
+    finished_at?
+}
+```
+
+### `metric.ts`
+
+```typescript
+type Split = 'validation' | 'test'
+type Direction = 'max' | 'min'
+
+interface MetricPublic {
+    uuid;
+    experiment_uuid;
+    dataset_uuid;
+    model_uuid;
+    split;
+    metric;
+    value;
+    direction;
+    computed_at
+}
+
+interface ExperimentMetrics {
+    experiment_uuid;
+    metrics_by_split: Record<Split, MetricPublic[]>
+}
+```
+
+### `leaderboard.ts`
+
+```typescript
+interface LeaderboardEntry {
+    experiment_uuid;
+    model_uuid;
+    model_name?;
+    dataset_uuid;
+    split;
+    metric;
+    value;
+    direction;
+    rank?
+}
+```
 
 ---
 

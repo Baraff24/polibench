@@ -53,8 +53,14 @@ Struttura delle route:
 /login               → Pagina di login
 /register            → Pagina di registrazione
 /profile             → Profilo utente (autenticato)
-/users               → Lista utenti (autenticato, admin)
+/users               → Lista utenti (admin)
 /sso-login-callback  → Callback dopo Google SSO
+/leaderboard         → Classifica run (filtri dataset/metric/split/top_n)
+/datasets            → Lista dataset
+/datasets/:uuid      → Dettaglio dataset (splits, info, descrizione)
+/models              → Lista modelli ML
+/models/:uuid        → Dettaglio modello (family, paper, hyperparams)
+/experiments/:uuid   → Dettaglio experiment (run + metriche per split)
 ```
 
 ---
@@ -104,30 +110,38 @@ Il modifier è sempre aggiunto **accanto** al block, mai al posto: `btn btn--pri
 src/styles/
 ├── abstracts/
 │   ├── _variables.scss   ← colori, spaziature, tipografia, breakpoint
-│   └── _mixins.scss      ← respond-to, flex-center, card-surface, input-base, button-base
+│   └── _mixins.scss      ← card, input (mixin base)
 ├── base/
 │   ├── _reset.scss       ← reset CSS moderno (box-sizing, margini, font)
-│   └── _typography.scss  ← utility classes di testo (.text-sm, .text-muted…)
+│   └── _typography.scss  ← utility classes di testo (.text-muted, .text-center)
 ├── components/
 │   ├── _button.scss      ← .btn, varianti, dimensioni
 │   ├── _form.scss        ← .form, .field (label + input + errore)
 │   ├── _card.scss        ← .card, .card-grid
 │   ├── _alert.scss       ← .alert (inline), .toast (notifica a scomparsa)
 │   ├── _avatar.scss      ← .avatar con varianti di dimensione
-│   └── _dialog.scss      ← .dialog, .dialog-backdrop
+│   ├── _dialog.scss      ← .dialog, .dialog-backdrop
+│   ├── _table.scss       ← .table-wrap, .table, righe cliccabili
+│   ├── _badge.scss       ← .badge con varianti semantiche (success/error/…)
+│   ├── _stat-card.scss   ← .stat-card, .stat-grid (card KPI)
+│   ├── _spinner.scss     ← .spinner (animazione di caricamento)
+│   └── _empty-state.scss ← .empty-state (stato vuoto)
 ├── layout/
-│   ├── _layout.scss      ← .layout, .container, .page
-│   └── _navbar.scss      ← .navbar, .dropdown
+│   ├── _layout.scss      ← .layout, .container, .page, .page-header
+│   └── _navbar.scss      ← .sidebar, .topbar, .dropdown
 ├── pages/
 │   ├── _home.scss        ← .hero, .features
 │   ├── _auth.scss        ← .auth (login/register)
 │   ├── _profile.scss     ← .profile
-│   └── _users.scss       ← .users-layout, .user-list, .user-detail-panel
+│   ├── _users.scss       ← .users-layout, .user-list
+│   ├── _leaderboard.scss ← .leaderboard-filters, .leaderboard-rank
+│   ├── _datasets.scss    ← .dataset-card
+│   └── _detail.scss      ← .detail-section, .detail-grid, .detail-field
 └── main.scss             ← entry point: importa tutto in ordine
 ```
 
-`main.scss` è l'unico file importato in `main.tsx`. Gli altri file usano `@use` per dipendere da `abstracts/`
-senza importazioni circolari.
+Per la documentazione completa del sistema di stile — variabili, mixin, blocchi BEM e regole per gli aggiornamenti —
+vedere `03_scss.md`.
 
 ---
 
