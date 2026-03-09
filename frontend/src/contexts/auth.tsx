@@ -4,6 +4,7 @@ import type { User } from '../models'
 
 type AuthContextType = {
   user: User | undefined
+  loading: boolean
   setUser: (user: User | undefined) => void
   login: (data: FormData) => void
   logout: () => void
@@ -17,16 +18,17 @@ interface AuthContextProviderProps {
 
 const AuthProvider: FC<AuthContextProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User>()
+  const [loading, setLoading] = useState(true)
 
-  // Check if there is a currently active session
-  // when the provider is mounted for the first time.
   useEffect(() => {
     async function fetchUserProfile() {
       try {
-        const user = await userService.getProfile()
-        setUser(user)
+        const u = await userService.getProfile()
+        setUser(u)
       } catch {
         setUser(undefined)
+      } finally {
+        setLoading(false)
       }
     }
     fetchUserProfile()
@@ -34,8 +36,8 @@ const AuthProvider: FC<AuthContextProviderProps> = ({ children }) => {
 
   const login = async (data: FormData) => {
     await authService.login(data)
-    const user = await userService.getProfile()
-    setUser(user)
+    const u = await userService.getProfile()
+    setUser(u)
   }
 
   const logout = () => {
@@ -44,7 +46,9 @@ const AuthProvider: FC<AuthContextProviderProps> = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading, setUser, login, logout }}>
+      {children}
+    </AuthContext.Provider>
   )
 }
 

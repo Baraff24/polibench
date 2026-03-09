@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router'
 import type { ReactNode } from 'react'
 import { useAuth } from '../../contexts/auth.tsx'
+import LoadingSpinner from './LoadingSpinner.tsx'
 
 type Props = {
   children: ReactNode
@@ -8,7 +9,11 @@ type Props = {
 }
 
 export default function RequireAuth({ children, adminOnly = false }: Props) {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return <LoadingSpinner />
+  }
 
   if (user === undefined) {
     return <Navigate to='/login' replace />
