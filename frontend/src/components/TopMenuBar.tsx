@@ -257,6 +257,45 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
         )}
 
         <div className='topbar__right'>
+          {user === undefined && (
+            <div className='dropdown' ref={dropdownRef}>
+              <button
+                className='topbar__avatar-btn'
+                aria-expanded={menuOpen}
+                aria-haspopup='true'
+                aria-label='Account menu'
+                onClick={() => setMenuOpen((v) => !v)}
+              >
+                <span className='avatar avatar--sm'>
+                  <svg
+                    width='16'
+                    height='16'
+                    viewBox='0 0 24 24'
+                    fill='none'
+                    stroke='currentColor'
+                    strokeWidth='2'
+                  >
+                    <path d='M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2' />
+                    <circle cx='12' cy='7' r='4' />
+                  </svg>
+                </span>
+              </button>
+
+              <div className={dropdownMenuClass}>
+                <NavLink to='/login' className='dropdown__item' onClick={() => setMenuOpen(false)}>
+                  Login
+                </NavLink>
+                <NavLink
+                  to='/register'
+                  className='dropdown__item'
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Register
+                </NavLink>
+              </div>
+            </div>
+          )}
+
           {user !== undefined && (
             <div className='dropdown' ref={dropdownRef}>
               <button

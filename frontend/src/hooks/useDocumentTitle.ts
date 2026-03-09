@@ -10,6 +10,7 @@ const TITLES: Record<string, string> = {
   '/leaderboard': 'Leaderboard',
   '/datasets': 'Datasets',
   '/models': 'Models',
+  '/verify-email': 'Verify Email',
 }
 
 export default function useDocumentTitle() {

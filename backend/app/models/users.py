@@ -24,6 +24,7 @@ class User(Document):
     role: UserRole = UserRole.RESEARCHER
     team_uuid: Annotated[UUID | None, Indexed()] = None
     is_active: bool = True
+    is_verified: bool = False
     is_superuser: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     last_login_at: datetime | None = None

@@ -14,6 +14,7 @@ import Models, { loader as modelsLoader } from './routes/models'
 import ModelDetail, { loader as modelDetailLoader } from './routes/model-detail'
 import ExperimentDetail, { loader as experimentDetailLoader } from './routes/experiment-detail'
 import Leaderboard from './routes/leaderboard'
+import VerifyEmail from './routes/verify-email'
 import { RequireAuth } from './components'
 
 export const routes = [
@@ -43,6 +44,10 @@ export const routes = [
       {
         path: 'register',
         Component: Register,
+      },
+      {
+        path: 'verify-email',
+        Component: VerifyEmail,
       },
       {
         path: 'users',

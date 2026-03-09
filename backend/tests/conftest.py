@@ -44,6 +44,7 @@ async def _bootstrap_mock_db(test_app: FastAPI) -> None:
             email=settings.FIRST_SUPERUSER,
             hashed_password=get_hashed_password(settings.FIRST_SUPERUSER_PASSWORD),
             is_superuser=True,
+            is_verified=True,
         ).create()
 
 

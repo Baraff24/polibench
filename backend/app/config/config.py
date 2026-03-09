@@ -37,5 +37,16 @@ class Settings(BaseSettings):
     SSO_CALLBACK_HOSTNAME: str | None = None
     SSO_LOGIN_CALLBACK_URL: str | None = None
 
+    # Email (SMTP)
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM_EMAIL: str | None = None
+    SMTP_TLS: bool = True
+
+    # Frontend URL (used to build verification links)
+    FRONTEND_URL: str = "http://localhost:5173"
+
 
 settings = Settings()  # type: ignore

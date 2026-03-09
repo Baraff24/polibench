@@ -1283,4 +1283,29 @@ h1, h2, h3, h4, h5, h6 {
   word-break: break-word;
 }
 
+.verify-email {
+  text-align: center;
+  padding: 5rem 1.5rem;
+}
+.verify-email__icon {
+  margin-bottom: 1.5rem;
+}
+.verify-email__icon--success {
+  color: #0ab39c;
+}
+.verify-email__icon--error {
+  color: #f06548;
+}
+.verify-email__title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #e9ecef;
+  margin-bottom: 0.75rem;
+}
+.verify-email__desc {
+  font-size: 0.9375rem;
+  color: #6c757d;
+  margin-bottom: 2rem;
+}
+
 /*# sourceMappingURL=main.css.map */

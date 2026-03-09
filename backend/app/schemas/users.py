@@ -20,6 +20,7 @@ class PrivateUserBase(UserBase):
 
     email: EmailStr | None = None
     is_active: bool | None = None
+    is_verified: bool | None = None
     is_superuser: bool | None = None
     provider: str | None = None
 

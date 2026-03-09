@@ -12,6 +12,11 @@ from ..auth.auth import (
     get_current_active_user,
     get_hashed_password,
 )
+from ..services.email import (
+    create_verification_token,
+    send_verification_email,
+    verify_email_token,
+)
 
 router = APIRouter()
 
@@ -25,6 +30,8 @@ async def register_user(
 ):
     """
     Register a new user.
+    Creates the user with is_verified=False and sends
+    a verification email with a JWT token.
     """
     hashed_password = get_hashed_password(password)
     user = models.User(
@@ -32,14 +39,64 @@ async def register_user(
         hashed_password=hashed_password,
         first_name=first_name,
         last_name=last_name,
+        is_verified=False,
     )
     try:
         await user.create()
-        return user
     except errors.DuplicateKeyError:
         raise HTTPException(
             status_code=400, detail="User with that email already exists."
         )
+
+    # Invia email di verifica
+    token = create_verification_token(user.uuid)
+    send_verification_email(user.email, token)
+
+    return user
+
+
+@router.get("/verify/{token}")
+async def verify_email(token: str):
+    """
+    Verifica l'indirizzo email dell'utente.
+    Il token è un JWT con subject=user.uuid e purpose=email-verification.
+    """
+    user_uuid = verify_email_token(token)
+    if user_uuid is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Token di verifica non valido o scaduto.",
+        )
+
+    user = await models.User.find_one({"uuid": user_uuid})
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    if user.is_verified:
+        return {"message": "Email già verificata."}
+
+    user.is_verified = True
+    await user.save()
+    return {"message": "Email verificata con successo."}
+
+
+@router.post("/resend-verification")
+async def resend_verification_email(
+    email: EmailStr = Body(..., embed=True),
+):
+    """
+    Reinvia l'email di verifica.
+    Utile se l'utente non ha ricevuto la prima email.
+    """
+    user = await models.User.find_one({"email": email})
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if user.is_verified:
+        return {"message": "Email già verificata."}
+
+    token = create_verification_token(user.uuid)
+    send_verification_email(user.email, token)
+    return {"message": "Email di verifica reinviata."}
 
 
 @router.get("", response_model=list[schemas.User])

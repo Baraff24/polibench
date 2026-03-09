@@ -19,7 +19,7 @@ export default function RegisterForm() {
   const onSubmit: SubmitHandler<User> = async (data) => {
     try {
       await authService.register(data)
-      showSnackBar('Registration successful.', 'success')
+      showSnackBar('Registration successful! Check your email to verify your account.', 'success')
       navigate('/login')
     } catch (error) {
       let msg
