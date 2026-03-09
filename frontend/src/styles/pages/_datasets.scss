@@ -1,0 +1,40 @@
+// =============================================================================
+// Page: Datasets list
+// =============================================================================
+
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins' as *;
+
+.dataset-card {
+  @include card;
+  padding: $space-5 $space-6;
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+  cursor: pointer;
+  transition: border-color $transition;
+
+  &:hover {
+    border-color: $color-accent;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__name {
+    font-size: $font-size-md;
+    font-weight: $font-weight-semibold;
+    color: $color-text-strong;
+  }
+
+  &__meta {
+    display: flex;
+    gap: $space-3;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+  }
+}
+

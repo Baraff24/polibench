@@ -1,0 +1,42 @@
+// =============================================================================
+// Page: Dataset detail
+// =============================================================================
+
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins' as *;
+
+.detail-section {
+  @include card;
+  padding: $space-6;
+  margin-bottom: $space-6;
+
+  &__title {
+    font-size: $font-size-md;
+    font-weight: $font-weight-semibold;
+    color: $color-text-strong;
+    margin-bottom: $space-4;
+  }
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: $space-4;
+}
+
+.detail-field {
+  &__label {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: $space-1;
+  }
+
+  &__value {
+    font-size: $font-size-sm;
+    color: $color-text;
+    word-break: break-word;
+  }
+}
+

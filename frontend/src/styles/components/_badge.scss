@@ -1,0 +1,40 @@
+// =============================================================================
+// Component: Badge  (BEM: .badge)
+// =============================================================================
+
+@use '../abstracts/variables' as *;
+
+.badge {
+  display: inline-block;
+  padding: $space-1 $space-3;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  border-radius: $radius-sm;
+  line-height: 1;
+
+  &--success {
+    color: $color-success;
+    background: $color-success-bg;
+  }
+
+  &--error {
+    color: $color-error;
+    background: $color-error-bg;
+  }
+
+  &--warning {
+    color: $color-warning;
+    background: $color-warning-bg;
+  }
+
+  &--info {
+    color: $color-info;
+    background: $color-info-bg;
+  }
+
+  &--neutral {
+    color: $color-text-muted;
+    background: rgba($color-white, 0.06);
+  }
+}
+

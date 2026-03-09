@@ -1,0 +1,23 @@
+// =============================================================================
+// Component: Empty State  (BEM: .empty-state)
+// =============================================================================
+
+@use '../abstracts/variables' as *;
+
+.empty-state {
+  text-align: center;
+  padding: $space-12 $space-6;
+
+  &__title {
+    font-size: $font-size-md;
+    font-weight: $font-weight-medium;
+    color: $color-text-muted;
+    margin-bottom: $space-2;
+  }
+
+  &__desc {
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+  }
+}
+

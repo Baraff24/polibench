@@ -1,0 +1,85 @@
+// =============================================================================
+// Page: Leaderboard
+// =============================================================================
+
+@use '../abstracts/variables' as *;
+
+.leaderboard-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-4;
+  margin-bottom: $space-6;
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    min-width: 10rem;
+  }
+
+  &__label {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__select {
+    padding: $space-2 $space-3;
+    font: inherit;
+    font-size: $font-size-sm;
+    color: $color-text;
+    background: $color-bg-input;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    cursor: pointer;
+
+    &:focus {
+      outline: none;
+      border-color: $color-accent;
+    }
+  }
+
+  &__input {
+    padding: $space-2 $space-3;
+    font: inherit;
+    font-size: $font-size-sm;
+    color: $color-text;
+    background: $color-bg-input;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    width: 8rem;
+
+    &:focus {
+      outline: none;
+      border-color: $color-accent;
+    }
+  }
+}
+
+.leaderboard-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-bold;
+
+  &--gold {
+    background: rgba(#f7b84b, 0.2);
+    color: #f7b84b;
+  }
+
+  &--silver {
+    background: rgba(#ced4da, 0.2);
+    color: #ced4da;
+  }
+
+  &--bronze {
+    background: rgba(#cd7f32, 0.2);
+    color: #cd7f32;
+  }
+}
+

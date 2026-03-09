@@ -1,0 +1,45 @@
+// =============================================================================
+// Component: Table  (BEM: .table)
+// =============================================================================
+
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins' as *;
+
+.table-wrap {
+  @include card;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+
+  &__th {
+    padding: $space-3 $space-5;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    color: $color-text-muted;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid $color-border;
+  }
+
+  &__td {
+    padding: $space-3 $space-5;
+    font-size: $font-size-sm;
+    color: $color-text;
+    border-bottom: 1px solid $color-border;
+    white-space: nowrap;
+  }
+
+  &__tr--clickable {
+    cursor: pointer;
+    transition: background $transition;
+
+    &:hover {
+      background: rgba($color-white, 0.03);
+    }
+  }
+}
+
