@@ -43,11 +43,32 @@ services:
       - "MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}"
       - "MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}"
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
+
+  mongo-express:
+    image: mongo-express:latest
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=db
+      - ME_CONFIG_MONGODB_PORT=${MONGO_PORT}
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=${MONGO_USER}
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=${MONGO_PASSWORD}
+      - ME_CONFIG_BASICAUTH_USERNAME=${MONGO_EXPRESS_USER:-admin}
+      - ME_CONFIG_BASICAUTH_PASSWORD=${MONGO_EXPRESS_PASSWORD:-admin}
+      - ME_CONFIG_SITE_BASEURL=/mongo-express/
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.${STACK_NAME?Variable not set}-mongo-express.rule=PathPrefix(`/mongo-express`)
+      - traefik.http.services.${STACK_NAME?Variable not set}-mongo-express.loadbalancer.server.port=8081
 
   backend:
     image: '${DOCKER_IMAGE_BACKEND?Variable not set}:${TAG-latest}'
