@@ -89,10 +89,6 @@ export default function UserProfile({ userProfile, onUserUpdated, allowDelete }:
     navigate('/')
   }
 
-  let initials = 'P'
-  if (userProfile.first_name) {
-    initials = userProfile.first_name[0].toUpperCase()
-  }
   const fullName = [userProfile.first_name, userProfile.last_name].filter(Boolean).join(' ')
   let emailClass = 'field__input'
   if (errors.email) {
@@ -104,14 +100,8 @@ export default function UserProfile({ userProfile, onUserUpdated, allowDelete }:
 
   return (
     <div className='profile'>
-      {/* Header */}
+      {/* Header — solo testo, niente avatar */}
       <div className='profile__header'>
-        <div className='avatar avatar--xl'>
-          {userProfile.picture && (
-            <img className='avatar__img' src={userProfile.picture} alt={fullName} />
-          )}
-          {!userProfile.picture && <span aria-hidden='true'>{initials}</span>}
-        </div>
         {fullName && <p className='profile__name'>{fullName}</p>}
         <p className='profile__email'>{userProfile.email}</p>
       </div>
@@ -197,7 +187,7 @@ export default function UserProfile({ userProfile, onUserUpdated, allowDelete }:
         </form>
       </section>
 
-      {/* Change password — only for non-SSO users on their own profile */}
+      {/* Change password — solo per utenti non-SSO sul proprio profilo */}
       {isOwnProfile && !isSSOUser && (
         <section className='profile__section'>
           <h2 className='profile__section-title'>Change password</h2>

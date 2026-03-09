@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router'
 import { useAuth } from '../contexts/auth'
+import { useSnackBar } from '../contexts/snackbar'
 
 type Props = {
   sidebarOpen: boolean
@@ -14,6 +15,7 @@ function navItemClass(isActive: boolean): string {
 
 export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
   const { user, logout } = useAuth()
+  const { showSnackBar } = useSnackBar()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -32,6 +34,7 @@ export default function TopMenuBar({ sidebarOpen, onToggleSidebar }: Props) {
   const handleLogout = () => {
     setMenuOpen(false)
     logout()
+    showSnackBar('Logged out successfully.', 'success')
     navigate('/')
   }
 

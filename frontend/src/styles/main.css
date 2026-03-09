@@ -1020,6 +1020,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 1.375rem;
   font-weight: 600;
   color: #e9ecef;
+  margin-bottom: 0.25rem;
 }
 .profile__email {
   font-size: 0.8125rem;
