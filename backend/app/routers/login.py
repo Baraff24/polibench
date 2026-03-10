@@ -114,13 +114,13 @@ async def google_callback(
             last_name=google_user.last_name,
             picture=google_user.picture,
             provider=google_user.provider,
-            is_email_verified=True,
+            is_verified=True,
         )
         user = await user.create()
-    elif not user.is_email_verified:
+    elif not user.is_verified:
         # If user already exists but email not verified (e.g. registered via password first),
         # mark it as verified since Google confirmed ownership
-        await user.set({models.User.is_email_verified: True})
+        await user.set({models.User.is_verified: True})
 
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
