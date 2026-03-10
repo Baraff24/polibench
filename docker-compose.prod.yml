@@ -38,6 +38,7 @@ services:
       traefik.http.routers.http-catchall.rule: Host(`${DOMAIN?Variable not set}`) || Host(`www.${DOMAIN?Variable not set}`)
       traefik.http.routers.http-catchall.entrypoints: web
       traefik.http.routers.http-catchall.middlewares: redirect-to-https
+      traefik.http.routers.http-catchall.service: noop@internal
 
       # middleware: http → https
       traefik.http.middlewares.redirect-to-https.redirectscheme.scheme: https
@@ -49,6 +50,7 @@ services:
       traefik.http.routers.wwwsecure-catchall.tls: true
       traefik.http.routers.wwwsecure-catchall.tls.certresolver: le
       traefik.http.routers.wwwsecure-catchall.middlewares: wwwtohttps
+      traefik.http.routers.wwwsecure-catchall.service: noop@internal
 
       # middleware: www → non-www
       traefik.http.middlewares.wwwtohttps.redirectregex.regex: ^https://www\.(.+)
@@ -116,7 +118,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.${STACK_NAME?Variable not set}-backend-http.rule=Host(`${DOMAIN?Variable not set}`) && (PathPrefix(`/api`) || PathPrefix(`/docs`) || PathPrefix(`/redoc`))
-      - traefik.http.routers.${STACK_NAME?Variable not set}-backend-http.entrypoints=websecure
+      - traefik.http.routers.${STACK_NAME?Variable not set}-backend-http.entrypoints=web,websecure
       - traefik.http.routers.${STACK_NAME?Variable not set}-backend-http.tls=true
       - traefik.http.routers.${STACK_NAME?Variable not set}-backend-http.tls.certresolver=le
       - traefik.http.services.${STACK_NAME?Variable not set}-backend.loadbalancer.server.port=8000
@@ -134,7 +136,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.rule=Host(`${DOMAIN?Variable not set}`) && PathPrefix(`/`)
-      - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.entrypoints=websecure
+      - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.entrypoints=web,websecure
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.tls=true
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.tls.certresolver=le
       - traefik.http.services.${STACK_NAME?Variable not set}-frontend.loadbalancer.server.port=80
