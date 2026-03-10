@@ -1,112 +1,451 @@
 # Polibench
 
-![Tests](https://github.com/baraff/polibench/actions/workflows/test.yml/badge.svg)
-![Build](https://github.com/baraff/polibench/actions/workflows/build.yml/badge.svg)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-![python_version](https://img.shields.io/badge/Python-%3E=3.12-blue)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Python](https://img.shields.io/badge/Python-%3E=3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![MongoDB](https://img.shields.io/badge/MongoDB-47A248?logo=mongodb&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 
-This is a template application for a FARM stack. FARM stands for FastAPI, React, MongoDB.
+**Polibench** è una piattaforma web per il **benchmarking comparativo di modelli di raccomandazione** (Recommender
+Systems). Consente a ricercatori e team di registrare dataset, algoritmi, esperimenti e metriche di valutazione in un
+unico ambiente strutturato, e di consultare leaderboard ordinate per performance.
 
-## Features
+Il progetto nasce in contesto accademico e si ispira a piattaforme come [BARS](https://openbenchmark.github.io/BARS/)
+e [OpenBenchmark](https://openbenchmark.github.io/), con l'obiettivo di centralizzare i risultati sperimentali e
+facilitare la riproducibilità.
 
-### Clean design with minimal dependencies
+---
 
-[![API docs](frontend/public/farmd-1.png)](https://github.com/baraff/polibench)
+## Funzionalità principali
 
-### Basic user management with OAuth2 SSO
+- **Gestione Dataset** — registrazione di dataset con task (`ranking`, `rating_prediction`, `ctr`), versione,
+  partizioni (train/test/validation) e visibilità (public/private).
+- **Registrazione Modelli** — catalogo di algoritmi di raccomandazione (BPR, LightGCN, SGL, …) con iperparametri di
+  riferimento, paper e implementazione.
+- **Submission di Esperimenti** — associazione dataset–modello con configurazione di training, seed, codice sorgente e
+  artefatti per la riproducibilità.
+- **Metriche di Valutazione** — registrazione batch di metriche (AUC, LogLoss, NDCG@k, Recall@k, …) per split (
+  test/validation) con direzione (max/min).
+- **Leaderboard** — classifica in tempo reale dei modelli per dataset, metrica e split, con grafici interattivi (
+  Recharts).
+- **Autenticazione** — JWT con email/password, Google OAuth2 (SSO), verifica email via SMTP.
+- **Ruoli utente** — `admin`, `researcher`, `viewer` con controlli di accesso differenziati.
+- **API UUID-first** — tutti gli endpoint pubblici usano UUID; gli ObjectId MongoDB restano interni.
+- **Pannello MongoDB** — Mongo Express integrato per ispezionare il database via web.
 
-[![API docs](frontend/public/farmd-2.png)](https://github.com/baraff/polibench)
+---
 
-## Project structure
+## Stack tecnologico
 
-The project is composed of :
+| Layer                  | Tecnologia                                                                     | Ruolo                                     |
+|------------------------|--------------------------------------------------------------------------------|-------------------------------------------|
+| **Backend**            | [FastAPI](https://fastapi.tiangolo.com/)                                       | Framework API async                       |
+| **ODM**                | [Beanie](https://beanie-odm.dev/)                                              | Object-Document Mapper per MongoDB        |
+| **Validazione**        | [Pydantic v2](https://docs.pydantic.dev/)                                      | Schemi API e modelli dati                 |
+| **Database**           | [MongoDB](https://www.mongodb.com/)                                            | Database documentale NoSQL                |
+| **Driver DB**          | [Motor](https://motor.readthedocs.io/)                                         | Client MongoDB async per Python           |
+| **Frontend**           | [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) | UI reattiva type-safe                     |
+| **Build tool**         | [Vite](https://vitejs.dev/)                                                    | Dev server con HMR e build ottimizzato    |
+| **Stili**              | [SCSS (BEM)](https://getbem.com/)                                              | CSS modulare senza framework esterni      |
+| **Grafici**            | [Recharts](https://recharts.org/)                                              | Visualizzazione dati (leaderboard charts) |
+| **Routing**            | [React Router v7](https://reactrouter.com/)                                    | Client-side routing con loader            |
+| **Form**               | [React Hook Form](https://react-hook-form.com/)                                | Gestione form performante                 |
+| **HTTP client**        | [Axios](https://axios-http.com/)                                               | Chiamate API con interceptor JWT          |
+| **Reverse proxy**      | [Traefik](https://traefik.io/)                                                 | Routing, TLS automatico (Let's Encrypt)   |
+| **Containerizzazione** | [Docker Compose](https://docs.docker.com/compose/)                             | Orchestrazione servizi (dev + prod)       |
+| **Package manager**    | [uv](https://docs.astral.sh/uv/) (backend), npm (frontend)                     | Gestione dipendenze                       |
+| **Testing**            | pytest + httpx (backend), Vitest (frontend)                                    | Test DB, API e componenti                 |
+| **Linting**            | Ruff + Black (backend), ESLint + Prettier (frontend)                           | Qualità del codice                        |
 
-* a backend API server built with FastAPI located in the [backend](backend) dir.
-* a frontend web app build with React and located in the [frontend](frontend) dir.
+---
 
-## Running the application locally for development
+## Struttura del progetto
 
-To run the application manually in a terminal, see both the [backend](backend/README.md) and [frontend](frontend/README.md)'s READMEs for instructions.
+```
+polibench/
+├── backend/                    # API FastAPI
+│   ├── app/
+│   │   ├── auth/               # Autenticazione JWT e OAuth2
+│   │   ├── config/             # Configurazione (Pydantic Settings)
+│   │   ├── models/             # Documenti Beanie (MongoDB)
+│   │   ├── routers/            # Endpoint HTTP (sottili)
+│   │   ├── schemas/            # Schemi Pydantic (input/output API)
+│   │   ├── services/           # Logica di business
+│   │   └── main.py             # Entry point dell'applicazione
+│   ├── scripts/
+│   │   └── seed.py             # Popolazione DB con dati di esempio
+│   └── tests/
+│       ├── db/                 # Smoke test database
+│       └── routers/            # Test API end-to-end
+│
+├── frontend/                   # Web app React
+│   ├── src/
+│   │   ├── components/         # Componenti UI (common, auth, leaderboard, layout)
+│   │   ├── contexts/           # React Context (auth, snackbar)
+│   │   ├── hooks/              # Custom hooks
+│   │   ├── models/             # Tipi TypeScript
+│   │   ├── routes/             # Pagine (home, datasets, models, experiments, leaderboard, …)
+│   │   ├── services/           # Chiamate API (auth, dataset, experiment, leaderboard, …)
+│   │   └── styles/             # SCSS organizzato in BEM
+│   └── public/                 # Asset statici
+│
+├── docs/                       # Documentazione estesa
+│   ├── backend/                # 15 documenti (panoramica → sviluppi futuri)
+│   └── frontend/               # 4 documenti (overview, tecnologie, architettura, SCSS)
+│
+├── docker-compose.yml          # Sviluppo locale (hot reload)
+├── docker-compose.prod.yml     # Produzione (TLS, build ottimizzate)
+├── .env.example                # Template variabili d'ambiente
+└── LICENSE                     # MIT
+```
 
-## Running the application with Docker
+---
 
-The project contains Docker configuration files to run the application with Docker compose. Two docker-compose files are provided with configuration for `dev` and for `production` environments. The Docker configuration is largely adapted from Tiangolo's [Full stack FastAPI template](https://github.com/fastapi/full-stack-fastapi-template) project.
+## Architettura
 
-### Local development with Docker
+### Backend — layer separati
 
-The local development file for docker is [docker-compose.yml](./docker-compose.yml).
+```
+┌──────────────────────────────────────────┐
+│            HTTP (FastAPI routers)         │  ← routers/
+├──────────────────────────────────────────┤
+│         Schemi API (Pydantic)            │  ← schemas/
+├──────────────────────────────────────────┤
+│         Service Layer (logica)           │  ← services/
+├──────────────────────────────────────────┤
+│         Autenticazione (JWT)             │  ← auth/
+├──────────────────────────────────────────┤
+│        Modelli dati (Beanie/ODM)         │  ← models/
+├──────────────────────────────────────────┤
+│           Database (MongoDB)             │  ← via Motor (async)
+└──────────────────────────────────────────┘
+```
 
-Start the stack with Docker Compose:
+I router sono volutamente **sottili**: ricevono la richiesta, delegano al service layer e restituiscono la risposta.
+Tutta la logica (risoluzione UUID → ObjectId, denormalizzazione, query leaderboard) vive nei service.
+
+### Frontend — layout
+
+```
+┌────────────────────────────────────────────────────┐
+│  TopMenuBar (logo, profilo, login/logout)          │
+├──────────────┬─────────────────────────────────────┤
+│  Sidebar     │  Contenuto principale               │
+│              │                                     │
+│  Dashboard   │  PageHeader                         │
+│  Leaderboard │  KPI Cards / Tabelle / Grafici      │
+│  Datasets    │  Form di submission                 │
+│  Models      │  Dettagli entità                    │
+│  Experiments │                                     │
+└──────────────┴─────────────────────────────────────┘
+```
+
+---
+
+## Entità del dominio
+
+| Entità         | Descrizione                                                                                           |
+|----------------|-------------------------------------------------------------------------------------------------------|
+| **User**       | Utente della piattaforma con ruolo (`admin`, `researcher`, `viewer`), autenticazione e verifica email |
+| **Team**       | Gruppo di ricerca che aggrega utenti sotto uno stesso namespace                                       |
+| **Dataset**    | Dataset di valutazione con task, versione, partizioni e visibilità                                    |
+| **MLModel**    | Algoritmo di raccomandazione con iperparametri di riferimento                                         |
+| **Experiment** | Associazione dataset–modello con configurazione, seed, codice e stato                                 |
+| **Metric**     | Risultato numerico per uno split e una metrica specifica (denormalizzato per query veloci)            |
+
+---
+
+## Avvio rapido
+
+### Prerequisiti
+
+- [Docker](https://docs.docker.com/get-docker/) e [Docker Compose](https://docs.docker.com/compose/install/)
+
+### 1. Clona il repository
+
+```bash
+git clone https://github.com/baraff/polibench.git
+cd polibench
+```
+
+### 2. Configura le variabili d'ambiente
+
+```bash
+cp .env.example .env
+# Modifica .env con i tuoi valori (vedi sezione "Configurazione" più sotto)
+```
+
+### 3. Avvia lo stack in sviluppo
 
 ```bash
 docker compose watch
 ```
 
-You can then open your browser and interact with these URLs:
+Questo avvia tutti i servizi con hot reload per backend e frontend.
 
-* Frontend, served with vite with hot reload of code: http://localhost
+### 4. Accedi all'applicazione
 
-* Backend, JSON based web API based on OpenAPI, with hot code reloading: http://localhost/api/v1
+| Servizio              | URL                                                              |
+|-----------------------|------------------------------------------------------------------|
+| **Frontend**          | [http://localhost](http://localhost)                             |
+| **API root**          | [http://localhost/api/v1](http://localhost/api/v1)               |
+| **Swagger UI**        | [http://localhost/docs](http://localhost/docs)                   |
+| **ReDoc**             | [http://localhost/redoc](http://localhost/redoc)                 |
+| **Mongo Express**     | [http://localhost/mongo-express](http://localhost/mongo-express) |
+| **Traefik Dashboard** | [http://localhost:8090](http://localhost:8090)                   |
 
-* Automatic interactive documentation with Swagger UI (from the OpenAPI backend): http://localhost/docs
-
-* Alternative automatic documentation with ReDoc (from the OpenAPI backend): http://localhost/redoc
-
-* Traefik UI, to see how the routes are being handled by the proxy: http://localhost:8090
-
-Once the stack is up, to check the logs, run:
-
-```bash
-docker compose logs
-```
-
-To check the logs of a specific service, add the name of the service, e.g.:
+### 5. Popola il database con dati di esempio (opzionale)
 
 ```bash
-docker compose logs backend
+docker compose exec backend uv run python scripts/seed.py
 ```
 
-To get access to a bash session inside a container (e.g. the `backend`):
+Per svuotare il database prima di popolare:
 
-```console
-$ docker compose exec backend bash
+```bash
+docker compose exec backend uv run python scripts/seed.py --reset
 ```
 
+---
 
-### Docker Compose settings for production
+## Sviluppo locale (senza Docker)
 
-The [docker-compose-prod.yml](./docker-compose.prod.yml) file contains the configuration to run the application with docker in a production environment, on a host server. To run the application with this file, run
+### Backend
 
-```console
+```bash
+cd backend
+uv sync                        # Installa le dipendenze nel venv
+uv run fastapi dev app/main.py # Avvia il server di sviluppo
+```
+
+Il server sarà disponibile su `http://127.0.0.1:8000`.
+
+- API: `http://localhost:8000/api/v1/`
+- Swagger: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+
+### Frontend
+
+```bash
+cd frontend
+npm install     # Installa le dipendenze
+npm run dev     # Avvia il dev server con hot reload
+```
+
+Il frontend sarà disponibile su `http://localhost:5173`.
+
+---
+
+## Test
+
+### Backend — test database (smoke test)
+
+```bash
+cd backend
+uv run pytest tests/db/ -v
+```
+
+### Backend — test API end-to-end
+
+```bash
+cd backend
+uv run pytest tests/routers/ -v
+```
+
+### Backend — tutti i test
+
+```bash
+cd backend
+uv run pytest -v
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm run test
+```
+
+---
+
+## Configurazione
+
+Tutte le variabili d'ambiente sono definite nel file `.env` alla radice del progetto. Un template con valori di esempio
+è disponibile in [`.env.example`](.env.example).
+
+### Variabili principali
+
+| Variabile                  | Descrizione                                                  | Default                    |
+|----------------------------|--------------------------------------------------------------|----------------------------|
+| `DOMAIN`                   | Dominio dell'applicazione                                    | `localhost`                |
+| `ENVIRONMENT`              | Ambiente (`development`, `test`, `production`)               | `development`              |
+| `PROJECT_NAME`             | Nome del progetto                                            | `polibench`                |
+| `SECRET_KEY`               | Chiave segreta per JWT (generala con `openssl rand -hex 32`) | —                          |
+| `FIRST_SUPERUSER`          | Email del superutente creato al primo avvio                  | `admin@polibench.com`      |
+| `FIRST_SUPERUSER_PASSWORD` | Password del superutente                                     | —                          |
+| `MONGO_HOST`               | Host MongoDB                                                 | `localhost`                |
+| `MONGO_PORT`               | Porta MongoDB                                                | `27017`                    |
+| `MONGO_DB`                 | Nome del database                                            | `polibench`                |
+| `MONGO_USER`               | Username MongoDB                                             | —                          |
+| `MONGO_PASSWORD`           | Password MongoDB                                             | —                          |
+| `VITE_BACKEND_API_URL`     | URL dell'API usato dal frontend                              | `http://localhost/api/v1/` |
+| `FRONTEND_URL`             | URL del frontend (per link di verifica email)                | `http://localhost:5173`    |
+
+### SMTP (invio email di verifica)
+
+Polibench supporta la verifica dell'email degli utenti registrati. Configura un provider SMTP per abilitare l'invio. Se
+SMTP non è configurato, il link di verifica viene stampato nella console del backend.
+
+Opzioni supportate:
+
+- **Gmail** — STARTTLS su porta 587 (richiede [App Password](https://myaccount.google.com/apppasswords))
+- **Aruba** — SSL diretto su porta 465
+- Qualsiasi provider SMTP compatibile
+
+### SSO Google (opzionale)
+
+Per abilitare il login con Google, configura `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` ottenuti
+dalla [Google Cloud Console](https://console.cloud.google.com/). Lascia vuoti per disabilitare.
+
+### Mongo Express
+
+Il pannello web Mongo Express è protetto da HTTP Basic Auth. Configura `MONGO_EXPRESS_USER` e `MONGO_EXPRESS_PASSWORD`
+nel file `.env`. In produzione cambia sempre le credenziali di default.
+
+---
+
+## Deploy in produzione
+
+Il file [`docker-compose.prod.yml`](docker-compose.prod.yml) è configurato per il deploy su un server con:
+
+- **Traefik** come reverse proxy con TLS automatico (Let's Encrypt)
+- Redirect automatico HTTP → HTTPS e www → non-www
+- Frontend compilato e servito da **nginx**
+- Mongo Express protetto e accessibile su `/mongo-express`
+
+### Avviare in produzione
+
+```bash
+# Crea la rete Traefik (solo la prima volta)
+docker network create traefik-public
+
+# Avvia lo stack
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-**Note:** This will not work out of the box, mainly because the `docker-compose-prod.yml` configures a traefik proxy with ssl enabled that will try to fetch ssl certificates from Let's Encrypt, which will not work unless you specify a valid hostname accessible on the internet. However, to deploy the application in production on a server, you only need to set the required env variables in the [.env](./.env) file.
+### Variabili specifiche per produzione
 
-When using the production configuration, the frontend app is built into static files and the app is served by an nginx server. The [nginx configuration file](frontend/nginx.conf) is in the frontend dir.
+Nel file `.env` aggiorna almeno:
 
-### Docker Compose files and env vars
+| Variabile                  | Valore produzione                |
+|----------------------------|----------------------------------|
+| `DOMAIN`                   | `tuodominio.com`                 |
+| `ENVIRONMENT`              | `production`                     |
+| `SECRET_KEY`               | Valore casuale (32+ byte hex)    |
+| `FIRST_SUPERUSER_PASSWORD` | Password forte                   |
+| `MONGO_PASSWORD`           | Password forte                   |
+| `MONGO_EXPRESS_PASSWORD`   | Password forte                   |
+| `TRAEFIK_TLS_EMAIL`        | Email valida per Let's Encrypt   |
+| `VITE_BACKEND_API_URL`     | `https://tuodominio.com/api/v1/` |
+| `FRONTEND_URL`             | `https://tuodominio.com`         |
+| `BACKEND_CORS_ORIGINS`     | `["https://tuodominio.com"]`     |
 
-Both the [docker-compose.yml](./docker-compose.yml) and [docker-compose-prod.yml](./docker-compose.prod.yml) files use the [.env](./.env) file containing configurations to be injected as environment variables in the containers.
+> ⚠️ **Non usare mai i valori di default del `.env.example` in produzione.** Genera sempre password e chiavi casuali.
 
-The docker-compose files are designed to support several environments (i.e. development, testing, production) simply by setting the appropriate variable values in the `.env` file.
+---
 
-The [.env](./.env) file contains all the configuration variables. The values set in the `.env` file will override those that are set in the frontend `.env` files for local development.
+## Endpoint API principali
 
-The `.env` file that is commited to the github repository contains example values which are ok to use for testing and development, but which should be changed when running the application in production (admin passwords, secret keys, client ids, etc.). During deployment in production, the .env file is replaced with one containing the appropriate values.
+| Metodo  | Endpoint                             | Descrizione                                       |
+|---------|--------------------------------------|---------------------------------------------------|
+| `POST`  | `/api/v1/login/access-token`         | Ottieni JWT (email/password)                      |
+| `GET`   | `/api/v1/login/google/authorize`     | Avvia OAuth2 con Google                           |
+| `POST`  | `/api/v1/users`                      | Registrazione utente                              |
+| `GET`   | `/api/v1/users/me`                   | Profilo utente corrente                           |
+| `PATCH` | `/api/v1/users/me`                   | Aggiorna profilo                                  |
+| `GET`   | `/api/v1/users/verify-email`         | Verifica email con token                          |
+| `GET`   | `/api/v1/datasets`                   | Lista dataset                                     |
+| `POST`  | `/api/v1/datasets`                   | Crea dataset (autenticato + verificato)           |
+| `GET`   | `/api/v1/datasets/{uuid}`            | Dettaglio dataset                                 |
+| `GET`   | `/api/v1/ml-models`                  | Lista modelli                                     |
+| `POST`  | `/api/v1/ml-models`                  | Registra modello (autenticato + verificato)       |
+| `GET`   | `/api/v1/ml-models/{uuid}`           | Dettaglio modello                                 |
+| `POST`  | `/api/v1/experiments`                | Sottometti esperimento (autenticato + verificato) |
+| `GET`   | `/api/v1/experiments/{uuid}`         | Dettaglio esperimento                             |
+| `GET`   | `/api/v1/experiments/{uuid}/metrics` | Metriche dell'esperimento                         |
+| `POST`  | `/api/v1/experiments/metrics`        | Sottometti metriche batch                         |
+| `GET`   | `/api/v1/leaderboard`                | Leaderboard filtrata per dataset, metrica e split |
 
-## Setting up Single Sign-On (SSO) with google
+La documentazione interattiva completa è disponibile su `/docs` (Swagger UI) e `/redoc`.
 
-To setup SSO and enable the `Sign-In with Google` button, you must first obtain a client-id and secret token from Google. Follow [these steps](https://developers.google.com/identity/protocols/oauth2) to obtain client credentials from your [Google Cloud Console](https://console.cloud.google.com/).
+---
 
-Create a new project, and from the `APIs & Services` menu, first create an `OAuth consent screen` for you application, then add an `OAuth 2.0 Client Id` in the `Credentials` menu. Select `Web application` as the application type. In the `Authorized redirect URIs`, add your hostname with the `api/v1/login/google/callback` endpoint. For instance, if testing locally while running the backend app with `uvicorn`, add `http://localhost:8000/api/v1/login/google/callback` (use `http://localhost/api/v1/login/google/callback` if running the application in dev with docker). If your application is hosted on a domain name, add it to the list of URIs (remember to update `http` to `https` when using SSL).
+## Documentazione
 
-Once you've create a client-id and token in your Google cloud console, copy those into your `.env` file's `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` variables.
+La cartella [`docs/`](docs/) contiene documentazione estesa divisa per area:
 
-## Setting up automatic build of the docker images in github
+### Backend (`docs/backend/`)
 
-The project has a [build workflow](./.github/workflows/build.yml) configuration to build the docker images for production and publish those into your Github package registry. To do this, you must first create a [Github Environment](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) for your project (call this environment `prod` or update the environment name in the workflow configuration.
+| File                                                                                | Contenuto                                   |
+|-------------------------------------------------------------------------------------|---------------------------------------------|
+| [`00_overview.md`](docs/backend/00_overview.md)                                     | Panoramica generale e obiettivi             |
+| [`01_technologies.md`](docs/backend/01_technologies.md)                             | Stack tecnologico e motivazioni             |
+| [`02_architecture.md`](docs/backend/02_architecture.md)                             | Architettura a layer e struttura cartelle   |
+| [`03_data_models.md`](docs/backend/03_data_models.md)                               | Modelli dati Beanie e diagramma di dominio  |
+| [`04_schemas.md`](docs/backend/04_schemas.md)                                       | Schemi Pydantic per input/output API        |
+| [`05_authentication.md`](docs/backend/05_authentication.md)                         | JWT, OAuth2, verifica email, ruoli          |
+| [`06_routers.md`](docs/backend/06_routers.md)                                       | Endpoint HTTP e convenzioni                 |
+| [`07_configuration.md`](docs/backend/07_configuration.md)                           | Pydantic Settings e variabili d'ambiente    |
+| [`08_testing.md`](docs/backend/08_testing.md)                                       | Strategia di test (DB smoke test + API e2e) |
+| [`09_services.md`](docs/backend/09_services.md)                                     | Service layer e logica di business          |
+| [`10_decisions.md`](docs/backend/10_decisions.md)                                   | Decisioni architetturali (ADR) e trade-off  |
+| [`11_errors_and_api_conventions.md`](docs/backend/11_errors_and_api_conventions.md) | Gestione errori e convenzioni HTTP          |
+| [`12_indexes_and_performance.md`](docs/backend/12_indexes_and_performance.md)       | Query critiche, indici e performance        |
+| [`13_deployment.md`](docs/backend/13_deployment.md)                                 | Deploy con Docker e Traefik                 |
+| [`14_future_work.md`](docs/backend/14_future_work.md)                               | Limiti attuali e sviluppi futuri            |
+| [`domain_model.puml`](docs/backend/domain_model.puml)                               | Diagramma UML del dominio (PlantUML)        |
 
-You also need to add an environment secret variable `SERVER_ENV_PROD` which should contain the root `.env` file with the variables set for your production environment (simply copy-paste the contents of the env file as the github secret). This secret environment variable will be used by the github workflow to build the docker images with the [docker-compose.prod.yml](./docker-compose.prod.yml) file.
+### Frontend (`docs/frontend/`)
 
-Finally, enable write permission for the `GITHUB_TOKEN` to enable pushing images to your package registry: Go to `Settings` > `Actions` > `General` and check `Read and write permissions` under `Workflow permissions`.
+| File                                                     | Contenuto                             |
+|----------------------------------------------------------|---------------------------------------|
+| [`00_overview.md`](docs/frontend/00_overview.md)         | Panoramica e struttura                |
+| [`01_technologies.md`](docs/frontend/01_technologies.md) | Stack tecnologico frontend            |
+| [`02_architecture.md`](docs/frontend/02_architecture.md) | Architettura componenti e routing     |
+| [`03_scss.md`](docs/frontend/03_scss.md)                 | Organizzazione SCSS e convenzioni BEM |
+
+---
+
+## Pagine dell'applicazione
+
+| Pagina                | Route                            | Descrizione                                         |
+|-----------------------|----------------------------------|-----------------------------------------------------|
+| Home                  | `/`                              | Landing page con panoramica del progetto            |
+| Login                 | `/login`                         | Accesso con email/password o Google SSO             |
+| Registrazione         | `/register`                      | Registrazione nuovo utente                          |
+| Verifica email        | `/verify-email`                  | Conferma indirizzo email                            |
+| Profilo               | `/profile`                       | Profilo utente (protetta)                           |
+| Datasets              | `/datasets`                      | Lista di tutti i dataset                            |
+| Dettaglio dataset     | `/datasets/:uuid`                | Informazioni, statistiche e leaderboard del dataset |
+| Nuovo dataset         | `/datasets/new`                  | Form creazione dataset (protetta)                   |
+| Modelli               | `/models`                        | Lista di tutti i modelli                            |
+| Dettaglio modello     | `/models/:uuid`                  | Informazioni e esperimenti del modello              |
+| Nuovo modello         | `/models/new`                    | Form registrazione modello (protetta)               |
+| Leaderboard           | `/leaderboard`                   | Classifica globale con filtri e grafici             |
+| Dettaglio esperimento | `/experiments/:uuid`             | Dettaglio di un esperimento e relative metriche     |
+| Nuovo esperimento     | `/experiments/new`               | Form submission esperimento (protetta)              |
+| Submission metriche   | `/experiments/:uuid/metrics/new` | Form invio batch metriche (protetta)                |
+| Gestione utenti       | `/users`                         | Pannello admin per la gestione utenti (solo admin)  |
+
+---
+
+## Licenza
+
+Questo progetto è distribuito con licenza [MIT](LICENSE).
+
+---
+
+## Autore
+
+Sviluppato da [Raffaele Grieco](https://github.com/baraff) come progetto di tesi.
