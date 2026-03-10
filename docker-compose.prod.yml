@@ -34,19 +34,24 @@ services:
       traefik.enable: true
       # Use the traefik-public network (declared below)
       traefik.docker.network: traefik-public
-      # Global redirection: http to https
-      traefik.http.routers.http-catchall.rule: HostRegexp(`{host:(www\.)?${DOMAIN?Variable not set}}`)
+      # Global redirection: http → https (tutti i domini)
+      traefik.http.routers.http-catchall.rule: Host(`${DOMAIN?Variable not set}`) || Host(`www.${DOMAIN?Variable not set}`)
       traefik.http.routers.http-catchall.entrypoints: web
-      traefik.http.routers.http-catchall.middlewares: wwwtohttps
+      traefik.http.routers.http-catchall.middlewares: redirect-to-https
 
-      # Global redirection: https (www.) to https
-      traefik.http.routers.wwwsecure-catchall.rule: HostRegexp(`{host:(www\.)${DOMAIN?Variable not set}}`)
+      # middleware: http → https
+      traefik.http.middlewares.redirect-to-https.redirectscheme.scheme: https
+      traefik.http.middlewares.redirect-to-https.redirectscheme.permanent: true
+
+      # Redirect www → non-www su https
+      traefik.http.routers.wwwsecure-catchall.rule: Host(`www.${DOMAIN?Variable not set}`)
       traefik.http.routers.wwwsecure-catchall.entrypoints: websecure
       traefik.http.routers.wwwsecure-catchall.tls: true
+      traefik.http.routers.wwwsecure-catchall.tls.certresolver: le
       traefik.http.routers.wwwsecure-catchall.middlewares: wwwtohttps
 
-      # middleware: http(s)://(www.) to  https://
-      traefik.http.middlewares.wwwtohttps.redirectregex.regex: ^https?://(?:www\.)?(.+)
+      # middleware: www → non-www
+      traefik.http.middlewares.wwwtohttps.redirectregex.regex: ^https://www\.(.+)
       traefik.http.middlewares.wwwtohttps.redirectregex.replacement: https://$${1}
       traefik.http.middlewares.wwwtohttps.redirectregex.permanent: true
 
