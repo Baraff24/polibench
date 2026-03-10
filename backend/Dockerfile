@@ -30,6 +30,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Copy the project into the image
 ADD pyproject.toml README.md ./
 ADD app /app/app
+ADD scripts /app/scripts
 
 # Sync the project
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
