@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/auth'
 
 export async function loader() {
   try {
+    // Scambia il cookie temporaneo con un token JWT persistente in localStorage
     await authService.refreshToken()
     return null
   } catch {
@@ -20,11 +21,13 @@ export default function SSOLogin() {
   const { setUser } = useAuth()
 
   useEffect(() => {
-    async function fetchUserProfile() {
+    async function completeLogin() {
       try {
+        // Il token è già in localStorage (salvato dal loader via refreshToken)
+        // Basta caricare il profilo utente
         const user = await userService.getProfile()
         setUser(user)
-        showSnackBar('Login successful.', 'success')
+        showSnackBar('Login effettuato con successo.', 'success')
       } catch (error) {
         let msg
         if (
@@ -41,13 +44,13 @@ export default function SSOLogin() {
         navigate('/')
       }
     }
-    fetchUserProfile()
-  })
+    completeLogin()
+  }, []) // esegue solo al mount
 
   return (
     <div className='auth'>
       <div className='auth__card'>
-        <p className='text-muted text-center'>Completing login…</p>
+        <p className='text-muted text-center'>Completamento login in corso…</p>
       </div>
     </div>
   )

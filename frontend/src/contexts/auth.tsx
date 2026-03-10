@@ -22,6 +22,11 @@ const AuthProvider: FC<AuthContextProviderProps> = ({ children }) => {
 
   useEffect(() => {
     async function fetchUserProfile() {
+      // Salta se non c'è token — evita race condition con SSO callback
+      if (!localStorage.getItem('token')) {
+        setLoading(false)
+        return
+      }
       try {
         const u = await userService.getProfile()
         setUser(u)
