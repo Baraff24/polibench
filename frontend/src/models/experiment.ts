@@ -47,6 +47,7 @@ export interface ExperimentSummary {
   dataset_uuid: string
   dataset_version_uuid: string
   model_uuid: string
+  model_name: string | null
   run_name: string | null
   status: Status
   created_at: string

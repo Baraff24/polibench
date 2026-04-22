@@ -181,6 +181,28 @@ Contiene gli endpoint sia per `Dataset` che per `MLModel` (entità di "catalogo"
 2. Risolve `team_id → Team → team.uuid` e `created_by_user_id → User → user.uuid`
 3. Ritorna `DatasetPublic` con tutti i campi UUID
 
+### DatasetVersion (versioning + YAML)
+
+| Endpoint                                              | Metodo | Auth              | Input / Output                                | Note |
+|-------------------------------------------------------|--------|-------------------|-----------------------------------------------|------|
+| `/api/v1/datasets/{dataset_uuid}/versions`            | GET    | pubblico          | — → `list[DatasetVersionSummary]`             | Versioni del dataset |
+| `/api/v1/datasets/{dataset_uuid}/versions`            | POST   | utente verificato | `DatasetVersionCreate` → `DatasetVersionPublic` | Accetta i 3 YAML raw |
+| `/api/v1/dataset-versions/{version_uuid}`             | GET    | pubblico          | — → `DatasetVersionPublic`                    | Dettaglio versione |
+| `/api/v1/dataset-versions/{version_uuid}/sources`     | GET    | pubblico          | — → `list[SourcePublic]`                      | Provenance da dataset YAML |
+| `/api/v1/dataset-versions/{version_uuid}/resources`   | GET    | pubblico          | — → `list[ResourcePublic]`                    | Risorse parse dal dataset YAML |
+| `/api/v1/dataset-versions/{version_uuid}/pipeline`    | GET    | pubblico          | — → `DatasetVersionPipelinePublic`            | Blocchi pipeline normalizzati |
+| `/api/v1/dataset-versions/{version_uuid}/yaml/dataset`| GET    | pubblico          | — → `DatasetVersionYamlPublic`                | YAML dataset |
+| `/api/v1/dataset-versions/{version_uuid}/yaml/pipeline`| GET   | pubblico          | — → `DatasetVersionYamlPublic`                | YAML pipeline |
+| `/api/v1/dataset-versions/{version_uuid}/yaml/characteristics` | GET | pubblico | — → `DatasetVersionYamlPublic` | YAML characteristics |
+| `/api/v1/dataset-versions/{version_uuid}/yaml/{kind}/raw` | GET | pubblico | `text/yaml`                                   | Download raw |
+| `/api/v1/dataset-versions/{version_uuid}/experiments` | GET    | pubblico          | — → `list[ExperimentSummary]`                 | Lista run collegate alla versione |
+
+Nel POST di creazione versione, il backend parse automaticamente i 3 YAML raw:
+
+1. `pipeline_yaml_raw` → `pipeline_blocks`
+2. `characteristics_yaml_raw` → campi denormalizzati (`n_users`, `density`, ecc.)
+3. `dataset_yaml_raw` → materializzazione di `Source` e `Resource`
+
 ### MLModel
 
 | Endpoint                         | Metodo | Auth              | Input / Output                    | Note |
@@ -204,14 +226,14 @@ Contiene gli endpoint sia per `Dataset` che per `MLModel` (entità di "catalogo"
 
 | Endpoint                     | Metodo | Auth              | Input / Output                          | Note                                         |
 |------------------------------|--------|-------------------|-----------------------------------------|----------------------------------------------|
-| `/api/v1/experiments`        | POST   | utente verificato | `ExperimentCreate` → `ExperimentPublic` | Risolve UUID → ObjectId; status parte QUEUED |
+| `/api/v1/experiments`        | POST   | utente verificato | `ExperimentCreate` → `ExperimentPublic` | Preferisce `dataset_version_uuid` (supporta `dataset_uuid` legacy) |
 | `/api/v1/experiments/{uuid}` | GET    | utente attivo     | — → `ExperimentPublic`                  | Risolve tutti gli ObjectId interni in UUID   |
 
 **Flusso POST `/experiments`**:
 
-1. `ExperimentCreate` contiene `dataset_uuid` e `model_uuid` (UUID pubblici)
-2. Il service risolve `dataset_uuid → Dataset` e `model_uuid → MLModel` (404 se non esistono)
-3. Crea il Document `Experiment` con ObjectId interni: `dataset_id`, `model_id`, `submitted_by_user_id`
+1. `ExperimentCreate` contiene `dataset_version_uuid` e `model_uuid` (UUID pubblici); `dataset_uuid` resta compatibilità legacy
+2. Il service risolve `dataset_version_uuid → DatasetVersion + Dataset` e `model_uuid → MLModel` (404 se non esistono)
+3. Crea il Document `Experiment` con ObjectId interni: `dataset_version_id`, `model_id`, `submitted_by_user_id`
 4. `submitted_by_user_id` viene estratto dal token JWT — il client non lo invia mai
 5. `status` viene impostato a `QUEUED` lato server — il client non lo invia mai
 6. La risposta `ExperimentPublic` risolve tutti gli ObjectId in UUID
@@ -222,7 +244,21 @@ Contiene gli endpoint sia per `Dataset` che per `MLModel` (entità di "catalogo"
 - `status`: inizialmente `QUEUED`
 - `created_at`: timestamp server
 
-### Metrics (submission batch)
+### Metric Import (CSV async)
+
+| Endpoint                                   | Metodo | Auth              | Input / Output                        | Note |
+|--------------------------------------------|--------|-------------------|---------------------------------------|------|
+| `/api/v1/experiments/{uuid}/metric-import` | POST   | utente verificato | `multipart/form-data (file)` → `MetricImportPublic` | Crea job e avvia worker async |
+| `/api/v1/experiments/{uuid}/metric-imports` | GET   | utente attivo     | — → `list[MetricImportPublic]`        | Storico job di import per experiment |
+
+**Flusso POST `/experiments/{uuid}/metric-import`**:
+
+1. Il router valida il file CSV (`UploadFile`) e l'utente autenticato
+2. Crea `MetricImportJob` con stato iniziale e path file salvato
+3. Avvia `BackgroundTasks` con `process_metric_import_job(job.uuid)`
+4. Il worker parse il CSV e popola `ExperimentMetric` (metriche finali)
+
+### Metrics (batch diretto legacy + lettura)
 
 | Endpoint                             | Metodo | Auth              | Input / Output                             | Note                                             |
 |--------------------------------------|--------|-------------------|--------------------------------------------|--------------------------------------------------|
@@ -242,8 +278,8 @@ Contiene gli endpoint sia per `Dataset` che per `MLModel` (entità di "catalogo"
 
 | Endpoint                    | Metodo | Auth     | Query params                                              | Output                              |
 |-----------------------------|--------|----------|-----------------------------------------------------------|-------------------------------------|
-| `/api/v1/leaderboard`       | GET    | pubblico | `dataset_uuid`, `metric`, `split`, `top_n=10`             | `list[LeaderboardEntry]`            |
-| `/api/v1/leaderboard/multi` | GET    | pubblico | `dataset_uuid`, `metrics`, `split`, `sort_by`, `top_n=20` | `list[MultiMetricLeaderboardEntry]` |
+| `/api/v1/leaderboard`       | GET    | pubblico | `dataset_uuid`, `metric`, `split`, `top_n=10`, `dataset_version_uuid?`             | `list[LeaderboardEntry]`            |
+| `/api/v1/leaderboard/multi` | GET    | pubblico | `dataset_uuid`, `metrics`, `split`, `sort_by`, `top_n=20`, `dataset_version_uuid?` | `list[MultiMetricLeaderboardEntry]` |
 
 **Flusso GET `/leaderboard`** (single-metric):
 
@@ -291,11 +327,22 @@ quindi la query è un semplice `find()` su indice composto `{dataset_id, metric,
 | `POST /api/v1/datasets`                   | POST   | verificato | Crea Dataset                            |
 | `GET  /api/v1/datasets`                   | GET    | no         | Lista Dataset                           |
 | `GET  /api/v1/datasets/{uuid}`            | GET    | no         | Dettaglio Dataset                       |
+| `GET  /api/v1/datasets/{uuid}/versions`   | GET    | no         | Lista DatasetVersion                    |
+| `POST /api/v1/datasets/{uuid}/versions`   | POST   | verificato | Crea DatasetVersion (+YAML raw)         |
+| `GET  /api/v1/dataset-versions/{uuid}`    | GET    | no         | Dettaglio DatasetVersion                |
+| `GET  /api/v1/dataset-versions/{uuid}/sources` | GET | no      | Sources della versione                  |
+| `GET  /api/v1/dataset-versions/{uuid}/resources` | GET | no     | Resources della versione                |
+| `GET  /api/v1/dataset-versions/{uuid}/pipeline` | GET | no      | Pipeline blocks della versione          |
+| `GET  /api/v1/dataset-versions/{uuid}/yaml/{kind}` | GET | no   | YAML normalizzato (`dataset/pipeline/characteristics`) |
+| `GET  /api/v1/dataset-versions/{uuid}/yaml/{kind}/raw` | GET | no | Download YAML raw                        |
+| `GET  /api/v1/dataset-versions/{uuid}/experiments` | GET | no    | Experiment della versione                |
 | `POST /api/v1/ml-models`                  | POST   | verificato | Registra MLModel                        |
 | `GET  /api/v1/ml-models`                  | GET    | no         | Lista MLModel                           |
 | `GET  /api/v1/ml-models/{uuid}`           | GET    | no         | Dettaglio MLModel                       |
 | `POST /api/v1/experiments`                | POST   | verificato | Sottomette Experiment (UUID input)      |
 | `GET  /api/v1/experiments/{uuid}`         | GET    | attivo     | Dettaglio Experiment                    |
+| `POST /api/v1/experiments/{uuid}/metric-import` | POST | verificato | Upload CSV e avvio import async       |
+| `GET  /api/v1/experiments/{uuid}/metric-imports` | GET | attivo   | Lista job import metriche               |
 | `POST /api/v1/experiments/{uuid}/metrics` | POST   | verificato | Sottomette metriche batch               |
 | `GET  /api/v1/experiments/{uuid}/metrics` | GET    | no         | Metriche raggruppate per split          |
 | `GET  /api/v1/leaderboard`                | GET    | no         | Top-N per (dataset, metric, split)      |

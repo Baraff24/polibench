@@ -1,15 +1,19 @@
-import { useLoaderData } from 'react-router'
+import { useLoaderData, useNavigate } from 'react-router'
+import { useState } from 'react'
 import { Badge, DataTable, EmptyState, PageHeader, StatCard } from '../components'
 import type { Column } from '../components'
-import { datasetService } from '../services'
+import { datasetService, experimentService } from '../services'
 import type {
   DatasetVersionPipelinePublic,
   DatasetVersionPublic,
+  DatasetVersionYamlPublic,
+  ExperimentSummary,
   ResourcePublic,
   SourcePublic,
 } from '../models'
 import type { Params } from 'react-router'
 
+type YamlKind = 'dataset' | 'pipeline' | 'characteristics'
 type PipelineRow = DatasetVersionPipelinePublic['blocks'][number]
 
 const pipelineColumns: Column<PipelineRow>[] = [
@@ -37,23 +41,91 @@ const resourceColumns: Column<ResourcePublic>[] = [
   { key: 'required', header: 'Required', render: (row) => (row.required ? 'yes' : 'no') },
 ]
 
+const experimentColumns: Column<ExperimentSummary>[] = [
+  { key: 'run_name', header: 'Run', render: (row) => row.run_name || '—' },
+  { key: 'model', header: 'Model', render: (row) => row.model_name || row.model_uuid },
+  { key: 'status', header: 'Status', render: (row) => row.status },
+  {
+    key: 'created_at',
+    header: 'Created',
+    render: (row) => new Date(row.created_at).toLocaleString(),
+  },
+]
+
 export async function loader({ params }: { params: Params }) {
   const versionUuid = params.uuid as string
-  const [version, sources, resources, pipeline] = await Promise.all([
+  const [
+    version,
+    sources,
+    resources,
+    pipeline,
+    datasetYaml,
+    pipelineYaml,
+    characteristicsYaml,
+    experiments,
+  ] = await Promise.all([
     datasetService.getVersionByUuid(versionUuid),
     datasetService.getVersionSources(versionUuid),
     datasetService.getVersionResources(versionUuid),
     datasetService.getVersionPipeline(versionUuid),
+    datasetService.getVersionYaml(versionUuid, 'dataset'),
+    datasetService.getVersionYaml(versionUuid, 'pipeline'),
+    datasetService.getVersionYaml(versionUuid, 'characteristics'),
+    experimentService.listByDatasetVersion(versionUuid),
   ])
-  return { version, sources, resources, pipeline }
+  return {
+    version,
+    sources,
+    resources,
+    pipeline,
+    experiments,
+    yamls: {
+      dataset: datasetYaml,
+      pipeline: pipelineYaml,
+      characteristics: characteristicsYaml,
+    },
+  }
 }
 
 export default function DatasetVersionDetail() {
-  const { version, sources, resources, pipeline } = useLoaderData() as {
+  const navigate = useNavigate()
+  const [visibleYaml, setVisibleYaml] = useState<YamlKind | null>(null)
+
+  const { version, sources, resources, pipeline, experiments, yamls } =
+    useLoaderData() as {
     version: DatasetVersionPublic
     sources: SourcePublic[]
     resources: ResourcePublic[]
     pipeline: DatasetVersionPipelinePublic
+    experiments: ExperimentSummary[]
+    yamls: Record<YamlKind, DatasetVersionYamlPublic>
+  }
+
+  const yamlKinds: { kind: YamlKind; label: string }[] = [
+    { kind: 'dataset', label: 'Dataset YAML' },
+    { kind: 'pipeline', label: 'Pipeline YAML' },
+    { kind: 'characteristics', label: 'Characteristics YAML' },
+  ]
+
+  const toggleYaml = (kind: YamlKind) => {
+    if (visibleYaml === kind) {
+      setVisibleYaml(null)
+      return
+    }
+    setVisibleYaml(kind)
+  }
+
+  const downloadYaml = (kind: YamlKind) => {
+    const payload = yamls[kind]
+    const blob = new Blob([payload.content || ''], { type: 'text/yaml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${version.version}_${kind}.yml`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -82,6 +154,37 @@ export default function DatasetVersionDetail() {
       </section>
 
       <section className='detail-section'>
+        <h2 className='detail-section__title'>YAML</h2>
+        <div className='form__actions'>
+          {yamlKinds.map(({ kind, label }) => (
+            <div key={kind} style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type='button' className='btn btn--outline' onClick={() => toggleYaml(kind)}>
+                {visibleYaml === kind ? `Hide ${label}` : `View ${label}`}
+              </button>
+              <button type='button' className='btn btn--outline' onClick={() => downloadYaml(kind)}>
+                Download
+              </button>
+            </div>
+          ))}
+        </div>
+        {visibleYaml && (
+          <pre
+            className='detail-field__value'
+            style={{
+              whiteSpace: 'pre-wrap',
+              marginTop: '1rem',
+              padding: '1rem',
+              border: '1px solid var(--color-border, #ddd)',
+              borderRadius: '8px',
+              background: '#fafafa',
+            }}
+          >
+            {yamls[visibleYaml].content || '# empty'}
+          </pre>
+        )}
+      </section>
+
+      <section className='detail-section'>
         <h2 className='detail-section__title'>Sources</h2>
         {sources.length === 0 ? (
           <EmptyState title='No sources' description='No sources found in dataset YAML.' />
@@ -96,6 +199,23 @@ export default function DatasetVersionDetail() {
           <EmptyState title='No resources' description='No resources found in dataset YAML.' />
         ) : (
           <DataTable columns={resourceColumns} rows={resources} rowKey={(row) => row.uuid} />
+        )}
+      </section>
+
+      <section className='detail-section'>
+        <h2 className='detail-section__title'>Experiments</h2>
+        {experiments.length === 0 ? (
+          <EmptyState
+            title='No experiments yet'
+            description='No experiment has been submitted for this dataset version.'
+          />
+        ) : (
+          <DataTable
+            columns={experimentColumns}
+            rows={experiments}
+            rowKey={(row) => row.uuid}
+            onRowClick={(row) => navigate(`/experiments/${row.uuid}`)}
+          />
         )}
       </section>
     </div>

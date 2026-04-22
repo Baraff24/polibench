@@ -11,7 +11,6 @@ export default function CreateDataset() {
   const [loading, setLoading] = useState(false)
 
   const [name, setName] = useState('')
-  const [initialVersion, setInitialVersion] = useState('1.0')
   const [task, setTask] = useState<TaskType>('ranking')
   const [visibility, setVisibility] = useState<Visibility>('public')
   const [description, setDescription] = useState('')
@@ -30,11 +29,7 @@ export default function CreateDataset() {
         visibility,
         description: description.trim() || undefined,
       })
-      await datasetService.createVersion(dataset.uuid, {
-        version: initialVersion.trim() || '1.0',
-        status: 'draft',
-      })
-      showSnackBar('Dataset and initial version created!', 'success')
+      showSnackBar('Dataset created. Add the first version with YAML in the detail page.', 'success')
       navigate('/datasets/' + dataset.uuid)
     } catch {
       showSnackBar('Error creating dataset.', 'error')
@@ -74,18 +69,6 @@ export default function CreateDataset() {
             <option value='ranking'>Ranking</option>
             <option value='rating_prediction'>Rating Prediction</option>
           </select>
-        </div>
-
-        <div className='field'>
-          <label className='field__label' htmlFor='ds-version'>
-            Initial Version
-          </label>
-          <input
-            id='ds-version'
-            className='field__input'
-            value={initialVersion}
-            onChange={(e) => setInitialVersion(e.target.value)}
-          />
         </div>
 
         <div className='field'>

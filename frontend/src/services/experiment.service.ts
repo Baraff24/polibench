@@ -3,6 +3,7 @@ import type {
   ExperimentCreate,
   ExperimentMetrics,
   ExperimentPublic,
+  ExperimentSummary,
   MetricImportPublic,
   MetricsBatchCreate,
 } from '../models'
@@ -42,6 +43,13 @@ class ExperimentService {
 
   async listMetricImports(uuid: string): Promise<MetricImportPublic[]> {
     const response = await axios.get(API_URL + `experiments/${uuid}/metric-imports`)
+    return response.data
+  }
+
+  async listByDatasetVersion(datasetVersionUuid: string): Promise<ExperimentSummary[]> {
+    const response = await axios.get(
+      API_URL + `dataset-versions/${datasetVersionUuid}/experiments`,
+    )
     return response.data
   }
 }

@@ -49,6 +49,7 @@ class ExperimentSummary(BaseModel):
     dataset_uuid: UUID
     dataset_version_uuid: UUID
     model_uuid: UUID
+    model_name: str | None = None
     run_name: str | None = None
     status: Status
     created_at: datetime

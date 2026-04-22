@@ -119,6 +119,7 @@ frontend/
 | `/datasets`                      | `Datasets`         | Pubblico    | —                       |
 | `/datasets/new`                  | `CreateDataset`    | Autenticato | `RequireAuth`           |
 | `/datasets/:uuid`                | `DatasetDetail`    | Pubblico    | —                       |
+| `/dataset-versions/:uuid`        | `DatasetVersionDetail` | Pubblico | —                       |
 | `/models`                        | `Models`           | Pubblico    | —                       |
 | `/models/new`                    | `CreateModel`      | Autenticato | `RequireAuth`           |
 | `/models/:uuid`                  | `ModelDetail`      | Pubblico    | —                       |
@@ -126,6 +127,11 @@ frontend/
 | `/experiments/:uuid`             | `ExperimentDetail` | Autenticato | `RequireAuth`           |
 | `/experiments/:uuid/metrics/new` | `SubmitMetrics`    | Autenticato | `RequireAuth`           |
 | `/users`                         | `Users`            | Admin       | `RequireAuth adminOnly` |
+
+Nota flusso DatasetVersion:
+
+- `CreateDataset` crea solo l'entità catalografica `Dataset`.
+- La prima `DatasetVersion` si crea dalla pagina `/datasets/:uuid` tramite form YAML (dataset/pipeline/characteristics).
 
 ---
 

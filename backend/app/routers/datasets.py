@@ -14,6 +14,7 @@ from app.schemas.dataset_versions import (
     SourcePublic,
 )
 from app.schemas.datasets import DatasetCreate, DatasetPublic, DatasetSummary
+from app.schemas.experiments import ExperimentSummary
 from app.schemas.ml_models import MLModelCreate, MLModelPublic, MLModelSummary
 from app.services.dataset_versions import (
     create_dataset_version,
@@ -32,6 +33,7 @@ from app.services.datasets import (
     list_datasets,
     list_ml_models,
 )
+from app.services.experiments import list_experiments_for_dataset_version
 
 router = APIRouter()
 
@@ -161,6 +163,17 @@ async def get_characteristics_yaml_endpoint(
 async def download_yaml_raw_endpoint(version_uuid: UUID, kind: str) -> Response:
     yaml_payload = await get_yaml_for_version(version_uuid, kind)
     return Response(content=yaml_payload.content, media_type="text/yaml")
+
+
+@router.get(
+    "/dataset-versions/{version_uuid}/experiments",
+    response_model=list[ExperimentSummary],
+    tags=["dataset-versions"],
+)
+async def list_experiments_for_version_endpoint(
+    version_uuid: UUID,
+) -> list[ExperimentSummary]:
+    return await list_experiments_for_dataset_version(version_uuid)
 
 
 @router.post("/ml-models", response_model=MLModelPublic, tags=["ml-models"])

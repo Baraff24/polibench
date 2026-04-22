@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from app.models.experiments import Experiment, Status
 from app.models.teams import Team
 from app.models.users import User
-from app.schemas.experiments import ExperimentCreate, ExperimentPublic
+from app.schemas.experiments import ExperimentCreate, ExperimentPublic, ExperimentSummary
 from app.services.dataset_versions import (
     get_dataset_version_and_dataset,
     get_latest_dataset_version,
@@ -131,3 +131,41 @@ async def get_experiment_public(experiment_uuid: UUID) -> ExperimentPublic:
         created_at=exp.created_at,
         finished_at=exp.finished_at,
     )
+
+
+async def list_experiments_for_dataset_version(
+    dataset_version_uuid: UUID,
+) -> list[ExperimentSummary]:
+    from app.models.ml_models import MLModel
+
+    dataset_version, dataset = await get_dataset_version_and_dataset(dataset_version_uuid)
+    experiments = (
+        await Experiment.find(Experiment.dataset_version_id == dataset_version.id)
+        .sort([("created_at", -1)])
+        .to_list()
+    )
+    if not experiments:
+        return []
+
+    model_ids = list({e.model_id for e in experiments})
+    models = await MLModel.find({"_id": {"$in": model_ids}}).to_list()
+    model_by_id = {m.id: m for m in models}
+
+    out: list[ExperimentSummary] = []
+    for exp in experiments:
+        model = model_by_id.get(exp.model_id)
+        if model is None:
+            continue
+        out.append(
+            ExperimentSummary(
+                uuid=exp.uuid,
+                dataset_uuid=dataset.uuid,
+                dataset_version_uuid=dataset_version.uuid,
+                model_uuid=model.uuid,
+                model_name=model.name,
+                run_name=exp.run_name,
+                status=exp.status,
+                created_at=exp.created_at,
+            )
+        )
+    return out

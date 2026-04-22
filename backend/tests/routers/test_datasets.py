@@ -125,6 +125,54 @@ characteristics:
 
 
 @pytest.mark.anyio
+async def test_list_experiments_for_dataset_version(
+    client: AsyncClient,
+    superuser_token_headers: dict[str, str],
+) -> None:
+    ds_resp = await client.post(
+        f"{API}/datasets",
+        json={"name": "Version-Experiments-DS", "task": "ranking"},
+        headers=superuser_token_headers,
+    )
+    assert ds_resp.status_code == 200
+    dataset_uuid = ds_resp.json()["uuid"]
+
+    version_resp = await client.post(
+        f"{API}/datasets/{dataset_uuid}/versions",
+        json={"version": "v1", "status": "ready"},
+        headers=superuser_token_headers,
+    )
+    assert version_resp.status_code == 200
+    version_uuid = version_resp.json()["uuid"]
+
+    model_resp = await client.post(
+        f"{API}/ml-models",
+        json={"name": "Version-Experiments-Model"},
+        headers=superuser_token_headers,
+    )
+    assert model_resp.status_code == 200
+    model_uuid = model_resp.json()["uuid"]
+
+    exp_resp = await client.post(
+        f"{API}/experiments",
+        json={"dataset_version_uuid": version_uuid, "model_uuid": model_uuid},
+        headers=superuser_token_headers,
+    )
+    assert exp_resp.status_code == 200
+    exp_uuid = exp_resp.json()["uuid"]
+
+    list_resp = await client.get(f"{API}/dataset-versions/{version_uuid}/experiments")
+    assert list_resp.status_code == 200
+    rows = list_resp.json()
+    assert len(rows) == 1
+    assert rows[0]["uuid"] == exp_uuid
+    assert rows[0]["dataset_uuid"] == dataset_uuid
+    assert rows[0]["dataset_version_uuid"] == version_uuid
+    assert rows[0]["model_uuid"] == model_uuid
+    assert rows[0]["model_name"] == "Version-Experiments-Model"
+
+
+@pytest.mark.anyio
 async def test_get_dataset_not_found(client: AsyncClient) -> None:
     fake_uuid = "00000000-0000-0000-0000-000000000000"
     resp = await client.get(f"{API}/datasets/{fake_uuid}")

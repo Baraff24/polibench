@@ -116,16 +116,17 @@ async def create_experiment(data: ExperimentCreate, current_user: User) -> Exper
 
 **Flusso**:
 
-1. Risolve `data.dataset_uuid → Dataset` (404 se non esiste)
-2. Risolve `data.model_uuid → MLModel` (404 se non esiste)
-3. Crea il Document `Experiment` con:
-    - `dataset_id = dataset.id`, `model_id = model.id` (ObjectId interni)
+1. Risolve `data.dataset_version_uuid → DatasetVersion` (404 se non esiste)
+2. Risolve `DatasetVersion → Dataset` per valorizzare la risposta pubblica
+3. Risolve `data.model_uuid → MLModel` (404 se non esiste)
+4. Crea il Document `Experiment` con:
+    - `dataset_version_id = dataset_version.id`, `model_id = model.id` (ObjectId interni)
     - `submitted_by_user_id = current_user.id` (dal JWT, non dal client)
     - `status = Status.QUEUED` (fissato lato server)
-4. Chiama `_experiment_to_public(exp, data, current_user)` per la risposta
+5. Restituisce `ExperimentPublic` con `dataset_uuid`, `dataset_version_uuid` e `model_uuid` risolti
 
-**Ottimizzazione post-creazione**: `_experiment_to_public` usa i UUID già noti dal payload `data` invece di fare
-ulteriori query al DB. Questo evita 2 round-trip inutili subito dopo la creazione.
+**Compatibilità**: se il client passa `dataset_uuid` (legacy), il service risolve automaticamente la versione più recente
+(`get_latest_dataset_version`) e continua il flusso su `dataset_version_id`.
 
 ### Lettura Experiment (risoluzione completa)
 
@@ -135,10 +136,28 @@ async def get_experiment_public(experiment_uuid: UUID) -> ExperimentPublic
 
 Usata da `GET /experiments/{uuid}`. Risolve tutti gli ObjectId interni:
 
-- `dataset_id → Dataset → uuid`
+- `dataset_version_id → DatasetVersion → uuid`
+- `DatasetVersion.dataset_id → Dataset → uuid`
 - `model_id → MLModel → uuid`
 - `submitted_by_user_id → User → uuid`
 - `team_id → Team → uuid` (se presente)
+
+### Lista Experiment per DatasetVersion
+
+```python
+async def list_experiments_for_dataset_version(
+        dataset_version_uuid: UUID,
+) -> list[ExperimentSummary]
+```
+
+Usata da `GET /dataset-versions/{version_uuid}/experiments`.
+
+Flusso:
+
+1. Risolve `dataset_version_uuid → DatasetVersion + Dataset`
+2. Legge tutti gli `Experiment` con `dataset_version_id` corrispondente
+3. Risolve i modelli in bulk (`model_id → MLModel`) per esporre `model_uuid` e `model_name`
+4. Restituisce `ExperimentSummary` ordinati per `created_at DESC`
 
 ---
 
@@ -304,4 +323,3 @@ registrazione anche in sviluppo locale senza un server SMTP.
 ### Configurazione SMTP
 
 Vedi [07_configuration.md](./07_configuration.md) per la lista completa delle variabili d'ambiente SMTP.
-
