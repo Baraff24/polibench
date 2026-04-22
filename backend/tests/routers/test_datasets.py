@@ -65,12 +65,20 @@ async def test_create_and_list_dataset_versions(
         "version": "v1",
         "status": "ready",
         "dataset_yaml_raw": """
+name: Amazon
+versions:
+  - v1
+latest_version: v1
+citation: "Synthetic citation"
+""".strip(),
+        "version_yaml_raw": """
 dataset_name: Amazon
 version: v1
 sources:
   - name: source-main
     source_type: url
     downloadable: true
+    url: https://example.org/amazon-v1.zip
 resources:
   - name: interactions
     source_name: source-main
@@ -123,6 +131,17 @@ characteristics:
     assert get_pipeline.status_code == 200
     assert len(get_pipeline.json()["blocks"]) == 1
 
+    get_version_yaml = await client.get(
+        f"{API}/dataset-versions/{version_uuid}/yaml/version"
+    )
+    assert get_version_yaml.status_code == 200
+    assert "source-main" in get_version_yaml.json()["content"]
+
+    get_metrics_yaml = await client.get(
+        f"{API}/dataset-versions/{version_uuid}/yaml/metrics"
+    )
+    assert get_metrics_yaml.status_code == 200
+
 
 @pytest.mark.anyio
 async def test_list_experiments_for_dataset_version(
@@ -170,6 +189,161 @@ async def test_list_experiments_for_dataset_version(
     assert rows[0]["dataset_version_uuid"] == version_uuid
     assert rows[0]["model_uuid"] == model_uuid
     assert rows[0]["model_name"] == "Version-Experiments-Model"
+
+
+@pytest.mark.anyio
+async def test_preview_dataset_version_payload(
+    client: AsyncClient,
+    superuser_token_headers: dict[str, str],
+) -> None:
+    ds_resp = await client.post(
+        f"{API}/datasets",
+        json={"name": "Preview-DS", "task": "ranking"},
+        headers=superuser_token_headers,
+    )
+    assert ds_resp.status_code == 200
+    dataset_uuid = ds_resp.json()["uuid"]
+
+    preview_payload = {
+        "version": "v2",
+        "status": "ready",
+        "dataset_yaml_raw": """
+name: Preview-DS
+versions: [v1, v2]
+latest_version: v2
+""".strip(),
+        "version_yaml_raw": """
+dataset_name: Preview-DS
+version: v2
+sources:
+  - name: source-main
+    source_type: url
+    downloadable: true
+    url: https://example.org/preview-v2.zip
+resources:
+  - name: interactions
+    source_name: source-main
+    type: interactions
+""".strip(),
+        "pipeline_yaml_raw": """
+pipeline:
+  - name: parse
+    operation: parse_csv
+  - name: split
+    operation: leave_one_out
+""".strip(),
+        "characteristics_yaml_raw": """
+dataset_name: Preview-DS
+version: v2
+characteristics:
+  n_users: 150
+  n_items: 90
+  n_interactions: 2000
+  density: 0.14
+""".strip(),
+    }
+
+    preview_resp = await client.post(
+        f"{API}/datasets/{dataset_uuid}/versions/preview",
+        json=preview_payload,
+        headers=superuser_token_headers,
+    )
+    assert preview_resp.status_code == 200
+    preview = preview_resp.json()
+    assert preview["dataset_uuid"] == dataset_uuid
+    assert preview["recognized_dataset_name"] == "Preview-DS"
+    assert preview["recognized_version"] == "v2"
+    assert preview["source_count"] == 1
+    assert preview["resource_count"] == 1
+    assert preview["pipeline_steps_count"] == 2
+    assert preview["characteristics"]["n_users"] == 150
+
+
+@pytest.mark.anyio
+async def test_dataset_version_validation_blocks_invalid_source_and_consistency(
+    client: AsyncClient,
+    superuser_token_headers: dict[str, str],
+) -> None:
+    ds_resp = await client.post(
+        f"{API}/datasets",
+        json={"name": "Strict-DS", "task": "ranking"},
+        headers=superuser_token_headers,
+    )
+    assert ds_resp.status_code == 200
+    dataset_uuid = ds_resp.json()["uuid"]
+
+    invalid_payload = {
+        "version": "v1",
+        "status": "ready",
+        "version_yaml_raw": """
+dataset_name: Other-DS
+version: v1
+sources:
+  - name: source-main
+    source_type: url
+    downloadable: true
+resources:
+  - name: interactions
+    source_name: source-main
+    type: interactions
+""".strip(),
+    }
+    invalid_resp = await client.post(
+        f"{API}/datasets/{dataset_uuid}/versions",
+        json=invalid_payload,
+        headers=superuser_token_headers,
+    )
+    assert invalid_resp.status_code == 422
+    assert "version_yaml_raw non coerente" in invalid_resp.json()["detail"]
+
+    invalid_downloadable_payload = {
+        "version": "v1",
+        "status": "ready",
+        "version_yaml_raw": """
+dataset_name: Strict-DS
+version: v1
+sources:
+  - name: source-main
+    source_type: url
+    downloadable: true
+resources:
+  - name: interactions
+    source_name: source-main
+    type: interactions
+""".strip(),
+    }
+    invalid_downloadable_resp = await client.post(
+        f"{API}/datasets/{dataset_uuid}/versions",
+        json=invalid_downloadable_payload,
+        headers=superuser_token_headers,
+    )
+    assert invalid_downloadable_resp.status_code == 422
+    assert "url obbligatorio" in invalid_downloadable_resp.json()["detail"]
+
+    invalid_source_payload = {
+        "version": "v2",
+        "status": "ready",
+        "version_yaml_raw": """
+dataset_name: Strict-DS
+version: v2
+sources:
+  - name: source-main
+    source_type: url
+    downloadable: true
+    url: https://example.org/strict.zip
+resources:
+  - name: interactions
+    source_name: missing-source
+    type: interactions
+""".strip(),
+    }
+    invalid_source_resp = await client.post(
+        f"{API}/datasets/{dataset_uuid}/versions",
+        json=invalid_source_payload,
+        headers=superuser_token_headers,
+    )
+    assert invalid_source_resp.status_code == 422
+    assert "source_name='missing-source'" in invalid_source_resp.json()["detail"]
 
 
 @pytest.mark.anyio

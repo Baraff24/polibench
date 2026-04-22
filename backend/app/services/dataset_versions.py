@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -9,8 +10,10 @@ from app.models.datasets import Dataset
 from app.models.resources import Resource
 from app.models.sources import Source
 from app.schemas.dataset_versions import (
+    DatasetVersionCharacteristicsPreview,
     DatasetVersionCreate,
     DatasetVersionPipelinePublic,
+    DatasetVersionPreviewPublic,
     DatasetVersionPublic,
     DatasetVersionSummary,
     DatasetVersionYamlPublic,
@@ -24,6 +27,20 @@ try:
     import yaml
 except ImportError:  # pragma: no cover - fallback unlikely in production
     yaml = None
+
+
+@dataclass
+class ParsedDatasetVersionPayload:
+    dataset_yaml: dict[str, Any] | list[Any] | None
+    version_yaml: dict[str, Any] | list[Any] | None
+    pipeline_yaml: dict[str, Any] | list[Any] | None
+    characteristics_yaml: dict[str, Any] | list[Any] | None
+    parsed_sources: list[dict[str, Any]]
+    parsed_resources: list[dict[str, Any]]
+    pipeline_blocks: list[dict[str, Any]]
+    characteristics: dict[str, int | float | None]
+    recognized_dataset_name: str | None
+    recognized_version: str | None
 
 
 async def get_dataset_version_by_uuid(version_uuid: UUID) -> DatasetVersion:
@@ -56,6 +73,210 @@ def _parse_yaml(raw: str | None, field_name: str) -> dict[str, Any] | list[Any] 
             detail=f"Formato non valido per {field_name}: atteso dict o list",
         )
     return parsed
+
+
+def _normalize_dataset_name(value: str) -> str:
+    return value.strip().lower()
+
+
+def _same_dataset_name(lhs: str, rhs: str) -> bool:
+    return _normalize_dataset_name(lhs) == _normalize_dataset_name(rhs)
+
+
+def _extract_string(
+    payload: dict[str, Any],
+    keys: tuple[str, ...],
+) -> str | None:
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _extract_dataset_name(payload: dict[str, Any] | list[Any] | None) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+
+    direct = _extract_string(payload, ("dataset_name", "name", "dataset"))
+    if direct is not None:
+        return direct
+
+    for nested_key in ("dataset", "metadata", "info"):
+        nested = payload.get(nested_key)
+        if not isinstance(nested, dict):
+            continue
+        nested_name = _extract_string(nested, ("dataset_name", "name"))
+        if nested_name is not None:
+            return nested_name
+    return None
+
+
+def _extract_version(payload: dict[str, Any] | list[Any] | None) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+
+    direct = _extract_string(payload, ("version", "dataset_version"))
+    if direct is not None:
+        return direct
+
+    for nested_key in ("dataset", "metadata", "info"):
+        nested = payload.get(nested_key)
+        if not isinstance(nested, dict):
+            continue
+        nested_version = _extract_string(nested, ("version", "dataset_version"))
+        if nested_version is not None:
+            return nested_version
+    return None
+
+
+def _extract_list_from_payload(
+    payload: dict[str, Any],
+    key: str,
+) -> list[Any]:
+    direct = payload.get(key)
+    if isinstance(direct, list):
+        return direct
+
+    for nested_key in ("version", "dataset_version", "registry", "spec"):
+        nested = payload.get(nested_key)
+        if not isinstance(nested, dict):
+            continue
+        candidate = nested.get(key)
+        if isinstance(candidate, list):
+            return candidate
+    return []
+
+
+def _as_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "y"}:
+            return True
+        if normalized in {"0", "false", "no", "n"}:
+            return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return False
+
+
+def _validate_dataset_yaml(
+    dataset: Dataset,
+    requested_version: str,
+    dataset_yaml: dict[str, Any] | list[Any] | None,
+) -> tuple[str | None, str | None]:
+    if dataset_yaml is None:
+        return None, None
+    if not isinstance(dataset_yaml, dict):
+        raise HTTPException(
+            status_code=422,
+            detail="dataset_yaml_raw deve rappresentare un oggetto YAML",
+        )
+
+    dataset_name = _extract_dataset_name(dataset_yaml)
+    if dataset_name is not None and not _same_dataset_name(dataset_name, dataset.name):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "dataset_yaml_raw non coerente: "
+                "dataset_name/name="
+                f"'{dataset_name}' non corrisponde al dataset '{dataset.name}'"
+            ),
+        )
+
+    versions = dataset_yaml.get("versions")
+    if versions is not None and isinstance(versions, list):
+        normalized_versions = {str(v).strip() for v in versions if str(v).strip()}
+        if normalized_versions and requested_version not in normalized_versions:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "dataset_yaml_raw non coerente: "
+                    f"la versione '{requested_version}' non è presente in versions"
+                ),
+            )
+
+    latest_version = dataset_yaml.get("latest_version")
+    if isinstance(latest_version, str) and latest_version.strip():
+        return dataset_name, latest_version.strip()
+    return dataset_name, None
+
+
+def _validate_version_yaml(
+    dataset: Dataset,
+    requested_version: str,
+    version_yaml: dict[str, Any] | list[Any] | None,
+) -> tuple[str | None, str | None]:
+    if version_yaml is None:
+        return None, None
+    if not isinstance(version_yaml, dict):
+        raise HTTPException(
+            status_code=422,
+            detail="version_yaml_raw deve rappresentare un oggetto YAML",
+        )
+
+    dataset_name = _extract_dataset_name(version_yaml)
+    if dataset_name is not None and not _same_dataset_name(dataset_name, dataset.name):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "version_yaml_raw non coerente: "
+                "dataset_name/name="
+                f"'{dataset_name}' non corrisponde al dataset '{dataset.name}'"
+            ),
+        )
+
+    version_in_yaml = _extract_version(version_yaml)
+    if version_in_yaml is not None and version_in_yaml != requested_version:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "version_yaml_raw non coerente: "
+                f"version='{version_in_yaml}' non corrisponde "
+                f"alla versione richiesta '{requested_version}'"
+            ),
+        )
+
+    return dataset_name, version_in_yaml
+
+
+def _validate_characteristics_yaml(
+    dataset: Dataset,
+    requested_version: str,
+    characteristics_yaml: dict[str, Any] | list[Any] | None,
+) -> tuple[str | None, str | None]:
+    if characteristics_yaml is None:
+        return None, None
+    if not isinstance(characteristics_yaml, dict):
+        raise HTTPException(
+            status_code=422,
+            detail="characteristics_yaml_raw deve rappresentare un oggetto YAML",
+        )
+
+    dataset_name = _extract_dataset_name(characteristics_yaml)
+    if dataset_name is not None and not _same_dataset_name(dataset_name, dataset.name):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "characteristics_yaml_raw non coerente: "
+                "dataset_name/name="
+                f"'{dataset_name}' non corrisponde al dataset '{dataset.name}'"
+            ),
+        )
+
+    version_in_yaml = _extract_version(characteristics_yaml)
+    if version_in_yaml is not None and version_in_yaml != requested_version:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "characteristics_yaml_raw non coerente: "
+                f"version='{version_in_yaml}' non corrisponde "
+                f"alla versione richiesta '{requested_version}'"
+            ),
+        )
+    return dataset_name, version_in_yaml
 
 
 def _normalize_pipeline_blocks(
@@ -130,6 +351,8 @@ def _extract_characteristics(
 
     base = characteristics_yaml.get("characteristics")
     if not isinstance(base, dict):
+        base = characteristics_yaml.get("metrics")
+    if not isinstance(base, dict):
         base = characteristics_yaml
 
     return {
@@ -143,30 +366,59 @@ def _extract_characteristics(
 
 
 def _parse_sources(
-    dataset_yaml: dict[str, Any] | list[Any] | None,
+    version_yaml: dict[str, Any] | list[Any] | None,
 ) -> list[dict[str, Any]]:
-    if not isinstance(dataset_yaml, dict):
+    if not isinstance(version_yaml, dict):
         return []
-    raw_sources = dataset_yaml.get("sources")
-    if not isinstance(raw_sources, list):
-        return []
+    raw_sources = _extract_list_from_payload(version_yaml, "sources")
 
     out: list[dict[str, Any]] = []
+    seen_names: set[str] = set()
     for source in raw_sources:
         if not isinstance(source, dict):
             continue
+
+        source_name = str(source.get("name") or "source").strip()
+        if source_name in seen_names:
+            raise HTTPException(
+                status_code=422,
+                detail=f"source duplicata nel version YAML: '{source_name}'",
+            )
+        seen_names.add(source_name)
+
+        downloadable = _as_bool(source.get("downloadable", False))
+        url = source.get("url")
+        if downloadable and (not isinstance(url, str) or not url.strip()):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"source '{source_name}': url obbligatorio quando downloadable=true"
+                ),
+            )
+
+        checksum = source.get("checksum")
+        checksum_algorithm = source.get("checksum_algorithm")
+        if checksum is not None and checksum_algorithm in (None, ""):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"source '{source_name}': checksum_algorithm "
+                    "obbligatorio quando è presente checksum"
+                ),
+            )
+
         inner_paths = source.get("inner_paths")
         if not isinstance(inner_paths, dict):
             inner_paths = None
         out.append(
             {
-                "name": str(source.get("name") or "source"),
+                "name": source_name,
                 "source_type": str(source.get("source_type") or "unknown"),
                 "archive": source.get("archive"),
-                "downloadable": bool(source.get("downloadable", False)),
-                "url": source.get("url"),
-                "checksum": source.get("checksum"),
-                "checksum_algorithm": source.get("checksum_algorithm"),
+                "downloadable": downloadable,
+                "url": url.strip() if isinstance(url, str) else None,
+                "checksum": checksum,
+                "checksum_algorithm": checksum_algorithm,
                 "filename": source.get("filename"),
                 "inner_paths": inner_paths,
             }
@@ -175,13 +427,11 @@ def _parse_sources(
 
 
 def _parse_resources(
-    dataset_yaml: dict[str, Any] | list[Any] | None,
+    version_yaml: dict[str, Any] | list[Any] | None,
 ) -> list[dict[str, Any]]:
-    if not isinstance(dataset_yaml, dict):
+    if not isinstance(version_yaml, dict):
         return []
-    raw_resources = dataset_yaml.get("resources")
-    if not isinstance(raw_resources, list):
-        return []
+    raw_resources = _extract_list_from_payload(version_yaml, "resources")
 
     out: list[dict[str, Any]] = []
     for resource in raw_resources:
@@ -192,9 +442,14 @@ def _parse_resources(
             schema_definition = resource.get("schema")
         if not isinstance(schema_definition, dict):
             schema_definition = None
+        source_name = resource.get("source_name")
+        if source_name is None:
+            source_name = resource.get("source")
+        if not isinstance(source_name, str):
+            source_name = None
         out.append(
             {
-                "source_name": resource.get("source_name"),
+                "source_name": source_name.strip() if source_name else None,
                 "name": str(resource.get("name") or "resource"),
                 "filename": resource.get("filename"),
                 "type": str(resource.get("type") or "unknown"),
@@ -205,6 +460,25 @@ def _parse_resources(
             }
         )
     return out
+
+
+def _validate_resource_source_names(
+    parsed_sources: list[dict[str, Any]],
+    parsed_resources: list[dict[str, Any]],
+) -> None:
+    source_names = {str(source["name"]) for source in parsed_sources}
+    for resource in parsed_resources:
+        source_name = resource.get("source_name")
+        if source_name is None:
+            continue
+        if source_name not in source_names:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "resource non valida: "
+                    f"source_name='{source_name}' non presente nella lista sources"
+                ),
+            )
 
 
 def _to_dataset_version_summary(
@@ -299,35 +573,108 @@ async def list_dataset_versions(dataset_uuid: UUID) -> list[DatasetVersionSummar
     return [_to_dataset_version_summary(dataset.uuid, v) for v in versions]
 
 
-async def create_dataset_version(
-    dataset_uuid: UUID,
+def _prepare_dataset_version_payload(
+    dataset: Dataset,
     data: DatasetVersionCreate,
-) -> DatasetVersionPublic:
-    dataset = await get_dataset_by_uuid(dataset_uuid)
-
+) -> ParsedDatasetVersionPayload:
     dataset_yaml = _parse_yaml(data.dataset_yaml_raw, "dataset_yaml_raw")
+    version_yaml = _parse_yaml(data.version_yaml_raw, "version_yaml_raw")
     pipeline_yaml = _parse_yaml(data.pipeline_yaml_raw, "pipeline_yaml_raw")
     characteristics_yaml = _parse_yaml(
         data.characteristics_yaml_raw,
         "characteristics_yaml_raw",
     )
-    pipeline_blocks = _normalize_pipeline_blocks(pipeline_yaml)
-    characteristics = _extract_characteristics(characteristics_yaml)
+
+    dataset_name_from_dataset_yaml, version_from_dataset_yaml = _validate_dataset_yaml(
+        dataset,
+        data.version,
+        dataset_yaml,
+    )
+    dataset_name_from_version_yaml, version_from_version_yaml = _validate_version_yaml(
+        dataset,
+        data.version,
+        version_yaml,
+    )
+    dataset_name_from_characteristics_yaml, version_from_characteristics_yaml = (
+        _validate_characteristics_yaml(
+            dataset,
+            data.version,
+            characteristics_yaml,
+        )
+    )
+
+    # New contract: sources/resources come from version YAML.
+    # Backward compatibility: if version YAML is not provided, fallback to dataset YAML.
+    source_of_truth_yaml = version_yaml if version_yaml is not None else dataset_yaml
+    parsed_sources = _parse_sources(source_of_truth_yaml)
+    parsed_resources = _parse_resources(source_of_truth_yaml)
+    _validate_resource_source_names(parsed_sources, parsed_resources)
+
+    return ParsedDatasetVersionPayload(
+        dataset_yaml=dataset_yaml,
+        version_yaml=version_yaml,
+        pipeline_yaml=pipeline_yaml,
+        characteristics_yaml=characteristics_yaml,
+        parsed_sources=parsed_sources,
+        parsed_resources=parsed_resources,
+        pipeline_blocks=_normalize_pipeline_blocks(pipeline_yaml),
+        characteristics=_extract_characteristics(characteristics_yaml),
+        recognized_dataset_name=(
+            dataset_name_from_version_yaml
+            or dataset_name_from_dataset_yaml
+            or dataset_name_from_characteristics_yaml
+            or dataset.name
+        ),
+        recognized_version=(
+            version_from_version_yaml
+            or version_from_characteristics_yaml
+            or version_from_dataset_yaml
+            or data.version
+        ),
+    )
+
+
+async def preview_dataset_version_payload(
+    dataset_uuid: UUID,
+    data: DatasetVersionCreate,
+) -> DatasetVersionPreviewPublic:
+    dataset = await get_dataset_by_uuid(dataset_uuid)
+    parsed = _prepare_dataset_version_payload(dataset, data)
+
+    return DatasetVersionPreviewPublic(
+        dataset_uuid=dataset.uuid,
+        requested_version=data.version,
+        recognized_dataset_name=parsed.recognized_dataset_name,
+        recognized_version=parsed.recognized_version,
+        source_count=len(parsed.parsed_sources),
+        resource_count=len(parsed.parsed_resources),
+        pipeline_steps_count=len(parsed.pipeline_blocks),
+        characteristics=DatasetVersionCharacteristicsPreview(**parsed.characteristics),
+    )
+
+
+async def create_dataset_version(
+    dataset_uuid: UUID,
+    data: DatasetVersionCreate,
+) -> DatasetVersionPublic:
+    dataset = await get_dataset_by_uuid(dataset_uuid)
+    parsed = _prepare_dataset_version_payload(dataset, data)
 
     version = DatasetVersion(
         dataset_id=dataset.id,
         version=data.version,
         release_notes=data.release_notes,
         dataset_yaml_raw=data.dataset_yaml_raw,
+        version_yaml_raw=data.version_yaml_raw,
         pipeline_yaml_raw=data.pipeline_yaml_raw,
         characteristics_yaml_raw=data.characteristics_yaml_raw,
-        pipeline_blocks=pipeline_blocks,
-        n_users=characteristics["n_users"],
-        n_items=characteristics["n_items"],
-        n_interactions=characteristics["n_interactions"],
-        density=characteristics["density"],
-        gini_user=characteristics["gini_user"],
-        gini_item=characteristics["gini_item"],
+        pipeline_blocks=parsed.pipeline_blocks,
+        n_users=parsed.characteristics["n_users"],
+        n_items=parsed.characteristics["n_items"],
+        n_interactions=parsed.characteristics["n_interactions"],
+        density=parsed.characteristics["density"],
+        gini_user=parsed.characteristics["gini_user"],
+        gini_item=parsed.characteristics["gini_item"],
         status=data.status,
     )
     try:
@@ -338,16 +685,13 @@ async def create_dataset_version(
             detail="Versione dataset già esistente per questo dataset",
         ) from exc
 
-    # Parse and materialize sources/resources from dataset YAML.
-    parsed_sources = _parse_sources(dataset_yaml)
     source_name_to_id: dict[str, Any] = {}
-    for source_data in parsed_sources:
+    for source_data in parsed.parsed_sources:
         source = Source(dataset_version_id=version.id, **source_data)
         await source.create()
         source_name_to_id[source.name] = source.id
 
-    parsed_resources = _parse_resources(dataset_yaml)
-    for resource_data in parsed_resources:
+    for resource_data in parsed.parsed_resources:
         source_name = resource_data.pop("source_name", None)
         source_id = source_name_to_id.get(str(source_name)) if source_name else None
         resource = Resource(
@@ -400,21 +744,23 @@ async def get_pipeline_for_version(version_uuid: UUID) -> DatasetVersionPipeline
 
 async def get_yaml_for_version(version_uuid: UUID, kind: str) -> DatasetVersionYamlPublic:
     version = await get_dataset_version_by_uuid(version_uuid)
+    normalized_kind = "characteristics" if kind == "metrics" else kind
     field_map = {
         "dataset": version.dataset_yaml_raw,
+        "version": version.version_yaml_raw,
         "pipeline": version.pipeline_yaml_raw,
         "characteristics": version.characteristics_yaml_raw,
     }
-    if kind not in field_map:
+    if normalized_kind not in field_map:
         raise HTTPException(status_code=404, detail="Tipo YAML non supportato")
 
-    content = field_map[kind]
+    content = field_map[normalized_kind]
     if content is None:
         raise HTTPException(status_code=404, detail="YAML non disponibile")
 
     return DatasetVersionYamlPublic(
         dataset_version_uuid=version.uuid,
-        kind=kind,
+        kind=normalized_kind,
         content=content,
     )
 

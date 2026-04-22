@@ -43,6 +43,7 @@ export interface DatasetVersionCreate {
   release_notes?: string | null
   status?: VersionStatus
   dataset_yaml_raw?: string | null
+  version_yaml_raw?: string | null
   pipeline_yaml_raw?: string | null
   characteristics_yaml_raw?: string | null
 }
@@ -113,4 +114,24 @@ export interface DatasetVersionYamlPublic {
   dataset_version_uuid: string
   kind: string
   content: string
+}
+
+export interface DatasetVersionCharacteristicsPreview {
+  n_users: number | null
+  n_items: number | null
+  n_interactions: number | null
+  density: number | null
+  gini_user: number | null
+  gini_item: number | null
+}
+
+export interface DatasetVersionPreviewPublic {
+  dataset_uuid: string
+  requested_version: string
+  recognized_dataset_name: string | null
+  recognized_version: string | null
+  source_count: number
+  resource_count: number
+  pipeline_steps_count: number
+  characteristics: DatasetVersionCharacteristicsPreview
 }

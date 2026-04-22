@@ -103,34 +103,51 @@ Rappresenta un gruppo di ricerca. Gli utenti appartengono a un team tramite `Use
 **File**: `models/datasets.py`  
 **Collezione MongoDB**: `datasets`
 
-Rappresenta un dataset di valutazione con le relative caratteristiche e partizioni.
+Rappresenta il **catalogo logico** del dataset (livello `datasets/*.yml`), senza campi version-specific.
 
 | Campo                | Tipo                       | Indice | Note                                   |
 |----------------------|----------------------------|--------|----------------------------------------|
 | `uuid`               | `UUID`                     | unique | Identificatore pubblico                |
-| `name`               | `str`                      | —      | Nome del dataset (es. "MovieLens-1M")  |
-| `version`            | `str`                      | —      | Versione (es. "1.0")                   |
+| `name`               | `str`                      | sì     | Nome del dataset (es. "MovieLens-1M")  |
 | `task`               | `TaskType`                 | —      | `ranking`, `rating_prediction` o `ctr` |
 | `description`        | `str \| None`              | —      | Descrizione opzionale                  |
 | `visibility`         | `Visibility`               | —      | `public` o `private`                   |
-| `splits`             | `Splits \| None`           | —      | Sotto-documento con conteggi           |
 | `team_id`            | `PydanticObjectId \| None` | sì     | FK verso Team                          |
 | `created_by_user_id` | `PydanticObjectId \| None` | sì     | FK verso User                          |
 | `created_at`         | `datetime`                 | —      | Timestamp creazione                    |
-
-**Sotto-documento `Splits`** (classe `BaseModel`):
-
-```python
-class Splits(BaseModel):
-    train: int | None = None
-    test: int | None = None
-    validation: int | None = None
-```
 
 **Enumerazioni**:
 
 - `TaskType`: `ranking` | `rating_prediction` | `ctr`
 - `Visibility`: `public` | `private`
+
+---
+
+## DatasetVersion
+
+**File**: `models/dataset_versions.py`  
+**Collezione MongoDB**: `dataset_versions`
+
+Rappresenta l'unità operativa reale (livello `versions/*_*.yml` + `metrics/*_*.yml` + `pipeline`).
+
+| Campo                     | Tipo                     | Indice | Note |
+|---------------------------|--------------------------|--------|------|
+| `uuid`                    | `UUID`                   | unique | Identificatore pubblico |
+| `dataset_id`              | `PydanticObjectId`       | sì     | FK verso `Dataset` |
+| `version`                 | `str`                    | unique composito con `dataset_id` | Versione funzionale |
+| `dataset_yaml_raw`        | `str \| None`            | —      | YAML dataset-level (metadata) |
+| `version_yaml_raw`        | `str \| None`            | —      | YAML version-level (sources/resources) |
+| `pipeline_yaml_raw`       | `str \| None`            | —      | YAML pipeline raw |
+| `characteristics_yaml_raw`| `str \| None`            | —      | YAML metrics/characteristics raw |
+| `pipeline_blocks`         | `list[dict] \| None`     | —      | Rappresentazione normalizzata per UI |
+| `n_users`                 | `int \| None`            | —      | Dataset characteristics denormalizzate |
+| `n_items`                 | `int \| None`            | —      | Dataset characteristics denormalizzate |
+| `n_interactions`          | `int \| None`            | —      | Dataset characteristics denormalizzate |
+| `density`                 | `float \| None`          | —      | Dataset characteristics denormalizzate |
+| `gini_user`               | `float \| None`          | —      | Dataset characteristics denormalizzate |
+| `gini_item`               | `float \| None`          | —      | Dataset characteristics denormalizzate |
+| `status`                  | `VersionStatus`          | —      | `draft` \| `ready` \| `processing` \| `failed` |
+| `created_at`              | `datetime`               | —      | Timestamp creazione |
 
 ---
 
@@ -170,7 +187,7 @@ l'entità centrale del sistema.
 | Campo                  | Tipo                       | Indice | Note                            |
 |------------------------|----------------------------|--------|---------------------------------|
 | `uuid`                 | `UUID`                     | unique | Identificatore pubblico         |
-| `dataset_id`           | `PydanticObjectId`         | sì     | FK verso Dataset                |
+| `dataset_version_id`   | `PydanticObjectId`         | sì     | FK verso DatasetVersion         |
 | `model_id`             | `PydanticObjectId`         | sì     | FK verso MLModel                |
 | `submitted_by_user_id` | `PydanticObjectId`         | sì     | FK verso User                   |
 | `team_id`              | `PydanticObjectId \| None` | sì     | FK verso Team (opzionale)       |
@@ -219,6 +236,7 @@ performance, in quanto è quello su cui si eseguono le query di leaderboard.
 | `uuid`                 | `UUID`                     | unique | Identificatore pubblico           |
 | `experiment_id`        | `PydanticObjectId`         | sì     | FK verso Experiment               |
 | `dataset_id`           | `PydanticObjectId`         | sì     | FK denormalizzato da Experiment   |
+| `dataset_version_id`   | `PydanticObjectId`         | sì     | FK denormalizzato da Experiment   |
 | `model_id`             | `PydanticObjectId`         | sì     | FK denormalizzato da Experiment   |
 | `submitted_by_user_id` | `PydanticObjectId \| None` | sì     | FK denormalizzato                 |
 | `team_id`              | `PydanticObjectId \| None` | sì     | FK denormalizzato                 |
@@ -233,6 +251,9 @@ performance, in quanto è quello su cui si eseguono le query di leaderboard.
 
 - `Split`: `validation` | `test`
 - `Direction`: `max` | `min`
+
+> Nota importante: questa collezione contiene solo **experiment metrics** (NDCG, Recall, RMSE, ...).  
+> Le **dataset characteristics** (`n_users`, `density`, `gini_*`) vivono in `DatasetVersion`.
 
 ### Denormalizzazione intenzionale
 
@@ -263,16 +284,17 @@ dell'inserimento (il router deve copiare `dataset_id` e `model_id` dall'`Experim
 User ──────────────────────────────── crea ──→ Dataset
 User ──────────────────────────────── crea ──→ MLModel
 User ──────────────────────────────── sottomette ──→ Experiment
+User ──────────────────────────────── carica ──→ MetricImportJob
 User ──────────────────────── appartiene a ──→ Team
 
 Team ──────────────────────── possiede ──→ Dataset
 Team ──────────────────────── possiede ──→ Experiment
 
-Dataset ──┐
-          ├──→ Experiment ──→ Metric (×N)
-MLModel ──┘
+Dataset ──→ DatasetVersion ──→ Experiment ──→ Metric (×N)
+                          ├──→ Source
+                          └──→ Resource
+MLModel ──────────────────┘
 ```
 
-Una singola coppia `(Dataset, MLModel)` può avere più `Experiment` (run diverse con seed o configurazioni diverse). Ogni
-`Experiment` produce N `Metric`, una per ogni combinazione di `(split, metric_name)`.
-
+Una singola coppia `(DatasetVersion, MLModel)` può avere più `Experiment` (run diverse con seed/config).  
+Ogni `Experiment` produce N `Metric`, una per ogni combinazione di `(split, metric_name)`.

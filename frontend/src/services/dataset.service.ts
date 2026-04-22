@@ -5,6 +5,7 @@ import type {
   DatasetSummary,
   DatasetVersionCreate,
   DatasetVersionPipelinePublic,
+  DatasetVersionPreviewPublic,
   DatasetVersionPublic,
   DatasetVersionSummary,
   DatasetVersionYamlPublic,
@@ -43,6 +44,14 @@ class DatasetService {
     return response.data
   }
 
+  async previewVersion(
+    datasetUuid: string,
+    data: DatasetVersionCreate,
+  ): Promise<DatasetVersionPreviewPublic> {
+    const response = await axios.post(API_URL + `datasets/${datasetUuid}/versions/preview`, data)
+    return response.data
+  }
+
   async getVersionByUuid(versionUuid: string): Promise<DatasetVersionPublic> {
     const response = await axios.get(API_URL + `dataset-versions/${versionUuid}`)
     return response.data
@@ -66,6 +75,14 @@ class DatasetService {
   async getVersionYaml(versionUuid: string, kind: string): Promise<DatasetVersionYamlPublic> {
     const response = await axios.get(API_URL + `dataset-versions/${versionUuid}/yaml/${kind}`)
     return response.data
+  }
+
+  async downloadVersionYamlRaw(versionUuid: string, kind: string): Promise<string> {
+    const response = await axios.get(API_URL + `dataset-versions/${versionUuid}/yaml/${kind}/raw`, {
+      responseType: 'text',
+      transformResponse: [(data) => data],
+    })
+    return response.data as string
   }
 }
 

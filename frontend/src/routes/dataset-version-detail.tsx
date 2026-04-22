@@ -13,7 +13,7 @@ import type {
 } from '../models'
 import type { Params } from 'react-router'
 
-type YamlKind = 'dataset' | 'pipeline' | 'characteristics'
+type YamlKind = 'dataset' | 'version' | 'pipeline' | 'characteristics'
 type PipelineRow = DatasetVersionPipelinePublic['blocks'][number]
 
 const pipelineColumns: Column<PipelineRow>[] = [
@@ -54,12 +54,26 @@ const experimentColumns: Column<ExperimentSummary>[] = [
 
 export async function loader({ params }: { params: Params }) {
   const versionUuid = params.uuid as string
+
+  const safeGetYaml = async (kind: YamlKind): Promise<DatasetVersionYamlPublic> => {
+    try {
+      return await datasetService.getVersionYaml(versionUuid, kind)
+    } catch {
+      return {
+        dataset_version_uuid: versionUuid,
+        kind,
+        content: '',
+      }
+    }
+  }
+
   const [
     version,
     sources,
     resources,
     pipeline,
     datasetYaml,
+    versionYaml,
     pipelineYaml,
     characteristicsYaml,
     experiments,
@@ -68,9 +82,10 @@ export async function loader({ params }: { params: Params }) {
     datasetService.getVersionSources(versionUuid),
     datasetService.getVersionResources(versionUuid),
     datasetService.getVersionPipeline(versionUuid),
-    datasetService.getVersionYaml(versionUuid, 'dataset'),
-    datasetService.getVersionYaml(versionUuid, 'pipeline'),
-    datasetService.getVersionYaml(versionUuid, 'characteristics'),
+    safeGetYaml('dataset'),
+    safeGetYaml('version'),
+    safeGetYaml('pipeline'),
+    safeGetYaml('characteristics'),
     experimentService.listByDatasetVersion(versionUuid),
   ])
   return {
@@ -81,6 +96,7 @@ export async function loader({ params }: { params: Params }) {
     experiments,
     yamls: {
       dataset: datasetYaml,
+      version: versionYaml,
       pipeline: pipelineYaml,
       characteristics: characteristicsYaml,
     },
@@ -103,6 +119,7 @@ export default function DatasetVersionDetail() {
 
   const yamlKinds: { kind: YamlKind; label: string }[] = [
     { kind: 'dataset', label: 'Dataset YAML' },
+    { kind: 'version', label: 'Version YAML' },
     { kind: 'pipeline', label: 'Pipeline YAML' },
     { kind: 'characteristics', label: 'Characteristics YAML' },
   ]
@@ -149,7 +166,20 @@ export default function DatasetVersionDetail() {
         {pipeline.blocks.length === 0 ? (
           <EmptyState title='No pipeline steps' description='No pipeline YAML parsed yet.' />
         ) : (
-          <DataTable columns={pipelineColumns} rows={pipeline.blocks} rowKey={(row) => row.name} />
+          <>
+            <div className='pipeline-chain'>
+              {pipeline.blocks.map((block, index) => (
+                <div key={`${block.name}-${index}`} className='pipeline-chain__item'>
+                  <div className='pipeline-chain__block'>
+                    <div className='pipeline-chain__title'>{block.name}</div>
+                    <div className='pipeline-chain__op'>{block.operation || 'operation'}</div>
+                  </div>
+                  {index < pipeline.blocks.length - 1 && <div className='pipeline-chain__arrow'>→</div>}
+                </div>
+              ))}
+            </div>
+            <DataTable columns={pipelineColumns} rows={pipeline.blocks} rowKey={(row) => row.name} />
+          </>
         )}
       </section>
 

@@ -14,6 +14,8 @@ export type {
   ResourcePublic,
   DatasetVersionPipelinePublic,
   DatasetVersionYamlPublic,
+  DatasetVersionPreviewPublic,
+  DatasetVersionCharacteristicsPreview,
 } from './dataset'
 export type { MLModelSummary, MLModelPublic, MLModelCreate } from './ml-model'
 export type {

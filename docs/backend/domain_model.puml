@@ -48,6 +48,7 @@ class DatasetVersion {
   +dataset_id: ObjectId <<indexed>>
   +version: string
   +dataset_yaml_raw: string?
+  +version_yaml_raw: string?
   +pipeline_yaml_raw: string?
   +characteristics_yaml_raw: string?
   +pipeline_blocks: object[]?
@@ -163,8 +164,8 @@ Team "1" -- "0..*" Dataset : owns/private >
 Team "1" -- "0..*" Experiment : owns >
 
 Dataset "1" -- "1..*" DatasetVersion : has >
-DatasetVersion "1" -- "1..*" Source : declares >
-DatasetVersion "1" -- "1..*" Resource : exposes >
+DatasetVersion "1" -- "0..*" Source : declares >
+DatasetVersion "1" -- "0..*" Resource : exposes >
 
 DatasetVersion "1" -- "0..*" Experiment : evaluated on >
 MLModel "1" -- "0..*" Experiment : runs >
@@ -172,4 +173,10 @@ Experiment "1" -- "0..*" MetricImportJob : imports >
 Experiment "1" -- "0..*" ExperimentMetric : produces >
 
 Source "1" -- "0..*" Resource : provides >
+
+note bottom of ExperimentMetric
+Contains only experiment performance metrics
+(e.g. ndcg, recall, rmse).
+Dataset characteristics live in DatasetVersion.
+end note
 @enduml

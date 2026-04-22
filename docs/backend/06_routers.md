@@ -186,22 +186,35 @@ Contiene gli endpoint sia per `Dataset` che per `MLModel` (entità di "catalogo"
 | Endpoint                                              | Metodo | Auth              | Input / Output                                | Note |
 |-------------------------------------------------------|--------|-------------------|-----------------------------------------------|------|
 | `/api/v1/datasets/{dataset_uuid}/versions`            | GET    | pubblico          | — → `list[DatasetVersionSummary]`             | Versioni del dataset |
-| `/api/v1/datasets/{dataset_uuid}/versions`            | POST   | utente verificato | `DatasetVersionCreate` → `DatasetVersionPublic` | Accetta i 3 YAML raw |
+| `/api/v1/datasets/{dataset_uuid}/versions`            | POST   | utente verificato | `DatasetVersionCreate` → `DatasetVersionPublic` | Accetta i 4 YAML raw |
+| `/api/v1/datasets/{dataset_uuid}/versions/preview`    | POST   | utente verificato | `DatasetVersionCreate` → `DatasetVersionPreviewPublic` | Preview parse/validazioni |
 | `/api/v1/dataset-versions/{version_uuid}`             | GET    | pubblico          | — → `DatasetVersionPublic`                    | Dettaglio versione |
-| `/api/v1/dataset-versions/{version_uuid}/sources`     | GET    | pubblico          | — → `list[SourcePublic]`                      | Provenance da dataset YAML |
-| `/api/v1/dataset-versions/{version_uuid}/resources`   | GET    | pubblico          | — → `list[ResourcePublic]`                    | Risorse parse dal dataset YAML |
+| `/api/v1/dataset-versions/{version_uuid}/sources`     | GET    | pubblico          | — → `list[SourcePublic]`                      | Provenance da version YAML |
+| `/api/v1/dataset-versions/{version_uuid}/resources`   | GET    | pubblico          | — → `list[ResourcePublic]`                    | Risorse parse dal version YAML |
 | `/api/v1/dataset-versions/{version_uuid}/pipeline`    | GET    | pubblico          | — → `DatasetVersionPipelinePublic`            | Blocchi pipeline normalizzati |
 | `/api/v1/dataset-versions/{version_uuid}/yaml/dataset`| GET    | pubblico          | — → `DatasetVersionYamlPublic`                | YAML dataset |
+| `/api/v1/dataset-versions/{version_uuid}/yaml/version`| GET    | pubblico          | — → `DatasetVersionYamlPublic`                | YAML version |
 | `/api/v1/dataset-versions/{version_uuid}/yaml/pipeline`| GET   | pubblico          | — → `DatasetVersionYamlPublic`                | YAML pipeline |
 | `/api/v1/dataset-versions/{version_uuid}/yaml/characteristics` | GET | pubblico | — → `DatasetVersionYamlPublic` | YAML characteristics |
+| `/api/v1/dataset-versions/{version_uuid}/yaml/metrics` | GET | pubblico | — → `DatasetVersionYamlPublic` | Alias di `characteristics` |
 | `/api/v1/dataset-versions/{version_uuid}/yaml/{kind}/raw` | GET | pubblico | `text/yaml`                                   | Download raw |
 | `/api/v1/dataset-versions/{version_uuid}/experiments` | GET    | pubblico          | — → `list[ExperimentSummary]`                 | Lista run collegate alla versione |
 
-Nel POST di creazione versione, il backend parse automaticamente i 3 YAML raw:
+Nel POST di creazione versione, il backend parse automaticamente i YAML raw:
 
-1. `pipeline_yaml_raw` → `pipeline_blocks`
-2. `characteristics_yaml_raw` → campi denormalizzati (`n_users`, `density`, ecc.)
-3. `dataset_yaml_raw` → materializzazione di `Source` e `Resource`
+1. `dataset_yaml_raw` (dataset-level metadata)
+2. `version_yaml_raw` (sources/resources della versione)
+3. `characteristics_yaml_raw` (dataset characteristics)
+4. `pipeline_yaml_raw` (pipeline blocks per UI)
+
+Validazioni principali:
+
+1. `dataset_name` nel version YAML deve combaciare con il dataset selezionato
+2. `version` nel version YAML deve combaciare con la versione richiesta
+3. `dataset_name/version` nel characteristics YAML devono combaciare con la target DatasetVersion
+4. ogni `resource.source_name` deve riferire una source esistente
+5. `downloadable=true` richiede `url`
+6. `checksum` richiede `checksum_algorithm`
 
 ### MLModel
 
@@ -328,12 +341,13 @@ quindi la query è un semplice `find()` su indice composto `{dataset_id, metric,
 | `GET  /api/v1/datasets`                   | GET    | no         | Lista Dataset                           |
 | `GET  /api/v1/datasets/{uuid}`            | GET    | no         | Dettaglio Dataset                       |
 | `GET  /api/v1/datasets/{uuid}/versions`   | GET    | no         | Lista DatasetVersion                    |
-| `POST /api/v1/datasets/{uuid}/versions`   | POST   | verificato | Crea DatasetVersion (+YAML raw)         |
+| `POST /api/v1/datasets/{uuid}/versions`   | POST   | verificato | Crea DatasetVersion (+4 YAML raw)       |
+| `POST /api/v1/datasets/{uuid}/versions/preview` | POST | verificato | Preview parse/validazione YAML     |
 | `GET  /api/v1/dataset-versions/{uuid}`    | GET    | no         | Dettaglio DatasetVersion                |
 | `GET  /api/v1/dataset-versions/{uuid}/sources` | GET | no      | Sources della versione                  |
 | `GET  /api/v1/dataset-versions/{uuid}/resources` | GET | no     | Resources della versione                |
 | `GET  /api/v1/dataset-versions/{uuid}/pipeline` | GET | no      | Pipeline blocks della versione          |
-| `GET  /api/v1/dataset-versions/{uuid}/yaml/{kind}` | GET | no   | YAML normalizzato (`dataset/pipeline/characteristics`) |
+| `GET  /api/v1/dataset-versions/{uuid}/yaml/{kind}` | GET | no   | YAML (`dataset/version/pipeline/characteristics`) |
 | `GET  /api/v1/dataset-versions/{uuid}/yaml/{kind}/raw` | GET | no | Download YAML raw                        |
 | `GET  /api/v1/dataset-versions/{uuid}/experiments` | GET | no    | Experiment della versione                |
 | `POST /api/v1/ml-models`                  | POST   | verificato | Registra MLModel                        |

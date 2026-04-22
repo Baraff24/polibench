@@ -18,6 +18,7 @@ class DatasetVersionBase(BaseModel):
     release_notes: str | None = None
     status: VersionStatus = VersionStatus.DRAFT
     dataset_yaml_raw: str | None = None
+    version_yaml_raw: str | None = None
     pipeline_yaml_raw: str | None = None
     characteristics_yaml_raw: str | None = None
 
@@ -92,3 +93,23 @@ class DatasetVersionYamlPublic(BaseModel):
     dataset_version_uuid: UUID
     kind: str
     content: str
+
+
+class DatasetVersionCharacteristicsPreview(BaseModel):
+    n_users: int | None = None
+    n_items: int | None = None
+    n_interactions: int | None = None
+    density: float | None = None
+    gini_user: float | None = None
+    gini_item: float | None = None
+
+
+class DatasetVersionPreviewPublic(BaseModel):
+    dataset_uuid: UUID
+    requested_version: str
+    recognized_dataset_name: str | None = None
+    recognized_version: str | None = None
+    source_count: int
+    resource_count: int
+    pipeline_steps_count: int
+    characteristics: DatasetVersionCharacteristicsPreview

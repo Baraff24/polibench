@@ -23,6 +23,7 @@ class DatasetVersion(Document):
 
     # Raw source of truth (downloadable as YAML)
     dataset_yaml_raw: str | None = None
+    version_yaml_raw: str | None = None
     pipeline_yaml_raw: str | None = None
     characteristics_yaml_raw: str | None = None
 

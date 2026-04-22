@@ -7,6 +7,7 @@ from app.models.users import User
 from app.schemas.dataset_versions import (
     DatasetVersionCreate,
     DatasetVersionPipelinePublic,
+    DatasetVersionPreviewPublic,
     DatasetVersionPublic,
     DatasetVersionSummary,
     DatasetVersionYamlPublic,
@@ -24,6 +25,7 @@ from app.services.dataset_versions import (
     list_dataset_versions,
     list_resources_for_version,
     list_sources_for_version,
+    preview_dataset_version_payload,
 )
 from app.services.datasets import (
     create_dataset,
@@ -82,6 +84,19 @@ async def create_dataset_version_endpoint(
     _: User = Depends(get_current_verified_user),
 ) -> DatasetVersionPublic:
     return await create_dataset_version(dataset_uuid, data)
+
+
+@router.post(
+    "/datasets/{dataset_uuid}/versions/preview",
+    response_model=DatasetVersionPreviewPublic,
+    tags=["datasets"],
+)
+async def preview_dataset_version_endpoint(
+    dataset_uuid: UUID,
+    data: DatasetVersionCreate,
+    _: User = Depends(get_current_verified_user),
+) -> DatasetVersionPreviewPublic:
+    return await preview_dataset_version_payload(dataset_uuid, data)
 
 
 @router.get(
@@ -145,6 +160,15 @@ async def get_pipeline_yaml_endpoint(version_uuid: UUID) -> DatasetVersionYamlPu
 
 
 @router.get(
+    "/dataset-versions/{version_uuid}/yaml/version",
+    response_model=DatasetVersionYamlPublic,
+    tags=["dataset-versions"],
+)
+async def get_version_yaml_endpoint(version_uuid: UUID) -> DatasetVersionYamlPublic:
+    return await get_yaml_for_version(version_uuid, "version")
+
+
+@router.get(
     "/dataset-versions/{version_uuid}/yaml/characteristics",
     response_model=DatasetVersionYamlPublic,
     tags=["dataset-versions"],
@@ -153,6 +177,15 @@ async def get_characteristics_yaml_endpoint(
     version_uuid: UUID,
 ) -> DatasetVersionYamlPublic:
     return await get_yaml_for_version(version_uuid, "characteristics")
+
+
+@router.get(
+    "/dataset-versions/{version_uuid}/yaml/metrics",
+    response_model=DatasetVersionYamlPublic,
+    tags=["dataset-versions"],
+)
+async def get_metrics_yaml_endpoint(version_uuid: UUID) -> DatasetVersionYamlPublic:
+    return await get_yaml_for_version(version_uuid, "metrics")
 
 
 @router.get(

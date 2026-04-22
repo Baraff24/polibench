@@ -131,7 +131,8 @@ frontend/
 Nota flusso DatasetVersion:
 
 - `CreateDataset` crea solo l'entità catalografica `Dataset`.
-- La prima `DatasetVersion` si crea dalla pagina `/datasets/:uuid` tramite form YAML (dataset/pipeline/characteristics).
+- La `DatasetVersion` si crea dalla pagina `/datasets/:uuid` tramite form YAML
+  (dataset/version/pipeline/characteristics) con preview parse prima del submit.
 
 ---
 

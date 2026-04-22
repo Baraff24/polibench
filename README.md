@@ -368,16 +368,35 @@ Nel file `.env` aggiorna almeno:
 | `GET`   | `/api/v1/datasets`                   | Lista dataset                                     |
 | `POST`  | `/api/v1/datasets`                   | Crea dataset (autenticato + verificato)           |
 | `GET`   | `/api/v1/datasets/{uuid}`            | Dettaglio dataset                                 |
+| `GET`   | `/api/v1/datasets/{uuid}/versions`   | Lista DatasetVersion del dataset                  |
+| `POST`  | `/api/v1/datasets/{uuid}/versions`   | Crea DatasetVersion da YAML                       |
+| `POST`  | `/api/v1/datasets/{uuid}/versions/preview` | Preview parse/validazione YAML               |
+| `GET`   | `/api/v1/dataset-versions/{uuid}`    | Dettaglio DatasetVersion                          |
+| `GET`   | `/api/v1/dataset-versions/{uuid}/sources` | Sources della DatasetVersion                 |
+| `GET`   | `/api/v1/dataset-versions/{uuid}/resources` | Resources della DatasetVersion              |
+| `GET`   | `/api/v1/dataset-versions/{uuid}/pipeline` | Pipeline normalizzata                         |
+| `GET`   | `/api/v1/dataset-versions/{uuid}/yaml/{kind}` | YAML (`dataset`, `version`, `pipeline`, `characteristics`) |
+| `GET`   | `/api/v1/dataset-versions/{uuid}/experiments` | Esperimenti collegati alla versione         |
 | `GET`   | `/api/v1/ml-models`                  | Lista modelli                                     |
 | `POST`  | `/api/v1/ml-models`                  | Registra modello (autenticato + verificato)       |
 | `GET`   | `/api/v1/ml-models/{uuid}`           | Dettaglio modello                                 |
 | `POST`  | `/api/v1/experiments`                | Sottometti esperimento (autenticato + verificato) |
 | `GET`   | `/api/v1/experiments/{uuid}`         | Dettaglio esperimento                             |
 | `GET`   | `/api/v1/experiments/{uuid}/metrics` | Metriche dell'esperimento                         |
-| `POST`  | `/api/v1/experiments/metrics`        | Sottometti metriche batch                         |
+| `POST`  | `/api/v1/experiments/{uuid}/metric-import` | Import metriche da CSV (async)              |
 | `GET`   | `/api/v1/leaderboard`                | Leaderboard filtrata per dataset, metrica e split |
 
 La documentazione interattiva completa è disponibile su `/docs` (Swagger UI) e `/redoc`.
+
+### Contratto YAML (allineato a DataRec)
+
+- `dataset_yaml_raw`: metadata catalografici dataset-level (`datasets/*.yml`)
+- `version_yaml_raw`: definizione version-level con `sources` e `resources` (`versions/*_*.yml`)
+- `characteristics_yaml_raw`: dataset characteristics (`metrics/*_*.yml`)
+- `pipeline_yaml_raw`: pipeline raw + normalizzazione in `pipeline_blocks`
+
+Le **dataset characteristics** (`n_users`, `density`, `gini_*`) restano in `DatasetVersion`;  
+le **experiment metrics** (`ndcg`, `recall`, `rmse`, ...) entrano solo in `ExperimentMetric` via CSV import.
 
 ---
 

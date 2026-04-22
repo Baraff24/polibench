@@ -41,3 +41,42 @@
   }
 }
 
+.pipeline-chain {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2;
+  margin-bottom: $space-4;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+
+  &__block {
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    padding: $space-2 $space-3;
+    background: $color-surface;
+    min-width: 10rem;
+  }
+
+  &__title {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: $color-text-strong;
+  }
+
+  &__op {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    margin-top: $space-1;
+    word-break: break-word;
+  }
+
+  &__arrow {
+    color: $color-text-muted;
+    font-size: $font-size-md;
+    line-height: 1;
+  }
+}
