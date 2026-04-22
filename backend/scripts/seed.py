@@ -24,14 +24,15 @@ from datetime import UTC, datetime, timedelta
 from random import Random
 
 from beanie import init_beanie
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 sys.path.insert(0, ".")
 
 from app.auth.auth import get_hashed_password
 from app.config.config import settings
 from app.models import DOCUMENT_MODELS
-from app.models.datasets import Dataset, Splits, TaskType, Visibility
+from app.models.dataset_versions import DatasetVersion, VersionStatus
+from app.models.datasets import Dataset, TaskType, Visibility
 from app.models.experiments import Artifacts, CodeInfo, Experiment, Status
 from app.models.metrics import Direction, Metric, Split
 from app.models.ml_models import MLModel
@@ -53,7 +54,7 @@ DATASETS = [
         "description": "1 million movie ratings from 6,000 users on 4,000 movies. "
         "Classic collaborative filtering benchmark.",
         "visibility": Visibility.PUBLIC,
-        "splits": Splits(train=800_000, validation=100_000, test=100_000),
+        "splits": {"train": 800_000, "validation": 100_000, "test": 100_000},
     },
     {
         "name": "Amazon-Books",
@@ -62,7 +63,7 @@ DATASETS = [
         "description": "Amazon product reviews dataset filtered to the Books category. "
         "Sparse implicit feedback benchmark.",
         "visibility": Visibility.PUBLIC,
-        "splits": Splits(train=2_380_000, validation=52_643, test=52_643),
+        "splits": {"train": 2_380_000, "validation": 52_643, "test": 52_643},
     },
     {
         "name": "Yelp2018",
@@ -71,7 +72,7 @@ DATASETS = [
         "description": "Local business reviews from Yelp, 2018 version. "
         "Used in many graph-based recommender papers.",
         "visibility": Visibility.PUBLIC,
-        "splits": Splits(train=1_237_259, validation=24_734, test=24_734),
+        "splits": {"train": 1_237_259, "validation": 24_734, "test": 24_734},
     },
     {
         "name": "MovieLens-100K",
@@ -80,7 +81,7 @@ DATASETS = [
         "description": "100,000 ratings from 943 users on 1,682 movies. "
         "Standard rating prediction benchmark.",
         "visibility": Visibility.PUBLIC,
-        "splits": Splits(train=80_000, validation=10_000, test=10_000),
+        "splits": {"train": 80_000, "validation": 10_000, "test": 10_000},
     },
     {
         "name": "Criteo-x4",
@@ -90,7 +91,7 @@ DATASETS = [
         "Standard benchmark for click-through rate prediction models. "
         "Inspired by BARS CTR Leaderboard.",
         "visibility": Visibility.PUBLIC,
-        "splits": Splits(train=33_003_326, validation=4_125_416, test=4_125_416),
+        "splits": {"train": 33_003_326, "validation": 4_125_416, "test": 4_125_416},
     },
 ]
 
@@ -276,7 +277,7 @@ def jitter(value: float, pct: float = 0.03) -> float:
 
 
 async def seed(reset: bool = False) -> None:
-    client = AsyncIOMotorClient(
+    client = AsyncMongoClient(
         settings.MONGO_HOST,
         settings.MONGO_PORT,
         username=settings.MONGO_USER,
@@ -290,6 +291,7 @@ async def seed(reset: bool = False) -> None:
     if reset:
         print("⚠️  Reset: elimino dataset, modelli, esperimenti e metriche esistenti...")
         await Dataset.delete_all()
+        await DatasetVersion.delete_all()
         await MLModel.delete_all()
         await Experiment.delete_all()
         await Metric.delete_all()
@@ -312,16 +314,48 @@ async def seed(reset: bool = False) -> None:
     # ---- Dataset ----
     print("\n📦 Dataset...")
     dataset_map: dict[str, Dataset] = {}
+    dataset_version_map: dict[str, DatasetVersion] = {}
     for d in DATASETS:
-        existing = await Dataset.find_one({"name": d["name"], "version": d["version"]})
+        existing = await Dataset.find_one({"name": d["name"]})
         if existing:
-            dataset_map[d["name"]] = existing
-            print(f"   · {d['name']} v{d['version']} (già presente)")
+            dataset_doc = existing
+            print(f"   · {d['name']} (già presente)")
+        else:
+            dataset_doc = Dataset(
+                name=d["name"],
+                task=d["task"],
+                description=d["description"],
+                visibility=d["visibility"],
+                created_by_user_id=admin.id,
+            )
+            await dataset_doc.create()
+            print(f"   + {d['name']}")
+
+        dataset_map[d["name"]] = dataset_doc
+
+        existing_version = await DatasetVersion.find_one(
+            {"dataset_id": dataset_doc.id, "version": d["version"]}
+        )
+        if existing_version:
+            dataset_version_map[d["name"]] = existing_version
+            print(f"     · version {d['version']} (già presente)")
             continue
-        doc = Dataset(**d, created_by_user_id=admin.id)
-        await doc.create()
-        dataset_map[d["name"]] = doc
-        print(f"   + {d['name']} v{d['version']}")
+
+        splits = d.get("splits") or {}
+        interactions = (
+            int(splits.get("train", 0))
+            + int(splits.get("validation", 0))
+            + int(splits.get("test", 0))
+        )
+        version_doc = DatasetVersion(
+            dataset_id=dataset_doc.id,
+            version=d["version"],
+            status=VersionStatus.READY,
+            n_interactions=interactions if interactions > 0 else None,
+        )
+        await version_doc.create()
+        dataset_version_map[d["name"]] = version_doc
+        print(f"     + version {d['version']}")
 
     # ---- MLModel ----
     print("\n🤖 Modelli...")
@@ -341,8 +375,9 @@ async def seed(reset: bool = False) -> None:
     print("\n🧪 Esperimenti e metriche...")
     for ds_name, model_name, run_name, seed_val, status, days_ago in EXPERIMENTS_PLAN:
         ds = dataset_map.get(ds_name)
+        ds_version = dataset_version_map.get(ds_name)
         ml = model_map.get(model_name)
-        if not ds or not ml:
+        if not ds or not ds_version or not ml:
             print(f"   ⚠ skip {run_name}: dataset o modello mancante")
             continue
 
@@ -359,7 +394,7 @@ async def seed(reset: bool = False) -> None:
         )
 
         exp = Experiment(
-            dataset_id=ds.id,
+            dataset_version_id=ds_version.id,
             model_id=ml.id,
             submitted_by_user_id=admin.id,
             run_name=run_name,
@@ -399,6 +434,7 @@ async def seed(reset: bool = False) -> None:
                         Metric(
                             experiment_id=exp.id,
                             dataset_id=ds.id,
+                            dataset_version_id=ds_version.id,
                             model_id=ml.id,
                             submitted_by_user_id=admin.id,
                             split=split,
@@ -418,6 +454,7 @@ async def seed(reset: bool = False) -> None:
                         Metric(
                             experiment_id=exp.id,
                             dataset_id=ds.id,
+                            dataset_version_id=ds_version.id,
                             model_id=ml.id,
                             submitted_by_user_id=admin.id,
                             split=split,
@@ -436,6 +473,7 @@ async def seed(reset: bool = False) -> None:
                         Metric(
                             experiment_id=exp.id,
                             dataset_id=ds.id,
+                            dataset_version_id=ds_version.id,
                             model_id=ml.id,
                             submitted_by_user_id=admin.id,
                             split=split,
@@ -450,7 +488,7 @@ async def seed(reset: bool = False) -> None:
         print(f"   + {run_name} [{status.value}] → {len(metrics_to_insert)} metriche")
 
     print("\n✅ Seed completato.")
-    client.close()
+    await client.close()
 
 
 if __name__ == "__main__":

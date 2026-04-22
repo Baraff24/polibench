@@ -10,6 +10,9 @@ import SSOLogin, { loader as ssoLoader } from './routes/sso.login'
 import Users, { loader as usersLoader } from './routes/users'
 import Datasets, { loader as datasetsLoader } from './routes/datasets'
 import DatasetDetail, { loader as datasetDetailLoader } from './routes/dataset-detail'
+import DatasetVersionDetail, {
+  loader as datasetVersionDetailLoader,
+} from './routes/dataset-version-detail'
 import Models, { loader as modelsLoader } from './routes/models'
 import ModelDetail, { loader as modelDetailLoader } from './routes/model-detail'
 import ExperimentDetail, { loader as experimentDetailLoader } from './routes/experiment-detail'
@@ -86,6 +89,12 @@ export const routes = [
         Component: DatasetDetail,
         HydrateFallback: HydrateFallback,
         loader: datasetDetailLoader,
+      },
+      {
+        path: 'dataset-versions/:uuid',
+        Component: DatasetVersionDetail,
+        HydrateFallback: HydrateFallback,
+        loader: datasetVersionDetailLoader,
       },
       {
         path: 'models',

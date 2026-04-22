@@ -1,18 +1,33 @@
-"""
-services/leaderboard.py
-========================
-Query leaderboard: top-N per (dataset_uuid, metric, split) ordinato per value.
-Supporta sia single-metric che multi-metric (stile BARS).
-"""
-
 from collections import defaultdict
 from uuid import UUID
 
 import pymongo
+from fastapi import HTTPException
 
 from app.models.metrics import Metric, Split
 from app.schemas.metrics import LeaderboardEntry, MultiMetricLeaderboardEntry
 from app.services.datasets import get_dataset_by_uuid
+
+
+async def _resolve_dataset_version_id(
+    dataset_uuid: UUID,
+    dataset_version_uuid: UUID | None,
+):
+    if dataset_version_uuid is None:
+        return None
+
+    from app.models.dataset_versions import DatasetVersion
+
+    dataset = await get_dataset_by_uuid(dataset_uuid)
+    version = await DatasetVersion.find_one(DatasetVersion.uuid == dataset_version_uuid)
+    if version is None:
+        raise HTTPException(status_code=404, detail="DatasetVersion non trovata")
+    if version.dataset_id != dataset.id:
+        raise HTTPException(
+            status_code=400,
+            detail="DatasetVersion non appartiene al dataset specificato",
+        )
+    return version.id
 
 
 async def get_leaderboard(
@@ -20,45 +35,55 @@ async def get_leaderboard(
     metric: str,
     split: Split,
     top_n: int = 10,
+    dataset_version_uuid: UUID | None = None,
 ) -> list[LeaderboardEntry]:
-    """
-    Flusso:
-    1. Risolve dataset_uuid → Dataset (404 se non esiste)
-    2. Query Metric per (dataset_id, metric, split) → sort DESC → limit top_n
-    3. Batch fetch MLModel e Experiment per nome e uuid
-    4. Assembla LeaderboardEntry con rank progressivo
-    """
+    from app.models.dataset_versions import DatasetVersion
     from app.models.experiments import Experiment
     from app.models.ml_models import MLModel
 
     dataset = await get_dataset_by_uuid(dataset_uuid)
+    dataset_version_id = await _resolve_dataset_version_id(
+        dataset_uuid,
+        dataset_version_uuid,
+    )
+
+    filters = [
+        Metric.dataset_id == dataset.id,
+        Metric.metric == metric,
+        Metric.split == split,
+    ]
+    if dataset_version_id is not None:
+        filters.append(Metric.dataset_version_id == dataset_version_id)
+
     rows = await (
-        Metric.find(
-            Metric.dataset_id == dataset.id,
-            Metric.metric == metric,
-            Metric.split == split,
-        )
+        Metric.find(*filters)
         .sort([("value", pymongo.DESCENDING)])
         .limit(top_n)
         .to_list()
     )
     if not rows:
         return []
-    # Batch fetch: una sola query per tutti i model_id distinti
+
     model_ids = list({r.model_id for r in rows})
     models = await MLModel.find({"_id": {"$in": model_ids}}).to_list()
     model_name_by_id = {m.id: m.name for m in models}
     model_uuid_by_id = {m.id: m.uuid for m in models}
-    # Batch fetch experiment uuid
+
     exp_ids = list({r.experiment_id for r in rows})
     experiments = await Experiment.find({"_id": {"$in": exp_ids}}).to_list()
     exp_uuid_by_id = {e.id: e.uuid for e in experiments}
+
+    version_ids = list({r.dataset_version_id for r in rows})
+    versions = await DatasetVersion.find({"_id": {"$in": version_ids}}).to_list()
+    version_uuid_by_id = {v.id: v.uuid for v in versions}
+
     return [
         LeaderboardEntry(
             experiment_uuid=exp_uuid_by_id[row.experiment_id],
             model_uuid=model_uuid_by_id.get(row.model_id, row.model_id),
             model_name=model_name_by_id.get(row.model_id),
             dataset_uuid=dataset.uuid,
+            dataset_version_uuid=version_uuid_by_id[row.dataset_version_id],
             split=row.split,
             metric=row.metric,
             k=row.k,
@@ -76,47 +101,40 @@ async def get_multi_metric_leaderboard(
     split: Split,
     sort_by: str,
     top_n: int = 20,
+    dataset_version_uuid: UUID | None = None,
 ) -> list[MultiMetricLeaderboardEntry]:
-    """
-    Leaderboard multi-metrica ispirata a BARS CTR Leaderboard.
-
-    Flusso:
-    1. Risolve dataset_uuid → Dataset (404 se non esiste)
-    2. Fetch tutte le Metric per (dataset_id, split) dove metric è in metrics_list
-    3. Raggruppa per experiment_id → per ogni experiment raccoglie tutte le metriche
-    4. Ordina per sort_by (la metrica primaria) desc o asc in base alla direction
-    5. Limit top_n
-    6. Batch fetch MLModel e Experiment per nome, uuid, repo_url
-    7. Assembla MultiMetricLeaderboardEntry con rank progressivo
-    """
+    from app.models.dataset_versions import DatasetVersion
     from app.models.experiments import Experiment
     from app.models.ml_models import MLModel
 
     dataset = await get_dataset_by_uuid(dataset_uuid)
+    dataset_version_id = await _resolve_dataset_version_id(
+        dataset_uuid,
+        dataset_version_uuid,
+    )
 
-    # Fetch tutte le metriche richieste per questo dataset e split
-    rows = await Metric.find(
+    filters = [
         Metric.dataset_id == dataset.id,
         Metric.split == split,
         {"metric": {"$in": metrics_list}},
-    ).to_list()
+    ]
+    if dataset_version_id is not None:
+        filters.append(Metric.dataset_version_id == dataset_version_id)
 
+    rows = await Metric.find(*filters).to_list()
     if not rows:
         return []
 
-    # Raggruppa per experiment_id
     by_exp: dict = defaultdict(dict)
     for row in rows:
         by_exp[row.experiment_id][row.metric] = row
 
-    # Determina la direction della metrica di ordinamento
     sort_direction = "max"
     for row in rows:
         if row.metric == sort_by:
             sort_direction = row.direction.value
             break
 
-    # Prepara la lista con il valore della sort_by metrica per ordinare
     aggregated = []
     for exp_id, metric_map in by_exp.items():
         sort_val = metric_map.get(sort_by)
@@ -124,15 +142,12 @@ async def get_multi_metric_leaderboard(
             continue
         aggregated.append((exp_id, metric_map, sort_val.value))
 
-    # Ordina: max → desc, min → asc
     reverse = sort_direction == "max"
     aggregated.sort(key=lambda x: x[2], reverse=reverse)
     aggregated = aggregated[:top_n]
-
     if not aggregated:
         return []
 
-    # Batch fetch modelli e esperimenti
     exp_ids = list({a[0] for a in aggregated})
     experiments = await Experiment.find({"_id": {"$in": exp_ids}}).to_list()
     exp_by_id = {e.id: e for e in experiments}
@@ -144,6 +159,16 @@ async def get_multi_metric_leaderboard(
     model_name_by_id = {m.id: m.name for m in models}
     model_uuid_by_id = {m.id: m.uuid for m in models}
 
+    version_ids = list(
+        {
+            metric_row.dataset_version_id
+            for _, metric_map, _ in aggregated
+            for metric_row in metric_map.values()
+        }
+    )
+    versions = await DatasetVersion.find({"_id": {"$in": version_ids}}).to_list()
+    version_uuid_by_id = {v.id: v.uuid for v in versions}
+
     result = []
     for rank, (exp_id, metric_map, _) in enumerate(aggregated, start=1):
         exp = exp_by_id.get(exp_id)
@@ -152,15 +177,21 @@ async def get_multi_metric_leaderboard(
 
         metrics_dict = {}
         directions_dict = {}
+        row_dataset_version_uuid = None
         for metric_name in metrics_list:
             m = metric_map.get(metric_name)
             if m is not None:
                 metrics_dict[metric_name] = m.value
                 directions_dict[metric_name] = m.direction
+                if row_dataset_version_uuid is None:
+                    row_dataset_version_uuid = version_uuid_by_id.get(
+                        m.dataset_version_id
+                    )
 
-        repo_url = None
-        if exp.code and exp.code.repo_url:
-            repo_url = exp.code.repo_url
+        if row_dataset_version_uuid is None:
+            continue
+
+        repo_url = exp.code.repo_url if exp.code else None
 
         result.append(
             MultiMetricLeaderboardEntry(
@@ -168,6 +199,7 @@ async def get_multi_metric_leaderboard(
                 model_uuid=model_uuid_by_id.get(exp.model_id, exp.uuid),
                 model_name=model_name_by_id.get(exp.model_id),
                 dataset_uuid=dataset.uuid,
+                dataset_version_uuid=row_dataset_version_uuid,
                 split=split,
                 metrics=metrics_dict,
                 directions=directions_dict,

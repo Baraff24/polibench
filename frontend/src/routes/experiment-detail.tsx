@@ -2,7 +2,13 @@ import { useLoaderData, useNavigate } from 'react-router'
 import { PageHeader, Badge, DataTable } from '../components'
 import type { Column } from '../components'
 import { experimentService } from '../services'
-import type { ExperimentPublic, ExperimentMetrics, MetricPublic, Split } from '../models'
+import type {
+  ExperimentPublic,
+  ExperimentMetrics,
+  MetricImportPublic,
+  MetricPublic,
+  Split,
+} from '../models'
 import type { Params } from 'react-router'
 
 function statusVariant(status: string): 'success' | 'error' | 'warning' | 'info' {
@@ -20,18 +26,23 @@ const metricColumns: Column<MetricPublic>[] = [
 
 export async function loader({ params }: { params: Params }) {
   const uuid = params.uuid as string
-  const experiment = await experimentService.getByUuid(uuid)
+  const [experiment, imports] = await Promise.all([
+    experimentService.getByUuid(uuid),
+    experimentService.listMetricImports(uuid).catch(() => []),
+  ])
+
   let metrics: ExperimentMetrics | null = null
   try {
     metrics = await experimentService.getMetrics(uuid)
   } catch {
     // no metrics yet
   }
-  return { experiment, metrics }
+  return { experiment, metrics, imports }
 }
 
 export default function ExperimentDetail() {
-  const { experiment, metrics } = useLoaderData() as {
+  const { experiment, metrics, imports } = useLoaderData() as {
+    imports: MetricImportPublic[]
     experiment: ExperimentPublic
     metrics: ExperimentMetrics | null
   }
@@ -52,7 +63,7 @@ export default function ExperimentDetail() {
           className='btn btn--primary btn--sm'
           onClick={() => navigate(`/experiments/${experiment.uuid}/metrics/new`)}
         >
-          Submit Metrics
+          Import Metrics CSV
         </button>
       </PageHeader>
 
@@ -101,6 +112,23 @@ export default function ExperimentDetail() {
               <div key={key} className='detail-field'>
                 <div className='detail-field__label'>{key}</div>
                 <div className='detail-field__value'>{String(val)}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {imports.length > 0 && (
+        <section className='detail-section'>
+          <h2 className='detail-section__title'>Metric import jobs</h2>
+          <div className='detail-grid'>
+            {imports.map((job) => (
+              <div key={job.uuid} className='detail-field'>
+                <div className='detail-field__label'>{job.csv_filename}</div>
+                <div className='detail-field__value'>
+                  {job.status}
+                  {job.error_message ? ` — ${job.error_message}` : ''}
+                </div>
               </div>
             ))}
           </div>

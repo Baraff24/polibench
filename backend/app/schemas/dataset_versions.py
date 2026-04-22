@@ -1,0 +1,94 @@
+from datetime import datetime
+from typing import Any
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+from app.models.dataset_versions import VersionStatus
+
+
+class PipelineBlockPublic(BaseModel):
+    name: str
+    operation: str
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class DatasetVersionBase(BaseModel):
+    version: str
+    release_notes: str | None = None
+    status: VersionStatus = VersionStatus.DRAFT
+    dataset_yaml_raw: str | None = None
+    pipeline_yaml_raw: str | None = None
+    characteristics_yaml_raw: str | None = None
+
+
+class DatasetVersionCreate(DatasetVersionBase):
+    pass
+
+
+class DatasetVersionPublic(BaseModel):
+    uuid: UUID
+    dataset_uuid: UUID
+    version: str
+    release_notes: str | None = None
+    status: VersionStatus
+    pipeline_blocks: list[PipelineBlockPublic] = Field(default_factory=list)
+    n_users: int | None = None
+    n_items: int | None = None
+    n_interactions: int | None = None
+    density: float | None = None
+    gini_user: float | None = None
+    gini_item: float | None = None
+    created_at: datetime
+
+
+class DatasetVersionSummary(BaseModel):
+    uuid: UUID
+    dataset_uuid: UUID
+    version: str
+    status: VersionStatus
+    n_users: int | None = None
+    n_items: int | None = None
+    n_interactions: int | None = None
+    density: float | None = None
+    created_at: datetime
+
+
+class SourcePublic(BaseModel):
+    uuid: UUID
+    dataset_version_uuid: UUID
+    name: str
+    source_type: str
+    archive: str | None = None
+    downloadable: bool
+    url: str | None = None
+    checksum: str | None = None
+    checksum_algorithm: str | None = None
+    filename: str | None = None
+    inner_paths: dict[str, Any] | None = None
+    created_at: datetime
+
+
+class ResourcePublic(BaseModel):
+    uuid: UUID
+    dataset_version_uuid: UUID
+    source_uuid: UUID | None = None
+    name: str
+    filename: str | None = None
+    type: str
+    format: str | None = None
+    required: bool
+    about: str | None = None
+    schema_definition: dict[str, Any] | None = None
+    created_at: datetime
+
+
+class DatasetVersionPipelinePublic(BaseModel):
+    dataset_version_uuid: UUID
+    blocks: list[PipelineBlockPublic] = Field(default_factory=list)
+
+
+class DatasetVersionYamlPublic(BaseModel):
+    dataset_version_uuid: UUID
+    kind: str
+    content: str

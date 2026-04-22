@@ -1,9 +1,24 @@
+from .dataset_versions import DatasetVersion
 from .datasets import Dataset
 from .experiments import Experiment
-from .metrics import Metric
+from .metric_import_jobs import MetricImportJob
+from .metrics import ExperimentMetric, Metric
 from .ml_models import MLModel
+from .resources import Resource
+from .sources import Source
 from .teams import Team
 from .users import User
 
 # Lista di tutti i Document Beanie da passare a init_beanie
-DOCUMENT_MODELS = [Dataset, Experiment, Metric, MLModel, Team, User]
+DOCUMENT_MODELS = [
+    Dataset,
+    DatasetVersion,
+    Source,
+    Resource,
+    Experiment,
+    MetricImportJob,
+    ExperimentMetric,
+    MLModel,
+    Team,
+    User,
+]

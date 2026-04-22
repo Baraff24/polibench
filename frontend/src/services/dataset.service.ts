@@ -1,5 +1,16 @@
 import axios from 'axios'
-import type { DatasetCreate, DatasetPublic, DatasetSummary } from '../models'
+import type {
+  DatasetCreate,
+  DatasetPublic,
+  DatasetSummary,
+  DatasetVersionCreate,
+  DatasetVersionPipelinePublic,
+  DatasetVersionPublic,
+  DatasetVersionSummary,
+  DatasetVersionYamlPublic,
+  ResourcePublic,
+  SourcePublic,
+} from '../models'
 
 const API_URL = import.meta.env.VITE_BACKEND_API_URL
 
@@ -16,6 +27,44 @@ class DatasetService {
 
   async create(data: DatasetCreate): Promise<DatasetPublic> {
     const response = await axios.post(API_URL + 'datasets', data)
+    return response.data
+  }
+
+  async getVersions(datasetUuid: string): Promise<DatasetVersionSummary[]> {
+    const response = await axios.get(API_URL + `datasets/${datasetUuid}/versions`)
+    return response.data
+  }
+
+  async createVersion(
+    datasetUuid: string,
+    data: DatasetVersionCreate,
+  ): Promise<DatasetVersionPublic> {
+    const response = await axios.post(API_URL + `datasets/${datasetUuid}/versions`, data)
+    return response.data
+  }
+
+  async getVersionByUuid(versionUuid: string): Promise<DatasetVersionPublic> {
+    const response = await axios.get(API_URL + `dataset-versions/${versionUuid}`)
+    return response.data
+  }
+
+  async getVersionSources(versionUuid: string): Promise<SourcePublic[]> {
+    const response = await axios.get(API_URL + `dataset-versions/${versionUuid}/sources`)
+    return response.data
+  }
+
+  async getVersionResources(versionUuid: string): Promise<ResourcePublic[]> {
+    const response = await axios.get(API_URL + `dataset-versions/${versionUuid}/resources`)
+    return response.data
+  }
+
+  async getVersionPipeline(versionUuid: string): Promise<DatasetVersionPipelinePublic> {
+    const response = await axios.get(API_URL + `dataset-versions/${versionUuid}/pipeline`)
+    return response.data
+  }
+
+  async getVersionYaml(versionUuid: string, kind: string): Promise<DatasetVersionYamlPublic> {
+    const response = await axios.get(API_URL + `dataset-versions/${versionUuid}/yaml/${kind}`)
     return response.data
   }
 }

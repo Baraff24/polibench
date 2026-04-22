@@ -29,7 +29,7 @@ async def _bootstrap_mock_db(test_app: FastAPI) -> None:
     e crea il superuser necessario per i test autenticati.
 
     Perché non usiamo LifespanManager sull'app globale di main.py?
-    Perché il suo lifespan usa AsyncIOMotorClient che tenta una
+    Perché il suo lifespan usa AsyncMongoClient che tenta una
     connessione TCP reale a MongoDB — senza Docker attivo va in timeout.
     Qui costruiamo una test_app separata con un lifespan mock.
     """

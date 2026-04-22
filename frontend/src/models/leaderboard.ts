@@ -5,6 +5,7 @@ export interface LeaderboardEntry {
   model_uuid: string
   model_name: string | null
   dataset_uuid: string
+  dataset_version_uuid: string
   split: Split
   metric: string
   k: number | null
@@ -18,6 +19,7 @@ export interface MultiMetricLeaderboardEntry {
   model_uuid: string
   model_name: string | null
   dataset_uuid: string
+  dataset_version_uuid: string
   split: Split
   metrics: Record<string, number>
   directions: Record<string, Direction>

@@ -49,7 +49,8 @@ export default function Datasets() {
                 <Badge text={ds.visibility} variant={badgeVariant} />
               </div>
               <div className='dataset-card__meta'>
-                <span>v{ds.version}</span>
+                <span>{ds.latest_version ? `latest v${ds.latest_version}` : 'no versions'}</span>
+                <span>{ds.versions_count} version{ds.versions_count === 1 ? '' : 's'}</span>
                 <span>{ds.task.replace('_', ' ')}</span>
               </div>
             </div>

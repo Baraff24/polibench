@@ -18,6 +18,7 @@ export interface MetricPublic {
   uuid: string
   experiment_uuid: string
   dataset_uuid: string
+  dataset_version_uuid: string
   model_uuid: string
   split: Split
   metric: string
@@ -30,4 +31,18 @@ export interface MetricPublic {
 export interface ExperimentMetrics {
   experiment_uuid: string
   metrics_by_split: Record<Split, MetricPublic[]>
+}
+
+export type ImportStatus = 'uploaded' | 'queued' | 'processing' | 'completed' | 'failed'
+
+export interface MetricImportPublic {
+  uuid: string
+  experiment_uuid: string
+  uploaded_by_user_uuid: string | null
+  status: ImportStatus
+  csv_filename: string
+  error_message: string | null
+  created_at: string
+  started_at: string | null
+  finished_at: string | null
 }

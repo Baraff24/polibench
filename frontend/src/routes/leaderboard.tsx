@@ -3,7 +3,12 @@ import { useNavigate } from 'react-router'
 import { PageHeader, EmptyState, DataTable } from '../components'
 import type { Column } from '../components'
 import { datasetService, leaderboardService } from '../services'
-import type { DatasetSummary, MultiMetricLeaderboardEntry, Split } from '../models'
+import type {
+  DatasetSummary,
+  DatasetVersionSummary,
+  MultiMetricLeaderboardEntry,
+  Split,
+} from '../models'
 import LeaderboardChart, { type LeaderboardChartMode } from '../components/leaderboard/LeaderboardChart'
 
 function rankClass(rank: number | null): string {
@@ -38,6 +43,8 @@ export default function Leaderboard() {
 
   const [datasets, setDatasets] = useState<DatasetSummary[]>([])
   const [datasetUuid, setDatasetUuid] = useState('')
+  const [datasetVersions, setDatasetVersions] = useState<DatasetVersionSummary[]>([])
+  const [datasetVersionUuid, setDatasetVersionUuid] = useState('')
   const [split, setSplit] = useState<Split>('test')
   const [topN, setTopN] = useState(20)
   const [entries, setEntries] = useState<MultiMetricLeaderboardEntry[]>([])
@@ -59,6 +66,11 @@ export default function Leaderboard() {
 
   function selectDataset(ds: DatasetSummary) {
     setDatasetUuid(ds.uuid)
+    datasetService
+      .getVersions(ds.uuid)
+      .then((versions) => setDatasetVersions(versions))
+      .catch(() => setDatasetVersions([]))
+    setDatasetVersionUuid('')
     const preset = METRIC_PRESETS[ds.task] || METRIC_PRESETS['ranking']
     setMetricNames(preset.metrics)
     setSortBy(preset.sortBy)
@@ -70,11 +82,11 @@ export default function Leaderboard() {
     if (!datasetUuid || metricNames.length === 0 || !sortBy) return
     setLoading(true)
     leaderboardService
-      .getMultiMetric(datasetUuid, metricNames, split, sortBy, topN)
+      .getMultiMetric(datasetUuid, metricNames, split, sortBy, topN, datasetVersionUuid || undefined)
       .then(setEntries)
       .catch(() => setEntries([]))
       .finally(() => setLoading(false))
-  }, [datasetUuid, metricNames, split, sortBy, topN])
+  }, [datasetUuid, datasetVersionUuid, metricNames, split, sortBy, topN])
 
   function handleDatasetChange(uuid: string) {
     const ds = datasets.find((d) => d.uuid === uuid)
@@ -226,7 +238,23 @@ export default function Leaderboard() {
           >
             {datasets.map((ds) => (
               <option key={ds.uuid} value={ds.uuid}>
-                {ds.name} v{ds.version}
+                {ds.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className='leaderboard-filters__field'>
+          <label className='leaderboard-filters__label'>Version</label>
+          <select
+            className='leaderboard-filters__select'
+            value={datasetVersionUuid}
+            onChange={(e) => setDatasetVersionUuid(e.target.value)}
+          >
+            <option value=''>All versions</option>
+            {datasetVersions.map((version) => (
+              <option key={version.uuid} value={version.uuid}>
+                v{version.version} ({version.status})
               </option>
             ))}
           </select>

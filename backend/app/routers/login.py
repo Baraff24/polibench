@@ -118,8 +118,9 @@ async def google_callback(
         )
         user = await user.create()
     elif not user.is_verified:
-        # If user already exists but email not verified (e.g. registered via password first),
-        # mark it as verified since Google confirmed ownership
+        # If user already exists but email is not verified
+        # (e.g. registered via password first), mark it as verified
+        # because Google confirmed ownership.
         await user.set({models.User.is_verified: True})
 
     if not user.is_active:

@@ -121,7 +121,7 @@ FastAPI gestisce le operazioni di startup e shutdown tramite il context manager 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # STARTUP
-    app.state.client = AsyncIOMotorClient(...)
+    app.state.client = AsyncMongoClient(...)
     await init_beanie(
         database=app.state.client[settings.MONGO_DB],
         document_models=DOCUMENT_MODELS
@@ -131,7 +131,7 @@ async def lifespan(app: FastAPI):
     if not user:
         await user.create()
     yield
-    # SHUTDOWN (implicito: Motor chiude le connessioni)
+    # SHUTDOWN (chiusura connessioni gestita dal client)
 ```
 
 `DOCUMENT_MODELS` è una lista definita in `models/__init__.py` che contiene tutti i Document Beanie registrati nel
@@ -222,7 +222,7 @@ In sviluppo, l'intero stack è avviato con `docker compose up`. I servizi defini
 
 | Servizio   | Immagine       | Porta     | Descrizione                             |
 |------------|----------------|-----------|-----------------------------------------|
-| `proxy`    | `traefik:v3.2` | 80, 8090  | Reverse proxy e dashboard               |
+| `proxy`    | `traefik:v3.6` | 80, 8090  | Reverse proxy e dashboard               |
 | `db`       | `mongo:latest` | variabile | Database MongoDB con volume persistente |
 | `backend`  | build locale   | 8000      | API FastAPI                             |
 | `frontend` | build locale   | 5173      | Dev server Vite                         |
@@ -234,4 +234,3 @@ Traefik instrada le richieste in base al path:
 
 Il servizio `backend` dipende da `db` con `condition: service_healthy`: FastAPI non parte finché MongoDB non supera il
 healthcheck (`mongosh --eval "db.adminCommand('ping')"`).
-

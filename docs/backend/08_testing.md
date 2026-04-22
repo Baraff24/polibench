@@ -61,7 +61,7 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
 ```
 
 Questa fixture costruisce una **`test_app` FastAPI separata** (non l'app globale di `main.py`) con un lifespan mock.
-Questo è fondamentale: il lifespan di `main.py` usa `AsyncIOMotorClient` che tenta una connessione TCP a MongoDB.
+Questo è fondamentale: il lifespan di `main.py` usa `AsyncMongoClient` che tenta una connessione TCP a MongoDB.
 Senza Docker attivo, va in timeout dopo 5 secondi — bloccando tutti i test.
 
 Il lifespan mock (`mock_lifespan`) chiama `_bootstrap_mock_db` che:
@@ -268,4 +268,3 @@ e gira completamente in-memory.
 | **asgi-lifespan**   | `>=2.1.0`    | Avvia il lifespan FastAPI nei test senza server reale |
 | **mongomock-motor** | `>=0.0.34`   | MongoDB in-memory per smoke test DB                   |
 | **pytest-cov**      | `>=6.1.1`    | Report di copertura del codice                        |
-

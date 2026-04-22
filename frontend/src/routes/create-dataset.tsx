@@ -11,7 +11,7 @@ export default function CreateDataset() {
   const [loading, setLoading] = useState(false)
 
   const [name, setName] = useState('')
-  const [version, setVersion] = useState('1.0')
+  const [initialVersion, setInitialVersion] = useState('1.0')
   const [task, setTask] = useState<TaskType>('ranking')
   const [visibility, setVisibility] = useState<Visibility>('public')
   const [description, setDescription] = useState('')
@@ -26,12 +26,15 @@ export default function CreateDataset() {
     try {
       const dataset = await datasetService.create({
         name: name.trim(),
-        version: version.trim(),
         task,
         visibility,
         description: description.trim() || undefined,
       })
-      showSnackBar('Dataset created!', 'success')
+      await datasetService.createVersion(dataset.uuid, {
+        version: initialVersion.trim() || '1.0',
+        status: 'draft',
+      })
+      showSnackBar('Dataset and initial version created!', 'success')
       navigate('/datasets/' + dataset.uuid)
     } catch {
       showSnackBar('Error creating dataset.', 'error')
@@ -59,18 +62,6 @@ export default function CreateDataset() {
         </div>
 
         <div className='field'>
-          <label className='field__label' htmlFor='ds-version'>
-            Version
-          </label>
-          <input
-            id='ds-version'
-            className='field__input'
-            value={version}
-            onChange={(e) => setVersion(e.target.value)}
-          />
-        </div>
-
-        <div className='field'>
           <label className='field__label' htmlFor='ds-task'>
             Task
           </label>
@@ -83,6 +74,18 @@ export default function CreateDataset() {
             <option value='ranking'>Ranking</option>
             <option value='rating_prediction'>Rating Prediction</option>
           </select>
+        </div>
+
+        <div className='field'>
+          <label className='field__label' htmlFor='ds-version'>
+            Initial Version
+          </label>
+          <input
+            id='ds-version'
+            className='field__input'
+            value={initialVersion}
+            onChange={(e) => setInitialVersion(e.target.value)}
+          />
         </div>
 
         <div className='field'>

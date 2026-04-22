@@ -247,6 +247,51 @@ eseguito LightGCN in questo esperimento specifico).
 
 ---
 
+## ADR-07 — `Dataset` catalografico + `DatasetVersion` come unità operativa
+
+### Decisione
+
+Il dominio viene evoluto verso un modello versionato:
+
+- `Dataset` diventa entità catalografica (nome, task, ownership, visibilità)
+- `DatasetVersion` diventa il nodo operativo che contiene YAML, pipeline, characteristics e provenance
+- `Experiment` referenzia `dataset_version_id` (non più `dataset_id`)
+- le metriche vengono separate in:
+  - `Dataset characteristics` (strutturali, per versione dataset)
+  - `Experiment performance metrics` (leaderboard)
+- la submission metriche passa da batch diretto a upload CSV + job asincrono (`MetricImportJob`)
+
+### Motivazione
+
+La richiesta accademica attuale non è più un benchmark "piatto" dataset/modello, ma un benchmark con:
+
+1. provenance (`sources` e `resources`)
+2. pipeline esplicita e versionata
+3. caratteristiche dataset distinte dalle metriche prestazionali del modello
+4. tracciamento del processo di import metriche asincrono
+
+Mantenere il modello precedente (`Dataset.version`, `Experiment.dataset_id`, upload metriche diretto) crea ambiguità
+semantica e rende fragile l'evoluzione.
+
+### Trade-off accettati
+
+- **Maggiore complessità di dominio**: più collezioni e più endpoint.
+- **Migrazione dati necessaria**: backfill da dataset legacy a dataset versionati.
+- **Compatibilità transitoria**: per ridurre impatto frontend servono endpoint legacy temporanei.
+
+### Impatto architetturale
+
+L'architettura applicativa non cambia:
+
+- FastAPI + Beanie
+- UUID-first API
+- router sottili + service layer
+- denormalizzazione controllata per query leaderboard
+
+Cambia il **core del dominio**, non la struttura tecnica del backend.
+
+---
+
 ## Riepilogo decisioni
 
 | ADR    | Decisione                         | Alternativa scartata             |
@@ -257,4 +302,4 @@ eseguito LightGCN in questo esperimento specifico).
 | ADR-04 | Denormalizzazione di `Metric`     | Join via `$lookup`               |
 | ADR-05 | Service layer separato            | Logica nei router                |
 | ADR-06 | `hyperparams` in `MLModel`        | `hyperparams` solo in Experiment |
-
+| ADR-07 | DatasetVersion come unità operativa | Dataset con versione "piatta"  |

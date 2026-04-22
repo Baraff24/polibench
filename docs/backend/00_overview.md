@@ -1,5 +1,9 @@
 # Backend — Panoramica Generale
 
+> Nota (22 aprile 2026): questa panoramica descrive il dominio **attualmente implementato**.
+> L'evoluzione verso dominio versionato (`DatasetVersion`, `Source/Resource`, import metriche async)
+> è descritta in [10_decisions.md](./10_decisions.md) (ADR-07).
+
 ## Cos'è Polibench
 
 Polibench è una piattaforma web per il **benchmarking comparativo di modelli di raccomandazione**. L'obiettivo è fornire
@@ -73,4 +77,3 @@ Il punto di ingresso dell'applicazione è `app/main.py`. Questo file:
 4. crea il superutente iniziale se non esiste
 5. configura il middleware CORS
 6. registra il router principale (`api_router`) con prefisso `/api/v1`
-

@@ -1,5 +1,15 @@
+from .dataset_versions import (
+    DatasetVersionCreate,
+    DatasetVersionPipelinePublic,
+    DatasetVersionPublic,
+    DatasetVersionSummary,
+    DatasetVersionYamlPublic,
+    ResourcePublic,
+    SourcePublic,
+)
 from .datasets import DatasetCreate, DatasetPublic, DatasetSummary
 from .experiments import ExperimentCreate, ExperimentPublic, ExperimentSummary
+from .metric_imports import MetricImportPublic
 from .metrics import (
     ExperimentMetrics,
     LeaderboardEntry,

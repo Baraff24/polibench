@@ -153,7 +153,7 @@ Google, evitando l'esposizione del token in URL o JavaScript.
 L'intero stack (backend, frontend, database, reverse proxy) è containerizzato con **Docker**. L'orchestrazione in
 sviluppo avviene tramite **Docker Compose** con la funzionalità `watch` per il live-reload automatico del codice.
 
-Il reverse proxy è **Traefik** (versione 3.2), che instrada le richieste verso backend e frontend in base al path (
+Il reverse proxy è **Traefik** (versione 3.6), che instrada le richieste verso backend e frontend in base al path (
 `/api` → backend, `/` → frontend).
 
 ---
@@ -181,4 +181,3 @@ Ruff è configurato per controllare stile (`E`, `W`), errori (`F`) e ordinamento
 | **asgi-lifespan**   | `>=2.1.0`    | Gestisce il lifespan FastAPI nei test            |
 | **mongomock-motor** | `>=0.0.34`   | Implementazione in-memory di Motor per i test DB |
 | **pytest-cov**      | `>=6.1.1`    | Copertura del codice                             |
-

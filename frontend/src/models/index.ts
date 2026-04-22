@@ -2,10 +2,18 @@ export type { User } from './user'
 export type {
   TaskType,
   Visibility,
-  Splits,
+  VersionStatus,
   DatasetSummary,
   DatasetPublic,
   DatasetCreate,
+  PipelineBlockPublic,
+  DatasetVersionCreate,
+  DatasetVersionSummary,
+  DatasetVersionPublic,
+  SourcePublic,
+  ResourcePublic,
+  DatasetVersionPipelinePublic,
+  DatasetVersionYamlPublic,
 } from './dataset'
 export type { MLModelSummary, MLModelPublic, MLModelCreate } from './ml-model'
 export type {
@@ -23,5 +31,7 @@ export type {
   MetricsBatchCreate,
   MetricPublic,
   ExperimentMetrics,
+  ImportStatus,
+  MetricImportPublic,
 } from './metric'
 export type { LeaderboardEntry, MultiMetricLeaderboardEntry } from './leaderboard'

@@ -1,16 +1,24 @@
-import { useLoaderData } from 'react-router'
-import { PageHeader, Badge, StatCard } from '../components'
+import { useLoaderData, useNavigate } from 'react-router'
+import { Badge, EmptyState, PageHeader, StatCard } from '../components'
 import { datasetService } from '../services'
-import type { DatasetPublic } from '../models'
+import type { DatasetPublic, DatasetVersionSummary } from '../models'
 import type { Params } from 'react-router'
 
 export async function loader({ params }: { params: Params }) {
-  const dataset = await datasetService.getByUuid(params.uuid as string)
-  return { dataset }
+  const datasetUuid = params.uuid as string
+  const [dataset, versions] = await Promise.all([
+    datasetService.getByUuid(datasetUuid),
+    datasetService.getVersions(datasetUuid),
+  ])
+  return { dataset, versions }
 }
 
 export default function DatasetDetail() {
-  const { dataset } = useLoaderData() as { dataset: DatasetPublic }
+  const navigate = useNavigate()
+  const { dataset, versions } = useLoaderData() as {
+    dataset: DatasetPublic
+    versions: DatasetVersionSummary[]
+  }
 
   let visibilityVariant: 'success' | 'warning' = 'warning'
   if (dataset.visibility === 'public') {
@@ -23,29 +31,13 @@ export default function DatasetDetail() {
         <Badge text={dataset.visibility} variant={visibilityVariant} />
       </PageHeader>
 
-      {/* Stats */}
-      {dataset.splits && (
-        <div className='stat-grid'>
-          {dataset.splits.train !== null && (
-            <StatCard label='Train' value={dataset.splits.train.toLocaleString()} />
-          )}
-          {dataset.splits.test !== null && (
-            <StatCard label='Test' value={dataset.splits.test.toLocaleString()} />
-          )}
-          {dataset.splits.validation !== null && (
-            <StatCard label='Validation' value={dataset.splits.validation.toLocaleString()} />
-          )}
-        </div>
-      )}
+      <div className='stat-grid'>
+        <StatCard label='Versions' value={String(dataset.versions_count)} />
+      </div>
 
-      {/* Details */}
       <section className='detail-section'>
         <h2 className='detail-section__title'>Information</h2>
         <div className='detail-grid'>
-          <div className='detail-field'>
-            <div className='detail-field__label'>Version</div>
-            <div className='detail-field__value'>{dataset.version}</div>
-          </div>
           <div className='detail-field'>
             <div className='detail-field__label'>Task</div>
             <div className='detail-field__value'>{dataset.task.replace('_', ' ')}</div>
@@ -56,6 +48,10 @@ export default function DatasetDetail() {
               {new Date(dataset.created_at).toLocaleDateString()}
             </div>
           </div>
+          <div className='detail-field'>
+            <div className='detail-field__label'>Latest Version</div>
+            <div className='detail-field__value'>{dataset.latest_version || '—'}</div>
+          </div>
         </div>
       </section>
 
@@ -65,6 +61,36 @@ export default function DatasetDetail() {
           <p className='detail-field__value'>{dataset.description}</p>
         </section>
       )}
+
+      <section className='detail-section'>
+        <h2 className='detail-section__title'>Versions</h2>
+        {versions.length === 0 ? (
+          <EmptyState
+            title='No versions yet'
+            description='Create a DatasetVersion to start running experiments.'
+          />
+        ) : (
+          <div className='card-grid'>
+            {versions.map((version) => (
+              <div
+                key={version.uuid}
+                className='dataset-card'
+                onClick={() => navigate(`/dataset-versions/${version.uuid}`)}
+              >
+                <div className='dataset-card__header'>
+                  <span className='dataset-card__name'>v{version.version}</span>
+                  <Badge text={version.status} variant='info' />
+                </div>
+                <div className='dataset-card__meta'>
+                  <span>{version.n_users ?? '—'} users</span>
+                  <span>{version.n_items ?? '—'} items</span>
+                  <span>{version.density ?? '—'} density</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   )
 }

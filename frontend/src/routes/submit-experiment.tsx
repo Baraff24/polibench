@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { PageHeader } from '../components'
-import { datasetService, mlModelService, experimentService } from '../services'
+import { datasetService, experimentService, mlModelService } from '../services'
 import { useSnackBar } from '../contexts/snackbar'
-import type { DatasetSummary, MLModelSummary } from '../models'
+import type { DatasetSummary, DatasetVersionSummary, MLModelSummary } from '../models'
 
 export default function SubmitExperiment() {
   const navigate = useNavigate()
@@ -11,9 +11,11 @@ export default function SubmitExperiment() {
   const [loading, setLoading] = useState(false)
 
   const [datasets, setDatasets] = useState<DatasetSummary[]>([])
+  const [versions, setVersions] = useState<DatasetVersionSummary[]>([])
   const [models, setModels] = useState<MLModelSummary[]>([])
 
   const [datasetUuid, setDatasetUuid] = useState('')
+  const [datasetVersionUuid, setDatasetVersionUuid] = useState('')
   const [modelUuid, setModelUuid] = useState('')
   const [runName, setRunName] = useState('')
   const [seed, setSeed] = useState('')
@@ -24,16 +26,38 @@ export default function SubmitExperiment() {
     mlModelService.getAll().then(setModels)
   }, [])
 
+  useEffect(() => {
+    if (!datasetUuid) {
+      setVersions([])
+      setDatasetVersionUuid('')
+      return
+    }
+    datasetService
+      .getVersions(datasetUuid)
+      .then((loadedVersions) => {
+        setVersions(loadedVersions)
+        if (loadedVersions.length > 0) {
+          setDatasetVersionUuid(loadedVersions[0].uuid)
+        } else {
+          setDatasetVersionUuid('')
+        }
+      })
+      .catch(() => {
+        setVersions([])
+        setDatasetVersionUuid('')
+      })
+  }, [datasetUuid])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!datasetUuid || !modelUuid) {
-      showSnackBar('Please select a dataset and a model.', 'error')
+    if (!datasetVersionUuid || !modelUuid) {
+      showSnackBar('Please select a dataset version and a model.', 'error')
       return
     }
     setLoading(true)
     try {
       const experiment = await experimentService.create({
-        dataset_uuid: datasetUuid,
+        dataset_version_uuid: datasetVersionUuid,
         model_uuid: modelUuid,
         run_name: runName.trim() || undefined,
         seed: seed ? Number(seed) : undefined,
@@ -67,7 +91,30 @@ export default function SubmitExperiment() {
             <option value=''>Select a dataset...</option>
             {datasets.map((d) => (
               <option key={d.uuid} value={d.uuid}>
-                {d.name} v{d.version} ({d.task})
+                {d.name} ({d.task})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className='field'>
+          <label className='field__label' htmlFor='exp-version'>
+            Dataset Version
+          </label>
+          <select
+            id='exp-version'
+            className='field__input'
+            value={datasetVersionUuid}
+            onChange={(e) => setDatasetVersionUuid(e.target.value)}
+            required
+            disabled={!datasetUuid || versions.length === 0}
+          >
+            <option value=''>
+              {datasetUuid ? 'Select a version...' : 'Select dataset first...'}
+            </option>
+            {versions.map((v) => (
+              <option key={v.uuid} value={v.uuid}>
+                v{v.version} ({v.status})
               </option>
             ))}
           </select>

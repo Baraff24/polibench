@@ -13,7 +13,8 @@ export interface Artifacts {
 }
 
 export interface ExperimentCreate {
-  dataset_uuid: string
+  dataset_version_uuid?: string
+  dataset_uuid?: string
   model_uuid: string
   team_uuid?: string | null
   run_name?: string | null
@@ -26,9 +27,10 @@ export interface ExperimentCreate {
 export interface ExperimentPublic {
   uuid: string
   dataset_uuid: string
+  dataset_version_uuid: string
   model_uuid: string
   team_uuid: string | null
-  submitted_by_user_uuid: string
+  submitted_by_user_uuid: string | null
   run_name: string | null
   status: Status
   seed: number | null
@@ -43,6 +45,7 @@ export interface ExperimentPublic {
 export interface ExperimentSummary {
   uuid: string
   dataset_uuid: string
+  dataset_version_uuid: string
   model_uuid: string
   run_name: string | null
   status: Status

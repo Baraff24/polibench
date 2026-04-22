@@ -17,7 +17,7 @@ class Direction(str, Enum):
     MIN = "min"  # lower is better
 
 
-class Metric(Document):
+class ExperimentMetric(Document):
     uuid: Annotated[UUID, Indexed(unique=True)] = Field(default_factory=uuid4)
 
     # Link to the run
@@ -25,6 +25,7 @@ class Metric(Document):
 
     # Denormalized for fast leaderboard queries
     dataset_id: Annotated[PydanticObjectId, Indexed()]
+    dataset_version_id: Annotated[PydanticObjectId, Indexed()]
     model_id: Annotated[PydanticObjectId, Indexed()]
     submitted_by_user_id: Annotated[PydanticObjectId | None, Indexed()] = None
     team_id: Annotated[PydanticObjectId | None, Indexed()] = None
@@ -42,3 +43,7 @@ class Metric(Document):
 
     class Settings:
         name = "metrics"
+
+
+# Transitional alias to keep compatibility with existing imports.
+Metric = ExperimentMetric

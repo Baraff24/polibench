@@ -129,7 +129,7 @@ incluse le istruzioni per **Gmail** (STARTTLS porta 587) e **Aruba** (SSL porta 
 Il `lifespan` definito in `app/main.py` esegue questa sequenza ad ogni avvio:
 
 ```
-1. Connessione a MongoDB (AsyncIOMotorClient)
+1. Connessione a MongoDB (AsyncMongoClient)
     └── usa MONGO_HOST, MONGO_PORT, MONGO_DB, MONGO_USER, MONGO_PASSWORD
 
 2. init_beanie(document_models=DOCUMENT_MODELS)
@@ -391,4 +391,3 @@ docker compose up -d --build
 ```
 
 > ⚠️ `docker compose down -v` rimuove **tutti i dati** del database. In produzione, esegui un backup prima.
-

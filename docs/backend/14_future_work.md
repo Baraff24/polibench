@@ -127,6 +127,7 @@ estensibile, ma l'aggiunta di nuovi task richiederebbe potenzialmente nuove metr
 
 | Feature                           | Motivazione                                                     |
 |-----------------------------------|-----------------------------------------------------------------|
+| Refactor dominio `DatasetVersion` + import metriche async | Allineamento al nuovo requisito accademico e separazione semantica delle metriche |
 | Enforcement visibilità Dataset    | Completare la feature `public/private` già modellata            |
 | Aggregazione leaderboard per team | Mostrare "miglior risultato per modello/team" nella leaderboard |
 | CLI di submission                 | Permettere a script esterni di sottomettere risultati via API   |
@@ -181,4 +182,3 @@ La distinzione importante da comunicare nella tesi è:
 > "Il sistema è progettato per essere esteso. Le limitazioni attuali sono note, documentate e risolvibili
 > senza stravolgere l'architettura, perché le decisioni progettuali fondamentali (UUID-first, service layer,
 > denormalizzazione) sono già orientate alla scalabilità."
-

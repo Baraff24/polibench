@@ -3,6 +3,7 @@ import type {
   ExperimentCreate,
   ExperimentMetrics,
   ExperimentPublic,
+  MetricImportPublic,
   MetricsBatchCreate,
 } from '../models'
 
@@ -24,8 +25,23 @@ class ExperimentService {
     return response.data
   }
 
+  // Legacy direct submission endpoint (kept during migration).
   async submitMetrics(uuid: string, data: MetricsBatchCreate): Promise<ExperimentMetrics> {
     const response = await axios.post(API_URL + `experiments/${uuid}/metrics`, data)
+    return response.data
+  }
+
+  async importMetricsCsv(uuid: string, file: File): Promise<MetricImportPublic> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await axios.post(API_URL + `experiments/${uuid}/metric-import`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data
+  }
+
+  async listMetricImports(uuid: string): Promise<MetricImportPublic[]> {
+    const response = await axios.get(API_URL + `experiments/${uuid}/metric-imports`)
     return response.data
   }
 }

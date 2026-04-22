@@ -24,14 +24,15 @@ docs/
 │   ├── 12_indexes_and_performance.md    ← query critiche, indici MongoDB, performance
 │   ├── 13_deployment.md            ← ambienti, Docker Compose, avvio, produzione
 │   ├── 14_future_work.md           ← limiti attuali e sviluppi futuri
-│   └── domain_model.puml           ← diagramma UML entità (DB layer)
+│   ├── domain_model.puml           ← diagramma UML entità (DB layer attuale)
+│   └── domain_model_v2.puml        ← diagramma UML target (post-refactor)
 └── frontend/
     ├── 00_overview.md              ← panoramica generale del frontend
     ├── 01_technologies.md          ← stack tecnologico frontend
     └── 02_architecture.md          ← architettura React, routing, contexts
 ```
 
-## Stato del progetto (marzo 2026)
+## Stato del progetto (aprile 2026)
 
 | Area                                               | Stato        |
 |----------------------------------------------------|--------------|
