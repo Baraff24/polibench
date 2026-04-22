@@ -42,23 +42,69 @@
 }
 
 .pipeline-chain {
+  &__summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-2;
+    margin-bottom: $space-3;
+  }
+
+  &__summary-item {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    border: 1px solid $color-border;
+    border-radius: $radius-full;
+    padding: $space-1 $space-3;
+    background: rgba($color-accent, 0.08);
+  }
+
   display: flex;
   flex-wrap: wrap;
-  gap: $space-2;
-  margin-bottom: $space-4;
+  gap: $space-3;
+  margin-bottom: $space-5;
 
   &__item {
     display: flex;
-    align-items: center;
-    gap: $space-2;
+    align-items: stretch;
+    gap: $space-3;
   }
 
   &__block {
     border: 1px solid $color-border;
     border-radius: $radius-md;
-    padding: $space-2 $space-3;
+    padding: $space-3;
     background: $color-bg-card;
-    min-width: 10rem;
+    min-width: 15rem;
+    max-width: 20rem;
+    transition: border-color $transition, transform $transition;
+
+    &:hover {
+      border-color: $color-border-strong;
+      transform: translateY(-1px);
+    }
+  }
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-2;
+    margin-bottom: $space-2;
+  }
+
+  &__index {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: $radius-full;
+    background: rgba($color-accent, 0.22);
+    border: 1px solid rgba($color-accent-light, 0.35);
+    color: $color-text-strong;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    margin-top: 0.05rem;
   }
 
   &__title {
@@ -72,11 +118,128 @@
     color: $color-text-muted;
     margin-top: $space-1;
     word-break: break-word;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: $space-2;
+    margin-bottom: $space-2;
+  }
+
+  &__badge {
+    border-radius: $radius-full;
+    font-size: $font-size-xs;
+    line-height: 1;
+    padding: 0.32rem $space-2;
+    border: 1px solid $color-border;
+    color: $color-text;
+    background: rgba($color-white, 0.03);
+  }
+
+  &__badge--ingest {
+    border-color: rgba($color-info, 0.35);
+    background: rgba($color-info, 0.15);
+  }
+
+  &__badge--transform {
+    border-color: rgba($color-success, 0.35);
+    background: rgba($color-success, 0.15);
+  }
+
+  &__badge--split {
+    border-color: rgba($color-warning, 0.35);
+    background: rgba($color-warning, 0.15);
+  }
+
+  &__badge--features {
+    border-color: rgba($color-accent-light, 0.4);
+    background: rgba($color-accent, 0.15);
+  }
+
+  &__badge--other {
+    border-color: $color-border-strong;
+    background: rgba($color-white, 0.04);
+  }
+
+  &__badge--neutral {
+    border-color: $color-border;
+    background: rgba($color-white, 0.03);
+  }
+
+  &__details {
+    border-top: 1px dashed $color-border;
+    margin-top: $space-2;
+    padding-top: $space-2;
+
+    summary {
+      cursor: pointer;
+      color: $color-text-muted;
+      font-size: $font-size-xs;
+      user-select: none;
+      list-style: none;
+    }
+
+    summary::-webkit-details-marker {
+      display: none;
+    }
+  }
+
+  &__params {
+    margin-top: $space-2;
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__param {
+    display: grid;
+    grid-template-columns: 6rem 1fr;
+    gap: $space-2;
+    align-items: flex-start;
+  }
+
+  &__param-key {
+    color: $color-text-muted;
+    font-size: $font-size-xs;
+  }
+
+  &__param-value {
+    color: $color-text;
+    font-size: $font-size-xs;
+    word-break: break-word;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
 
   &__arrow {
-    color: $color-text-muted;
+    color: rgba($color-accent-light, 0.9);
     font-size: $font-size-md;
-    line-height: 1;
+    line-height: 1.2;
+    align-self: center;
+    font-weight: $font-weight-semibold;
+    margin-right: $space-1;
+  }
+}
+
+@media (max-width: $bp-md) {
+  .pipeline-chain {
+    gap: $space-2;
+
+    &__item {
+      width: 100%;
+      flex-direction: column;
+      gap: $space-1;
+    }
+
+    &__block {
+      width: 100%;
+      max-width: none;
+    }
+
+    &__arrow {
+      display: none;
+    }
   }
 }

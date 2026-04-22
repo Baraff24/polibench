@@ -15,6 +15,68 @@ import type { Params } from 'react-router'
 
 type YamlKind = 'dataset' | 'version' | 'pipeline' | 'characteristics'
 type PipelineRow = DatasetVersionPipelinePublic['blocks'][number]
+type PipelinePhase = 'ingest' | 'transform' | 'split' | 'features' | 'other'
+
+const pipelinePhaseLabel: Record<PipelinePhase, string> = {
+  ingest: 'Ingest',
+  transform: 'Transform',
+  split: 'Split',
+  features: 'Features',
+  other: 'Generic',
+}
+
+const resolvePipelinePhase = (operation: string): PipelinePhase => {
+  const normalized = operation.trim().toLowerCase()
+  if (
+    normalized.includes('load') ||
+    normalized.includes('read') ||
+    normalized.includes('parse') ||
+    normalized.includes('ingest')
+  ) {
+    return 'ingest'
+  }
+  if (
+    normalized.includes('split') ||
+    normalized.includes('leave_one_out') ||
+    normalized.includes('temporal')
+  ) {
+    return 'split'
+  }
+  if (
+    normalized.includes('feature') ||
+    normalized.includes('encode') ||
+    normalized.includes('token')
+  ) {
+    return 'features'
+  }
+  if (
+    normalized.includes('normalize') ||
+    normalized.includes('clean') ||
+    normalized.includes('filter') ||
+    normalized.includes('dedup') ||
+    normalized.includes('map')
+  ) {
+    return 'transform'
+  }
+  return 'other'
+}
+
+const stringifyParamValue = (value: unknown): string => {
+  if (value === null || value === undefined) {
+    return '—'
+  }
+  if (typeof value === 'string') {
+    return value
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
 
 const pipelineColumns: Column<PipelineRow>[] = [
   { key: 'name', header: 'Step', render: (row) => row.name },
@@ -116,6 +178,9 @@ export default function DatasetVersionDetail() {
     experiments: ExperimentSummary[]
     yamls: Record<YamlKind, DatasetVersionYamlPublic>
   }
+  const uniqueOperationsCount = new Set(
+    pipeline.blocks.map((block) => block.operation || 'operation'),
+  ).size
 
   const yamlKinds: { kind: YamlKind; label: string }[] = [
     { kind: 'dataset', label: 'Dataset YAML' },
@@ -167,16 +232,54 @@ export default function DatasetVersionDetail() {
           <EmptyState title='No pipeline steps' description='No pipeline YAML parsed yet.' />
         ) : (
           <>
+            <div className='pipeline-chain__summary'>
+              <span className='pipeline-chain__summary-item'>{pipeline.blocks.length} steps</span>
+              <span className='pipeline-chain__summary-item'>{uniqueOperationsCount} operations</span>
+            </div>
             <div className='pipeline-chain'>
-              {pipeline.blocks.map((block, index) => (
-                <div key={`${block.name}-${index}`} className='pipeline-chain__item'>
-                  <div className='pipeline-chain__block'>
-                    <div className='pipeline-chain__title'>{block.name}</div>
-                    <div className='pipeline-chain__op'>{block.operation || 'operation'}</div>
+              {pipeline.blocks.map((block, index) => {
+                const phase = resolvePipelinePhase(block.operation || 'operation')
+                const paramsCount = Object.keys(block.params).length
+                return (
+                  <div key={`${block.name}-${index}`} className='pipeline-chain__item'>
+                    <div className='pipeline-chain__block'>
+                      <div className='pipeline-chain__header'>
+                        <span className='pipeline-chain__index'>{index + 1}</span>
+                        <div>
+                          <div className='pipeline-chain__title'>{block.name}</div>
+                          <div className='pipeline-chain__op'>{block.operation || 'operation'}</div>
+                        </div>
+                      </div>
+                      <div className='pipeline-chain__meta'>
+                        <span className={`pipeline-chain__badge pipeline-chain__badge--${phase}`}>
+                          {pipelinePhaseLabel[phase]}
+                        </span>
+                        <span className='pipeline-chain__badge pipeline-chain__badge--neutral'>
+                          {paramsCount} params
+                        </span>
+                      </div>
+                      <details className='pipeline-chain__details'>
+                        <summary>{paramsCount > 0 ? 'View parameters' : 'No parameters'}</summary>
+                        {paramsCount > 0 && (
+                          <div className='pipeline-chain__params'>
+                            {Object.entries(block.params).map(([key, value]) => (
+                              <div key={key} className='pipeline-chain__param'>
+                                <span className='pipeline-chain__param-key'>{key}</span>
+                                <span className='pipeline-chain__param-value'>
+                                  {stringifyParamValue(value)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </details>
+                    </div>
+                    {index < pipeline.blocks.length - 1 && (
+                      <div className='pipeline-chain__arrow'>→</div>
+                    )}
                   </div>
-                  {index < pipeline.blocks.length - 1 && <div className='pipeline-chain__arrow'>→</div>}
-                </div>
-              ))}
+                )
+              })}
             </div>
             <DataTable columns={pipelineColumns} rows={pipeline.blocks} rowKey={(row) => row.name} />
           </>
@@ -204,9 +307,12 @@ export default function DatasetVersionDetail() {
               whiteSpace: 'pre-wrap',
               marginTop: '1rem',
               padding: '1rem',
-              border: '1px solid var(--color-border, #ddd)',
+              border: '1px solid #d0d7de',
               borderRadius: '8px',
-              background: '#fafafa',
+              background: '#ffffff',
+              color: '#111111',
+              fontWeight: 500,
+              lineHeight: 1.45,
             }}
           >
             {yamls[visibleYaml].content || '# empty'}
