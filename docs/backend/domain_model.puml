@@ -3,23 +3,6 @@ hide circle
 skinparam classAttributeIconSize 0
 skinparam monochrome true
 
-' =================================================================
-' NOTA ARCHITETTURALE — DB layer vs API layer
-' =================================================================
-' Questo diagramma rappresenta il DB layer (MongoDB/Beanie).
-'
-' API layer (HTTP) — principio UUID-first:
-'   - path params:  sempre UUID  (GET /datasets/{uuid})
-'   - body input:   sempre UUID  (dataset_uuid, model_uuid, ...)
-'   - response:     solo uuid    (_id mai esposto al client)
-'
-' Il router è il solo punto che risolve UUID → ObjectId internamente.
-' =================================================================
-
-' =========================
-' Core entities
-' =========================
-
 class User {
   +_id: ObjectId
   +uuid: UUID <<unique>>
@@ -38,13 +21,6 @@ class User {
   +last_login_at: datetime?
 }
 
-note right of User
-  role enum: admin | researcher | viewer
-  hashed_password is None for SSO users.
-  team_uuid references Team.uuid (not _id):
-  cross-entity refs on User use UUID.
-end note
-
 class Team {
   +_id: ObjectId
   +uuid: UUID <<unique>>
@@ -54,31 +30,67 @@ class Team {
   +created_at: datetime
 }
 
-note right of Team
-  Membership: User.team_uuid → Team.uuid
-  (no member_user_ids array on Team)
-end note
-
 class Dataset {
   +_id: ObjectId
   +uuid: UUID <<unique>>
-  +name: string
-  +version: string
-  +task: TaskType
+  +name: string <<indexed>>
   +description: string?
-  +splits: Splits?
+  +task: TaskType
   +visibility: Visibility
   +team_id: ObjectId? <<indexed>>
   +created_by_user_id: ObjectId? <<indexed>>
   +created_at: datetime
 }
 
-note right of Dataset
-  task enum: ranking | rating_prediction | ctr
-  visibility enum: public | private
-  splits: { train: int?, test: int?, validation: int? }
-  Unique identity: {name, version}
-end note
+class DatasetVersion {
+  +_id: ObjectId
+  +uuid: UUID <<unique>>
+  +dataset_id: ObjectId <<indexed>>
+  +version: string
+  +dataset_yaml_raw: string?
+  +pipeline_yaml_raw: string?
+  +characteristics_yaml_raw: string?
+  +pipeline_blocks: object[]?
+  +n_users: int?
+  +n_items: int?
+  +n_interactions: int?
+  +density: float?
+  +gini_user: float?
+  +gini_item: float?
+  +status: VersionStatus
+  +created_at: datetime
+}
+
+class Source {
+  +_id: ObjectId
+  +uuid: UUID <<unique>>
+  +dataset_version_id: ObjectId <<indexed>>
+  +name: string
+  +source_type: string
+  +archive: string?
+  +downloadable: bool
+  +url: string?
+  +checksum: string?
+  +checksum_algorithm: string?
+  +filename: string?
+  +inner_paths: object?
+  +created_at: datetime
+}
+
+class Resource {
+  +_id: ObjectId
+  +uuid: UUID <<unique>>
+  +dataset_version_id: ObjectId <<indexed>>
+  +source_id: ObjectId? <<indexed>>
+  +name: string
+  +filename: string?
+  +type: string
+  +format: string?
+  +required: bool
+  +about: string?
+  +schema_definition: object?
+  +created_at: datetime
+}
 
 class MLModel {
   +_id: ObjectId
@@ -92,18 +104,10 @@ class MLModel {
   +created_at: datetime
 }
 
-note right of MLModel
-  Represents an algorithm (e.g. BPR-MF, LightGCN),
-  not a trained instance.
-  hyperparams: canonical config for this algorithm
-  (e.g. default values from the paper).
-  Run-specific variations go in Experiment.training_config.
-end note
-
 class Experiment {
   +_id: ObjectId
   +uuid: UUID <<unique>>
-  +dataset_id: ObjectId <<indexed>>
+  +dataset_version_id: ObjectId <<indexed>>
   +model_id: ObjectId <<indexed>>
   +submitted_by_user_id: ObjectId <<indexed>>
   +team_id: ObjectId? <<indexed>>
@@ -118,28 +122,26 @@ class Experiment {
   +finished_at: datetime?
 }
 
-note bottom of Experiment
-  status enum: queued | running | finished | failed
+class MetricImportJob {
+  +_id: ObjectId
+  +uuid: UUID <<unique>>
+  +experiment_id: ObjectId <<indexed>>
+  +uploaded_by_user_id: ObjectId <<indexed>>
+  +status: ImportStatus
+  +csv_filename: string
+  +csv_storage_path: string
+  +error_message: string?
+  +created_at: datetime
+  +started_at: datetime?
+  +finished_at: datetime?
+}
 
-  CodeInfo: { git_commit, repo_url, docker_image }
-  Artifacts: { logs_url, model_path, predictions_path }
-
-  training_config: run-specific variations
-  (seed, batch_size, scheduler...).
-  Canonical hyperparams → on MLModel, not here.
-
-  Useful indexes:
-  - {dataset_id, model_id, created_at:-1}
-  - {submitted_by_user_id, created_at:-1}
-  - {team_id, created_at:-1}
-  - {status, created_at:-1}
-end note
-
-class Metric {
+class ExperimentMetric {
   +_id: ObjectId
   +uuid: UUID <<unique>>
   +experiment_id: ObjectId <<indexed>>
   +dataset_id: ObjectId <<indexed>>
+  +dataset_version_id: ObjectId <<indexed>>
   +model_id: ObjectId <<indexed>>
   +submitted_by_user_id: ObjectId? <<indexed>>
   +team_id: ObjectId? <<indexed>>
@@ -151,37 +153,23 @@ class Metric {
   +computed_at: datetime
 }
 
-note right of Metric
-  split enum: validation | test
-  direction enum: max | min
+User "1" -- "0..*" Dataset : creates >
+User "1" -- "0..*" MLModel : creates >
+User "1" -- "0..*" Experiment : submits >
+User "1" -- "0..*" MetricImportJob : uploads >
+User "0..*" -- "0..1" Team : belongs to >
 
-  Denormalization:
-  dataset_id, model_id, submitted_by_user_id, team_id
-  are copied from Experiment at write time.
-  Purpose: leaderboard queries are index-only (no $lookup).
+Team "1" -- "0..*" Dataset : owns/private >
+Team "1" -- "0..*" Experiment : owns >
 
-  Key indexes:
-  - {dataset_id, split, metric, value:-1}
-  - {team_id, dataset_id, split, metric, value:-1}
-  - {submitted_by_user_id, dataset_id, split, metric}
-  - {experiment_id}
-end note
+Dataset "1" -- "1..*" DatasetVersion : has >
+DatasetVersion "1" -- "1..*" Source : declares >
+DatasetVersion "1" -- "1..*" Resource : exposes >
 
-' =========================
-' Relationships
-' =========================
-
-User "1" -- "0..*" Dataset       : creates >
-User "1" -- "0..*" MLModel       : creates >
-User "1" -- "0..*" Experiment    : submits >
-User "0..*" -- "0..1" Team       : belongs to >
-
-Team "1" -- "0..*" Dataset       : owns/private >
-Team "1" -- "0..*" Experiment    : owns >
-
-Dataset "1" -- "0..*" Experiment : evaluated on >
+DatasetVersion "1" -- "0..*" Experiment : evaluated on >
 MLModel "1" -- "0..*" Experiment : runs >
-Experiment "1" -- "1..*" Metric  : produces >
+Experiment "1" -- "0..*" MetricImportJob : imports >
+Experiment "1" -- "0..*" ExperimentMetric : produces >
 
+Source "1" -- "0..*" Resource : provides >
 @enduml
-
