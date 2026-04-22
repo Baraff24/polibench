@@ -295,6 +295,10 @@ USER_FIXTURES = [
 ]
 
 MOVIELENS_VERSIONS = ["v1", "v2", "v3"]
+ALIBABA_VERSIONS = ["v1", "v2"]
+EPINIONS_VERSIONS = ["v1", "v2"]
+AMAZON_BOOKS_VERSIONS = ["2023", "2024"]
+LASTFM_VERSIONS = ["2011", "2014"]
 
 ALIBABA_V1 = DatasetFixture(
     name="Alibaba-iFashion",
@@ -305,8 +309,8 @@ ALIBABA_V1 = DatasetFixture(
     owner="admin",
     dataset_yaml_raw=_dataset_yaml(
         name="Alibaba-iFashion",
-        versions=["v1"],
-        latest_version="v1",
+        versions=ALIBABA_VERSIONS,
+        latest_version="v2",
         description="Fashion recommendation benchmark.",
         citation="DataRecHub examples",
     ),
@@ -372,6 +376,106 @@ ALIBABA_V1 = DatasetFixture(
     ),
 )
 
+ALIBABA_V2 = DatasetFixture(
+    name="Alibaba-iFashion",
+    task=TaskType.RANKING,
+    description="Fashion recommendation benchmark with implicit feedback.",
+    visibility=Visibility.PUBLIC,
+    version="v2",
+    owner="admin",
+    dataset_yaml_raw=_dataset_yaml(
+        name="Alibaba-iFashion",
+        versions=ALIBABA_VERSIONS,
+        latest_version="v2",
+        description="Fashion recommendation benchmark.",
+        citation="DataRecHub examples",
+    ),
+    version_yaml_raw=_version_yaml(
+        dataset_name="Alibaba-iFashion",
+        version="v2",
+        sources=[
+            {
+                "name": "raw-archive-v2",
+                "source_type": "url",
+                "downloadable": True,
+                "url": "https://example.org/datasets/alibaba_ifashion_v2.zip",
+                "filename": "alibaba_ifashion_v2.zip",
+                "checksum": "sha256:abc124",
+                "checksum_algorithm": "sha256",
+            },
+            {
+                "name": "metadata-sidecar-v2",
+                "source_type": "url",
+                "downloadable": True,
+                "url": "https://example.org/datasets/alibaba_ifashion_v2_sidecar.zip",
+                "filename": "alibaba_ifashion_v2_sidecar.zip",
+            },
+        ],
+        resources=[
+            {
+                "name": "interactions",
+                "source_name": "raw-archive-v2",
+                "type": "interactions",
+                "format": "csv",
+                "required": True,
+            },
+            {
+                "name": "items",
+                "source_name": "metadata-sidecar-v2",
+                "type": "item_features",
+                "format": "csv",
+                "required": False,
+            },
+            {
+                "name": "category_graph",
+                "source_name": "metadata-sidecar-v2",
+                "type": "graph",
+                "format": "csv",
+                "required": False,
+            },
+        ],
+    ),
+    characteristics_yaml_raw=_characteristics_yaml(
+        dataset_name="Alibaba-iFashion",
+        version="v2",
+        n_users=70245,
+        n_items=41510,
+        n_interactions=912340,
+        density=0.000312,
+        gini_user=0.598,
+        gini_item=0.688,
+    ),
+    pipeline_yaml_raw=_pipeline_yaml(
+        [
+            {
+                "name": "ingest",
+                "operation": "load_csv",
+                "params": {"file": "interactions.csv"},
+            },
+            {
+                "name": "deduplicate",
+                "operation": "drop_duplicates",
+                "params": {"subset": ["user_id", "item_id", "timestamp"]},
+            },
+            {
+                "name": "kcore",
+                "operation": "filter_min_interactions",
+                "params": {"min_user_interactions": 5, "min_item_interactions": 5},
+            },
+            {
+                "name": "feature-join",
+                "operation": "join_item_features",
+                "params": {"resource": "items"},
+            },
+            {
+                "name": "split",
+                "operation": "leave_one_out",
+                "params": {"min_interactions": 5},
+            },
+        ]
+    ),
+)
+
 EPINIONS_V1_PRIVATE = DatasetFixture(
     name="Epinions",
     task=TaskType.RANKING,
@@ -381,8 +485,8 @@ EPINIONS_V1_PRIVATE = DatasetFixture(
     owner="researcher",
     dataset_yaml_raw=_dataset_yaml(
         name="Epinions",
-        versions=["v1"],
-        latest_version="v1",
+        versions=EPINIONS_VERSIONS,
+        latest_version="v2",
         description="Epinions trust/review benchmark.",
         citation="DataRecHub examples",
     ),
@@ -433,6 +537,97 @@ EPINIONS_V1_PRIVATE = DatasetFixture(
                 "name": "split",
                 "operation": "temporal_split",
                 "params": {"train_ratio": 0.8},
+            },
+        ]
+    ),
+)
+
+EPINIONS_V2_PRIVATE = DatasetFixture(
+    name="Epinions",
+    task=TaskType.RANKING,
+    description="Trust-aware recommendation benchmark from Epinions.",
+    visibility=Visibility.PRIVATE,
+    version="v2",
+    owner="researcher",
+    dataset_yaml_raw=_dataset_yaml(
+        name="Epinions",
+        versions=EPINIONS_VERSIONS,
+        latest_version="v2",
+        description="Epinions trust/review benchmark.",
+        citation="DataRecHub examples",
+    ),
+    version_yaml_raw=_version_yaml(
+        dataset_name="Epinions",
+        version="v2",
+        sources=[
+            {
+                "name": "epinions-main-v2",
+                "source_type": "url",
+                "downloadable": True,
+                "url": "https://example.org/datasets/epinions_v2.tar.gz",
+                "filename": "epinions_v2.tar.gz",
+                "checksum": "sha256:epinions-v2",
+                "checksum_algorithm": "sha256",
+            },
+            {
+                "name": "epinions-trust-v2",
+                "source_type": "url",
+                "downloadable": True,
+                "url": "https://example.org/datasets/epinions_trust_v2.tsv.gz",
+                "filename": "epinions_trust_v2.tsv.gz",
+            },
+        ],
+        resources=[
+            {
+                "name": "interactions",
+                "source_name": "epinions-main-v2",
+                "type": "interactions",
+                "format": "tsv",
+                "required": True,
+            },
+            {
+                "name": "trust_network",
+                "source_name": "epinions-trust-v2",
+                "type": "graph",
+                "format": "tsv",
+                "required": False,
+            },
+            {
+                "name": "review_metadata",
+                "source_name": "epinions-main-v2",
+                "type": "item_features",
+                "format": "tsv",
+                "required": False,
+            },
+        ],
+    ),
+    characteristics_yaml_raw=_characteristics_yaml(
+        dataset_name="Epinions",
+        version="v2",
+        n_users=42890,
+        n_items=150342,
+        n_interactions=744512,
+        density=0.000115,
+        gini_user=0.661,
+        gini_item=0.739,
+    ),
+    pipeline_yaml_raw=_pipeline_yaml(
+        [
+            {"name": "parse", "operation": "parse_tsv", "params": {"delimiter": "\\t"}},
+            {
+                "name": "kcore",
+                "operation": "filter_min_interactions",
+                "params": {"min_user_interactions": 3},
+            },
+            {
+                "name": "trust-link",
+                "operation": "join_graph_features",
+                "params": {"resource": "trust_network"},
+            },
+            {
+                "name": "split",
+                "operation": "temporal_split",
+                "params": {"train_ratio": 0.82},
             },
         ]
     ),
@@ -665,6 +860,334 @@ MOVIELENS_100K_V3 = DatasetFixture(
     ),
 )
 
+AMAZON_BOOKS_V2023 = DatasetFixture(
+    name="Amazon-Books",
+    task=TaskType.RATING_PREDICTION,
+    description="Amazon Books benchmark for explicit-feedback recommendation.",
+    visibility=Visibility.PUBLIC,
+    version="2023",
+    owner="researcher",
+    dataset_yaml_raw=_dataset_yaml(
+        name="Amazon-Books",
+        versions=AMAZON_BOOKS_VERSIONS,
+        latest_version="2024",
+        description="Amazon Books benchmark with yearly snapshots.",
+        citation="DataRecHub examples",
+    ),
+    version_yaml_raw=_version_yaml(
+        dataset_name="Amazon-Books",
+        version="2023",
+        sources=[
+            {
+                "name": "amazon-books-2023",
+                "source_type": "url",
+                "downloadable": True,
+                "url": "https://example.org/datasets/amazon_books_2023.parquet",
+                "filename": "amazon_books_2023.parquet",
+                "checksum": "sha256:amazon-books-2023",
+                "checksum_algorithm": "sha256",
+            }
+        ],
+        resources=[
+            {
+                "name": "ratings",
+                "source_name": "amazon-books-2023",
+                "type": "interactions",
+                "format": "parquet",
+                "required": True,
+            },
+            {
+                "name": "item_metadata",
+                "source_name": "amazon-books-2023",
+                "type": "item_features",
+                "format": "jsonl",
+                "required": False,
+            },
+        ],
+    ),
+    characteristics_yaml_raw=_characteristics_yaml(
+        dataset_name="Amazon-Books",
+        version="2023",
+        n_users=892345,
+        n_items=515210,
+        n_interactions=2987450,
+        density=0.000006,
+        gini_user=0.743,
+        gini_item=0.812,
+    ),
+    pipeline_yaml_raw=_pipeline_yaml(
+        [
+            {
+                "name": "load",
+                "operation": "load_parquet",
+                "params": {"file": "ratings.parquet"},
+            },
+            {
+                "name": "clean",
+                "operation": "drop_missing_values",
+                "params": {"columns": ["user_id", "item_id", "rating"]},
+            },
+            {
+                "name": "split",
+                "operation": "random_split",
+                "params": {"train_ratio": 0.8, "validation_ratio": 0.1},
+            },
+        ]
+    ),
+)
+
+AMAZON_BOOKS_V2024 = DatasetFixture(
+    name="Amazon-Books",
+    task=TaskType.RATING_PREDICTION,
+    description="Amazon Books benchmark for explicit-feedback recommendation.",
+    visibility=Visibility.PUBLIC,
+    version="2024",
+    owner="researcher",
+    dataset_yaml_raw=_dataset_yaml(
+        name="Amazon-Books",
+        versions=AMAZON_BOOKS_VERSIONS,
+        latest_version="2024",
+        description="Amazon Books benchmark with yearly snapshots.",
+        citation="DataRecHub examples",
+    ),
+    version_yaml_raw=_version_yaml(
+        dataset_name="Amazon-Books",
+        version="2024",
+        sources=[
+            {
+                "name": "amazon-books-2024",
+                "source_type": "url",
+                "downloadable": True,
+                "url": "https://example.org/datasets/amazon_books_2024.parquet",
+                "filename": "amazon_books_2024.parquet",
+                "checksum": "sha256:amazon-books-2024",
+                "checksum_algorithm": "sha256",
+            },
+            {
+                "name": "amazon-books-sidecar-2024",
+                "source_type": "url",
+                "downloadable": True,
+                "url": "https://example.org/datasets/amazon_books_2024_sidecar.zip",
+                "filename": "amazon_books_2024_sidecar.zip",
+            },
+        ],
+        resources=[
+            {
+                "name": "ratings",
+                "source_name": "amazon-books-2024",
+                "type": "interactions",
+                "format": "parquet",
+                "required": True,
+            },
+            {
+                "name": "item_metadata",
+                "source_name": "amazon-books-sidecar-2024",
+                "type": "item_features",
+                "format": "jsonl",
+                "required": False,
+            },
+            {
+                "name": "category_tree",
+                "source_name": "amazon-books-sidecar-2024",
+                "type": "graph",
+                "format": "json",
+                "required": False,
+            },
+        ],
+    ),
+    characteristics_yaml_raw=_characteristics_yaml(
+        dataset_name="Amazon-Books",
+        version="2024",
+        n_users=941120,
+        n_items=548990,
+        n_interactions=3278900,
+        density=0.000006,
+        gini_user=0.731,
+        gini_item=0.798,
+    ),
+    pipeline_yaml_raw=_pipeline_yaml(
+        [
+            {
+                "name": "load",
+                "operation": "load_parquet",
+                "params": {"file": "ratings.parquet"},
+            },
+            {
+                "name": "kcore",
+                "operation": "filter_min_interactions",
+                "params": {"min_user_interactions": 5, "min_item_interactions": 5},
+            },
+            {
+                "name": "normalize",
+                "operation": "normalize_ids",
+                "params": {"user_col": "user_id", "item_col": "item_id"},
+            },
+            {
+                "name": "split",
+                "operation": "temporal_split",
+                "params": {"train_ratio": 0.82, "validation_ratio": 0.08},
+            },
+        ]
+    ),
+)
+
+LASTFM_2011 = DatasetFixture(
+    name="LastFM",
+    task=TaskType.RANKING,
+    description="Music recommendation benchmark with implicit feedback.",
+    visibility=Visibility.PUBLIC,
+    version="2011",
+    owner="researcher",
+    dataset_yaml_raw=_dataset_yaml(
+        name="LastFM",
+        versions=LASTFM_VERSIONS,
+        latest_version="2014",
+        description="LastFM benchmark with multiple curated snapshots.",
+        citation="DataRecHub examples",
+    ),
+    version_yaml_raw=_version_yaml(
+        dataset_name="LastFM",
+        version="2011",
+        sources=[
+            {
+                "name": "lastfm-2011-main",
+                "source_type": "url",
+                "downloadable": True,
+                "url": "https://example.org/datasets/lastfm_2011.tar.gz",
+                "filename": "lastfm_2011.tar.gz",
+            }
+        ],
+        resources=[
+            {
+                "name": "interactions",
+                "source_name": "lastfm-2011-main",
+                "type": "interactions",
+                "format": "tsv",
+                "required": True,
+            },
+            {
+                "name": "social_graph",
+                "source_name": "lastfm-2011-main",
+                "type": "graph",
+                "format": "tsv",
+                "required": False,
+            },
+        ],
+    ),
+    characteristics_yaml_raw=_characteristics_yaml(
+        dataset_name="LastFM",
+        version="2011",
+        n_users=1892,
+        n_items=17632,
+        n_interactions=92834,
+        density=0.002781,
+        gini_user=0.584,
+        gini_item=0.643,
+    ),
+    pipeline_yaml_raw=_pipeline_yaml(
+        [
+            {"name": "load", "operation": "parse_tsv", "params": {"delimiter": "\\t"}},
+            {
+                "name": "filter",
+                "operation": "filter_min_interactions",
+                "params": {"min_user_interactions": 20},
+            },
+            {"name": "split", "operation": "leave_one_out", "params": {}},
+        ]
+    ),
+)
+
+LASTFM_2014 = DatasetFixture(
+    name="LastFM",
+    task=TaskType.RANKING,
+    description="Music recommendation benchmark with implicit feedback.",
+    visibility=Visibility.PUBLIC,
+    version="2014",
+    owner="researcher",
+    dataset_yaml_raw=_dataset_yaml(
+        name="LastFM",
+        versions=LASTFM_VERSIONS,
+        latest_version="2014",
+        description="LastFM benchmark with multiple curated snapshots.",
+        citation="DataRecHub examples",
+    ),
+    version_yaml_raw=_version_yaml(
+        dataset_name="LastFM",
+        version="2014",
+        sources=[
+            {
+                "name": "lastfm-2014-main",
+                "source_type": "url",
+                "downloadable": True,
+                "url": "https://example.org/datasets/lastfm_2014.tar.gz",
+                "filename": "lastfm_2014.tar.gz",
+                "checksum": "sha256:lastfm-2014-main",
+                "checksum_algorithm": "sha256",
+            },
+            {
+                "name": "lastfm-2014-tags",
+                "source_type": "url",
+                "downloadable": True,
+                "url": "https://example.org/datasets/lastfm_2014_tags.tsv.gz",
+                "filename": "lastfm_2014_tags.tsv.gz",
+            },
+        ],
+        resources=[
+            {
+                "name": "interactions",
+                "source_name": "lastfm-2014-main",
+                "type": "interactions",
+                "format": "tsv",
+                "required": True,
+            },
+            {
+                "name": "social_graph",
+                "source_name": "lastfm-2014-main",
+                "type": "graph",
+                "format": "tsv",
+                "required": False,
+            },
+            {
+                "name": "tags",
+                "source_name": "lastfm-2014-tags",
+                "type": "item_features",
+                "format": "tsv",
+                "required": False,
+            },
+        ],
+    ),
+    characteristics_yaml_raw=_characteristics_yaml(
+        dataset_name="LastFM",
+        version="2014",
+        n_users=2485,
+        n_items=20944,
+        n_interactions=131806,
+        density=0.00253,
+        gini_user=0.567,
+        gini_item=0.618,
+    ),
+    pipeline_yaml_raw=_pipeline_yaml(
+        [
+            {"name": "load", "operation": "parse_tsv", "params": {"delimiter": "\\t"}},
+            {
+                "name": "kcore",
+                "operation": "filter_min_interactions",
+                "params": {"min_user_interactions": 15, "min_item_interactions": 20},
+            },
+            {
+                "name": "feature-join",
+                "operation": "join_item_features",
+                "params": {"resource": "tags"},
+            },
+            {
+                "name": "split",
+                "operation": "temporal_split",
+                "params": {"train_ratio": 0.8, "validation_ratio": 0.1},
+            },
+        ]
+    ),
+)
+
 EDGE_TINY_RANKING_V1 = DatasetFixture(
     name="Tiny-Edge-Ranking",
     task=TaskType.RANKING,
@@ -727,10 +1250,16 @@ EDGE_TINY_RANKING_V1 = DatasetFixture(
 DATASET_FIXTURES_MINIMAL = [ALIBABA_V1]
 DATASET_FIXTURES_DEMO = [
     ALIBABA_V1,
+    ALIBABA_V2,
     EPINIONS_V1_PRIVATE,
+    EPINIONS_V2_PRIVATE,
     MOVIELENS_100K_V1,
     MOVIELENS_100K_V2,
     MOVIELENS_100K_V3,
+    AMAZON_BOOKS_V2023,
+    AMAZON_BOOKS_V2024,
+    LASTFM_2011,
+    LASTFM_2014,
 ]
 DATASET_FIXTURES_EDGE = [EDGE_TINY_RANKING_V1, MOVIELENS_100K_V3]
 
@@ -770,6 +1299,22 @@ MODEL_FIXTURES_DEMO = [
         paper_url="https://dl.acm.org/doi/10.1145/371920.372071",
         implementation="https://surpriselib.com",
         hyperparams={"k": 40, "sim_options": {"name": "cosine", "user_based": True}},
+    ),
+    ModelFixture(
+        name="ItemKNN",
+        family="neighborhood",
+        owner="researcher",
+        paper_url="https://dl.acm.org/doi/10.1145/371920.372071",
+        implementation="https://surpriselib.com",
+        hyperparams={"k": 50, "sim_options": {"name": "pearson", "user_based": False}},
+    ),
+    ModelFixture(
+        name="NeuMF",
+        family="neural-cf",
+        owner="researcher",
+        paper_url="https://arxiv.org/abs/1708.05031",
+        implementation="https://github.com/hexiangnan/neural_collaborative_filtering",
+        hyperparams={"embedding_dim": 64, "mlp_layers": [128, 64, 32], "lr": 0.0005},
     ),
     ModelFixture(
         name="PopRank",
@@ -825,11 +1370,40 @@ EXPERIMENT_FIXTURES_DEMO = [
         submitted_by="viewer",
     ),
     ExperimentFixture(
+        dataset_name="Alibaba-iFashion",
+        dataset_version="v2",
+        model_name="LightGCN",
+        run_name="seed-demo-lightgcn-alibaba-v2-finished",
+        seed=22,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        metrics=_ranking_metrics("best"),
+    ),
+    ExperimentFixture(
+        dataset_name="Alibaba-iFashion",
+        dataset_version="v2",
+        model_name="BPR-MF",
+        run_name="seed-demo-bpr-alibaba-v2-finished",
+        seed=23,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        metrics=_ranking_metrics("good"),
+    ),
+    ExperimentFixture(
+        dataset_name="Alibaba-iFashion",
+        dataset_version="v2",
+        model_name="NeuMF",
+        run_name="seed-demo-neumf-alibaba-v2-running",
+        seed=24,
+        status=Status.RUNNING,
+        submitted_by="researcher",
+    ),
+    ExperimentFixture(
         dataset_name="Epinions",
         dataset_version="v1",
         model_name="BPR-MF",
         run_name="seed-demo-bpr-epinions-v1-finished",
-        seed=7,
+        seed=31,
         status=Status.FINISHED,
         submitted_by="researcher",
         metrics=_ranking_metrics("good"),
@@ -839,7 +1413,7 @@ EXPERIMENT_FIXTURES_DEMO = [
         dataset_version="v1",
         model_name="LightGCN",
         run_name="seed-demo-lightgcn-epinions-v1-running",
-        seed=12,
+        seed=32,
         status=Status.RUNNING,
         submitted_by="researcher",
     ),
@@ -848,8 +1422,37 @@ EXPERIMENT_FIXTURES_DEMO = [
         dataset_version="v1",
         model_name="PopRank",
         run_name="seed-demo-poprank-epinions-v1-failed",
-        seed=18,
+        seed=33,
         status=Status.FAILED,
+        submitted_by="viewer",
+    ),
+    ExperimentFixture(
+        dataset_name="Epinions",
+        dataset_version="v2",
+        model_name="LightGCN",
+        run_name="seed-demo-lightgcn-epinions-v2-finished",
+        seed=34,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        metrics=_ranking_metrics("best"),
+    ),
+    ExperimentFixture(
+        dataset_name="Epinions",
+        dataset_version="v2",
+        model_name="BPR-MF",
+        run_name="seed-demo-bpr-epinions-v2-finished",
+        seed=35,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        metrics=_ranking_metrics("good"),
+    ),
+    ExperimentFixture(
+        dataset_name="Epinions",
+        dataset_version="v2",
+        model_name="PopRank",
+        run_name="seed-demo-poprank-epinions-v2-queued",
+        seed=36,
+        status=Status.QUEUED,
         submitted_by="viewer",
     ),
     ExperimentFixture(
@@ -874,10 +1477,19 @@ EXPERIMENT_FIXTURES_DEMO = [
     ),
     ExperimentFixture(
         dataset_name="MovieLens-100K",
+        dataset_version="v1",
+        model_name="ItemKNN",
+        run_name="seed-demo-itemknn-ml100k-v1-failed",
+        seed=103,
+        status=Status.FAILED,
+        submitted_by="viewer",
+    ),
+    ExperimentFixture(
+        dataset_name="MovieLens-100K",
         dataset_version="v2",
         model_name="SVD",
         run_name="seed-demo-svd-ml100k-v2-finished",
-        seed=103,
+        seed=104,
         status=Status.FINISHED,
         submitted_by="researcher",
         metrics=_rating_metrics("best"),
@@ -887,7 +1499,26 @@ EXPERIMENT_FIXTURES_DEMO = [
         dataset_version="v2",
         model_name="UserKNN",
         run_name="seed-demo-userknn-ml100k-v2-finished",
-        seed=104,
+        seed=105,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        metrics=_rating_metrics("good"),
+    ),
+    ExperimentFixture(
+        dataset_name="MovieLens-100K",
+        dataset_version="v2",
+        model_name="ItemKNN",
+        run_name="seed-demo-itemknn-ml100k-v2-running",
+        seed=106,
+        status=Status.RUNNING,
+        submitted_by="researcher",
+    ),
+    ExperimentFixture(
+        dataset_name="MovieLens-100K",
+        dataset_version="v3",
+        model_name="ItemKNN",
+        run_name="seed-demo-itemknn-ml100k-v3-finished",
+        seed=107,
         status=Status.FINISHED,
         submitted_by="researcher",
         metrics=_rating_metrics("good"),
@@ -897,7 +1528,7 @@ EXPERIMENT_FIXTURES_DEMO = [
         dataset_version="v3",
         model_name="SVD",
         run_name="seed-demo-svd-ml100k-v3-running",
-        seed=105,
+        seed=108,
         status=Status.RUNNING,
         submitted_by="researcher",
     ),
@@ -906,8 +1537,124 @@ EXPERIMENT_FIXTURES_DEMO = [
         dataset_version="v3",
         model_name="UserKNN",
         run_name="seed-demo-userknn-ml100k-v3-failed",
-        seed=106,
+        seed=109,
         status=Status.FAILED,
+        submitted_by="viewer",
+    ),
+    ExperimentFixture(
+        dataset_name="Amazon-Books",
+        dataset_version="2023",
+        model_name="SVD",
+        run_name="seed-demo-svd-amazon-books-2023-finished",
+        seed=201,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        metrics=_rating_metrics("baseline"),
+    ),
+    ExperimentFixture(
+        dataset_name="Amazon-Books",
+        dataset_version="2023",
+        model_name="UserKNN",
+        run_name="seed-demo-userknn-amazon-books-2023-finished",
+        seed=202,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        metrics=_rating_metrics("good"),
+    ),
+    ExperimentFixture(
+        dataset_name="Amazon-Books",
+        dataset_version="2023",
+        model_name="ItemKNN",
+        run_name="seed-demo-itemknn-amazon-books-2023-queued",
+        seed=203,
+        status=Status.QUEUED,
+        submitted_by="viewer",
+    ),
+    ExperimentFixture(
+        dataset_name="Amazon-Books",
+        dataset_version="2024",
+        model_name="SVD",
+        run_name="seed-demo-svd-amazon-books-2024-finished",
+        seed=204,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        metrics=_rating_metrics("best"),
+    ),
+    ExperimentFixture(
+        dataset_name="Amazon-Books",
+        dataset_version="2024",
+        model_name="ItemKNN",
+        run_name="seed-demo-itemknn-amazon-books-2024-finished",
+        seed=205,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        metrics=_rating_metrics("good"),
+    ),
+    ExperimentFixture(
+        dataset_name="Amazon-Books",
+        dataset_version="2024",
+        model_name="UserKNN",
+        run_name="seed-demo-userknn-amazon-books-2024-running",
+        seed=206,
+        status=Status.RUNNING,
+        submitted_by="researcher",
+    ),
+    ExperimentFixture(
+        dataset_name="LastFM",
+        dataset_version="2011",
+        model_name="BPR-MF",
+        run_name="seed-demo-bpr-lastfm-2011-finished",
+        seed=301,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        metrics=_ranking_metrics("baseline"),
+    ),
+    ExperimentFixture(
+        dataset_name="LastFM",
+        dataset_version="2011",
+        model_name="LightGCN",
+        run_name="seed-demo-lightgcn-lastfm-2011-finished",
+        seed=302,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        metrics=_ranking_metrics("good"),
+    ),
+    ExperimentFixture(
+        dataset_name="LastFM",
+        dataset_version="2011",
+        model_name="PopRank",
+        run_name="seed-demo-poprank-lastfm-2011-failed",
+        seed=303,
+        status=Status.FAILED,
+        submitted_by="viewer",
+    ),
+    ExperimentFixture(
+        dataset_name="LastFM",
+        dataset_version="2014",
+        model_name="LightGCN",
+        run_name="seed-demo-lightgcn-lastfm-2014-finished",
+        seed=304,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        metrics=_ranking_metrics("best"),
+    ),
+    ExperimentFixture(
+        dataset_name="LastFM",
+        dataset_version="2014",
+        model_name="NeuMF",
+        run_name="seed-demo-neumf-lastfm-2014-finished",
+        seed=305,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        metrics=_ranking_metrics("good"),
+    ),
+    ExperimentFixture(
+        dataset_name="LastFM",
+        dataset_version="2014",
+        model_name="PopRank",
+        run_name="seed-demo-poprank-lastfm-2014-running",
+        seed=306,
+        status=Status.RUNNING,
         submitted_by="viewer",
     ),
 ]

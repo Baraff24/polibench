@@ -149,10 +149,12 @@ Tutta la logica (risoluzione UUID → ObjectId, denormalizzazione, query leaderb
 |----------------|-------------------------------------------------------------------------------------------------------|
 | **User**       | Utente della piattaforma con ruolo (`admin`, `researcher`, `viewer`), autenticazione e verifica email |
 | **Team**       | Gruppo di ricerca che aggrega utenti sotto uno stesso namespace                                       |
-| **Dataset**    | Dataset di valutazione con task, versione, partizioni e visibilità                                    |
+| **Dataset**    | Catalogo logico del dataset (nome, task, visibilità, metadati)                                        |
+| **DatasetVersion** | Unità operativa versionata con YAML raw, sources/resources, pipeline e caratteristiche            |
 | **MLModel**    | Algoritmo di raccomandazione con iperparametri di riferimento                                         |
-| **Experiment** | Associazione dataset–modello con configurazione, seed, codice e stato                                 |
-| **Metric**     | Risultato numerico per uno split e una metrica specifica (denormalizzato per query veloci)            |
+| **Experiment** | Associazione datasetVersion–modello con configurazione, seed, codice e stato                          |
+| **ExperimentMetric** | Risultato numerico di performance (CSV import) denormalizzato per leaderboard/query veloci      |
+| **MetricImportJob** | Job async di import metriche da CSV con stati (`uploaded`, `processing`, `completed`, `failed`) |
 
 ---
 
@@ -198,14 +200,20 @@ Questo avvia tutti i servizi con hot reload per backend e frontend.
 ### 5. Popola il database con dati di esempio (opzionale)
 
 ```bash
-docker compose exec backend uv run python scripts/seed.py
+docker compose exec backend uv run python scripts/seed.py --mode minimal
 ```
 
 Per svuotare il database prima di popolare:
 
 ```bash
-docker compose exec backend uv run python scripts/seed.py --reset
+docker compose exec backend uv run python scripts/seed.py --mode demo --reset
 ```
+
+Modalità disponibili:
+
+- `minimal`: seed rapido con 1 dataset/versione + 1 modello + 1 esperimento.
+- `demo`: seed esteso multi-dataset/multi-versione con stati esperimenti misti e metric import realistici.
+- `edge`: casi limite validi per test UI/consistenza (senza dati volutamente invalidi).
 
 ---
 
