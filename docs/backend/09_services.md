@@ -1,325 +1,195 @@
 # Service Layer
 
-Il service layer si trova in `backend/app/services/`. Contiene **tutta la logica di business** del backend:
-risoluzione UUID→ObjectId, creazione e validazione delle entità, query al database, aggregazioni e denormalizzazione.
+Il service layer (`backend/app/services/`) contiene la logica di business:
+
+- risoluzione UUID -> Document
+- validazioni semantiche
+- parse YAML
+- denormalizzazione per query veloci
+- trasformazione Document -> schema pubblico
+
+I router restano sottili e delegano tutto qui.
 
 ---
 
-## Perché un service layer separato
+## Struttura attuale
 
-I router FastAPI devono restare "sottili": ricevono la richiesta HTTP, estraggono i parametri, delegano al service e
-restituiscono la risposta. Mettere logica nei router porta a codice difficile da testare e da riutilizzare.
-
-Il service layer risolve questo problema:
-
-| Router (sottile)              | Service (logica)                             |
-|-------------------------------|----------------------------------------------|
-| Estrae body, path params, JWT | Risolve UUID → Document (con 404 se assente) |
-| Chiama il service             | Crea e salva Document MongoDB                |
-| Ritorna la risposta HTTP      | Converte Document → Schema pubblico          |
-|                               | Gestisce la denormalizzazione                |
-|                               | Esegue query e aggregazioni                  |
-
----
-
-## Struttura dei file
-
-```
+```text
 services/
-├── __init__.py
-├── datasets.py      ← Dataset + MLModel (creazione, listing, dettaglio)
-├── email.py         ← Token di verifica email e invio SMTP
-├── experiments.py   ← Experiment (creazione, lettura, conversione UUID)
-├── metrics.py       ← Metric (batch insert, raggruppamento per split)
-└── leaderboard.py   ← Query leaderboard top-N
+├── datasets.py         # Dataset + MLModel
+├── dataset_versions.py # DatasetVersion + Source/Resource + YAML dataset/version/characteristics
+├── pipelines.py        # Pipeline create/list/preview/yaml/experiments
+├── experiments.py      # Experiment create/get/list
+├── metrics.py          # Metric batch + read per experiment
+├── metric_imports.py   # CSV import async jobs
+├── leaderboard.py      # leaderboard single/multi con filtri versione/pipeline
+└── email.py            # token verifica email + SMTP
 ```
 
 ---
 
-## services/datasets.py
+## `datasets.py`
 
-### Helper di risoluzione UUID → Document
+Responsabilita principali:
 
-```python
-async def get_dataset_by_uuid(dataset_uuid: UUID) -> Dataset
+- risolvere `dataset_uuid`, `model_uuid`, `team_uuid`
+- creare/listare dataset e modelli
+- conversione in `DatasetPublic`/`DatasetSummary` e `MLModelPublic`/`MLModelSummary`
 
-
-    async def get_ml_model_by_uuid(model_uuid: UUID) -> MLModel
-
-    async def get_team_by_uuid(team_uuid: UUID) -> Team
-```
-
-Questi helper sono usati sia internamente che dai service di `experiments.py` (per risolvere `dataset_uuid` e
-`model_uuid` durante la creazione di un Experiment). Se il Document non esiste, sollevano `HTTPException(404)`.
-
-### Creazione Dataset
+Pattern usato ovunque:
 
 ```python
-async def create_dataset(data: DatasetCreate, current_user: User) -> DatasetPublic
-```
-
-**Flusso**:
-
-1. Se `data.team_uuid` è presente → chiama `get_team_by_uuid` per ottenere il Document `Team`
-2. Crea il Document `Dataset` con:
-    - `team_id = team_doc.id` (ObjectId interno, non esposto)
-    - `created_by_user_id = current_user.id` (estratto dalla dipendenza JWT)
-3. Chiama `_dataset_to_public(dataset, creator, team)` per costruire la risposta
-
-### Conversione _dataset_to_public
-
-```python
-def _dataset_to_public(dataset, creator, team) -> DatasetPublic
-```
-
-Funzione pura che converte un Document `Dataset` (con ObjectId interni) in `DatasetPublic` (con solo UUID).
-Riceve `team` e `creator` già risolti come parametri: non fa query al DB.
-
-### Lettura Dataset (con risoluzione completa)
-
-```python
-async def get_dataset_public(dataset_uuid: UUID) -> DatasetPublic
-```
-
-Usata da `GET /datasets/{uuid}`. Risolve:
-
-- `dataset_uuid → Dataset`
-- `dataset.team_id → Team → team.uuid`
-- `dataset.created_by_user_id → User → user.uuid`
-
-Poi chiama `_dataset_to_public` con i Document già risolti.
-
-### MLModel — pattern identico
-
-Le funzioni `create_ml_model`, `list_ml_models`, `get_ml_model_public_by_uuid` seguono lo stesso pattern
-del Dataset. `_model_to_public` e `_model_to_summary` sono le funzioni di conversione analoghe.
-
-> **Nota**: `_model_to_public` include il campo `hyperparams` nella risposta pubblica `MLModelPublic`.
-
----
-
-## services/experiments.py
-
-### Helper di risoluzione
-
-```python
-async def get_experiment_by_uuid(experiment_uuid: UUID) -> Experiment
-```
-
-Usato sia internamente che da `services/metrics.py`.
-
-### Creazione Experiment
-
-```python
-async def create_experiment(data: ExperimentCreate, current_user: User) -> ExperimentPublic
-```
-
-**Flusso**:
-
-1. Risolve `data.dataset_version_uuid → DatasetVersion` (404 se non esiste)
-2. Risolve `DatasetVersion → Dataset` per valorizzare la risposta pubblica
-3. Risolve `data.model_uuid → MLModel` (404 se non esiste)
-4. Crea il Document `Experiment` con:
-    - `dataset_version_id = dataset_version.id`, `model_id = model.id` (ObjectId interni)
-    - `submitted_by_user_id = current_user.id` (dal JWT, non dal client)
-    - `status = Status.QUEUED` (fissato lato server)
-5. Restituisce `ExperimentPublic` con `dataset_uuid`, `dataset_version_uuid` e `model_uuid` risolti
-
-**Compatibilità**: se il client passa `dataset_uuid` (legacy), il service risolve automaticamente la versione più recente
-(`get_latest_dataset_version`) e continua il flusso su `dataset_version_id`.
-
-### Lettura Experiment (risoluzione completa)
-
-```python
-async def get_experiment_public(experiment_uuid: UUID) -> ExperimentPublic
-```
-
-Usata da `GET /experiments/{uuid}`. Risolve tutti gli ObjectId interni:
-
-- `dataset_version_id → DatasetVersion → uuid`
-- `DatasetVersion.dataset_id → Dataset → uuid`
-- `model_id → MLModel → uuid`
-- `submitted_by_user_id → User → uuid`
-- `team_id → Team → uuid` (se presente)
-
-### Lista Experiment per DatasetVersion
-
-```python
-async def list_experiments_for_dataset_version(
-        dataset_version_uuid: UUID,
-) -> list[ExperimentSummary]
-```
-
-Usata da `GET /dataset-versions/{version_uuid}/experiments`.
-
-Flusso:
-
-1. Risolve `dataset_version_uuid → DatasetVersion + Dataset`
-2. Legge tutti gli `Experiment` con `dataset_version_id` corrispondente
-3. Risolve i modelli in bulk (`model_id → MLModel`) per esporre `model_uuid` e `model_name`
-4. Restituisce `ExperimentSummary` ordinati per `created_at DESC`
-
----
-
-## services/metrics.py
-
-### Inserimento batch
-
-```python
-async def create_metrics_batch(data: MetricsBatchCreate) -> None
-```
-
-**Flusso**:
-
-1. Risolve `data.experiment_uuid → Experiment`
-2. Per ogni `MetricCreate` nel batch, costruisce un Document `Metric` **copiando** dall'Experiment:
-    - `experiment_id`, `dataset_id`, `model_id` → denormalizzazione intenzionale
-    - `submitted_by_user_id`, `team_id` → denormalizzazione opzionale
-3. Inserisce tutti in bulk con `Metric.insert_many(documents)`
-
-Non ritorna nulla: è il router a chiamare `get_experiment_metrics` per costruire la risposta.
-
-**Denormalizzazione**: i campi `dataset_id` e `model_id` vengono copiati dall'Experiment nel Metric per consentire
-query di leaderboard veloci (senza `$lookup`). Il costo è accettabile: vengono scritti una volta sola al momento
-della submission.
-
-### Lettura metriche per experiment
-
-```python
-async def get_experiment_metrics(experiment_uuid) -> ExperimentMetrics
-```
-
-**Flusso**:
-
-1. Risolve `experiment_uuid → Experiment`
-2. Fetch tutte le `Metric` con `experiment_id == exp.id`
-3. Risolve `dataset_id → Dataset` e `model_id → MLModel` **una volta sola** (non in loop)
-4. Per ogni Metric costruisce `MetricPublic` con UUID risolti
-5. Raggruppa in `dict[Split, list[MetricPublic]]` (struttura di `ExperimentMetrics.metrics_by_split`)
-
----
-
-## services/leaderboard.py
-
-```python
-async def get_leaderboard(
-        dataset_uuid: UUID,
-        metric: str,
-        split: Split,
-        top_n: int = 10,
-) -> list[LeaderboardEntry]
-```
-
-**Flusso**:
-
-1. Risolve `dataset_uuid → Dataset` (404 se non esiste)
-2. Query su `Metric`:
-   ```python
-   Metric.find(
-       Metric.dataset_id == dataset.id,
-       Metric.metric == metric,
-       Metric.split == split,
-   ).sort([("value", pymongo.DESCENDING)]).limit(top_n)
-   ```
-3. Raccoglie tutti gli `model_id` e `experiment_id` distinti nei risultati
-4. **Batch fetch**: una singola query per tutti i `MLModel` distinti, una per tutti gli `Experiment` distinti
-   (evita N+1 query)
-5. Costruisce dizionari `model_name_by_id`, `model_uuid_by_id`, `exp_uuid_by_id`
-6. Assembla `list[LeaderboardEntry]` con `rank` progressivo (1-based, da `enumerate(..., start=1)`)
-
-**Perché è veloce**: la query su `Metric` usa l'indice composto `{dataset_id, metric, split, value: -1}`.
-Non ci sono join (niente `$lookup`): `dataset_id` è già nel Metric per effetto della denormalizzazione.
-Il batch fetch di MLModel e Experiment avviene con `{"_id": {"$in": [...]}}` — una sola query per ciascuno.
-
-### get_multi_metric_leaderboard (stile BARS)
-
-```python
-async def get_multi_metric_leaderboard(
-        dataset_uuid: UUID,
-        metrics_list: list[str],
-        split: Split,
-        sort_by: str,
-        top_n: int = 20,
-) -> list[MultiMetricLeaderboardEntry]
-```
-
-**Flusso**:
-
-1. Risolve `dataset_uuid → Dataset` (404 se non esiste)
-2. Fetch tutte le `Metric` per `(dataset_id, split)` dove `metric ∈ metrics_list`
-3. Raggruppa per `experiment_id`: ogni experiment ottiene un dizionario `{metric_name: Metric}`
-4. Determina la `direction` della metrica `sort_by` (max → DESC, min → ASC)
-5. Ordina per il valore della metrica `sort_by` e limita a `top_n`
-6. Batch fetch di `Experiment` e `MLModel` per popolare `model_name`, `repo_url`
-7. Assembla `MultiMetricLeaderboardEntry` con `metrics: dict[str, float]`, `directions: dict[str, Direction]`
-
-Questo endpoint alimenta la leaderboard multi-colonna nel frontend (con grafico Recharts).
-È ispirato alla BARS CTR Leaderboard di OpenBenchmark.
-
----
-
-## Pattern ricorrenti
-
-### Risoluzione UUID → Document con 404
-
-Tutti i service usano questo pattern:
-
-```python
-async def get_XXX_by_uuid(uuid: UUID) -> XXX:
-    doc = await XXX.find_one(XXX.uuid == uuid)
+async def get_x_by_uuid(x_uuid: UUID) -> X:
+    doc = await X.find_one(X.uuid == x_uuid)
     if doc is None:
-        raise HTTPException(status_code=404, detail="XXX non trovato")
+        raise HTTPException(status_code=404, detail="... non trovato")
     return doc
 ```
 
-Centralizzare la risoluzione in una funzione dedicata garantisce che:
+---
 
-- il messaggio di errore sia consistente
-- il codice HTTP sia sempre 404 (non 500)
-- il service chiamante non debba gestire `None`
+## `dataset_versions.py`
 
-### Conversione Document → Schema pubblico
+Responsabilita principali:
 
-Le funzioni `_xxx_to_public` e `_xxx_to_summary` sono funzioni pure (nessuna query al DB):
+- creare/listare/dettagliare `DatasetVersion`
+- parse e validazione YAML:
+  - dataset-level (`dataset_yaml_raw`)
+  - version-level (`version_yaml_raw`)
+  - characteristics (`characteristics_yaml_raw`)
+- materializzare `Source` e `Resource` da version YAML
+- estrarre caratteristiche denormalizzate (`n_users`, `density`, `gini_*`)
+- endpoint YAML per `dataset`, `version`, `characteristics`
 
-- ricevono Document già risolti come parametri
-- restituiscono uno schema Pydantic
-- nessun side effect
+Validazioni chiave:
 
-Questo le rende facilmente testabili in isolamento.
+- `dataset_name` e `version` nel version YAML devono combaciare col target
+- `dataset_name` e `version` nel metrics/characteristics YAML devono combaciare col target
+- `resource.source_name` deve riferire una source esistente
+- `downloadable=true` richiede `url`
+- `checksum` richiede `checksum_algorithm`
+
+Compatibilita transitoria:
+
+- se in create versione arriva anche `pipeline_yaml_raw`, il service crea una prima `Pipeline` separata
+  tramite `create_pipeline_for_version(...)`
 
 ---
 
-## services/email.py
+## `pipelines.py`
 
-Gestisce la generazione dei token di verifica email e l'invio tramite SMTP.
+Nuovo service centrale per il modello pipeline-first.
 
-### Funzioni principali
+Responsabilita principali:
 
-```python
-def create_verification_token(user_uuid: UUID) -> str
-```
+- parse YAML pipeline
+- normalizzazione step in `blocks` (per UI a blocchi/chain)
+- validazioni coerenza con dataset/version target
+- creazione pipeline con `code` non semantico (`P001`, `P002`, ...)
+- list/dettaglio pipeline
+- retrieval YAML pipeline
+- preview parse prima del submit
+- lista esperimenti legati alla pipeline
+- helper `get_latest_pipeline_for_dataset_version(...)` per fallback legacy
 
-Genera un JWT con `purpose: email-verification`, `sub: user.uuid` e scadenza di 48 ore. Usa la stessa `SECRET_KEY`
-dei token di login, ma si distingue per il campo `purpose`.
+---
 
-```python
-def verify_email_token(token: str) -> UUID | None
-```
+## `experiments.py`
 
-Decodifica il token, verifica che `purpose == "email-verification"` e ritorna lo UUID dell'utente. Ritorna `None`
-se il token è scaduto, malformato o non ha il purpose corretto.
+Responsabilita principali:
 
-```python
-def send_verification_email(to_email: str, token: str) -> None
-```
+- creare un `Experiment` privilegiando `pipeline_uuid`
+- fallback legacy da `dataset_version_uuid` / `dataset_uuid`
+- denormalizzare `dataset_version_id` e `dataset_id` dentro `Experiment`
+- leggere dettaglio run con UUID risolti
+- listare esperimenti per dataset version o pipeline
 
-Costruisce un'email HTML con il link di verifica (`{FRONTEND_URL}/verify-email?token={token}`) e la invia via SMTP.
+Flusso `create_experiment(...)`:
 
-**Fallback senza SMTP**: se `SMTP_HOST` non è configurato, la funzione logga il link di verifica nella console
-del backend tramite `logger.warning()` e ritorna senza errore. Questo permette di completare il flusso di
-registrazione anche in sviluppo locale senza un server SMTP.
+1. risolve pipeline (path principale) oppure fallback legacy
+2. risolve model
+3. imposta `submitted_by_user_id` da JWT
+4. salva `pipeline_id`, `dataset_version_id`, `dataset_id`, `model_id`
+5. ritorna `ExperimentPublic` con UUID e metadati pipeline
 
-### Configurazione SMTP
+---
 
-Vedi [07_configuration.md](./07_configuration.md) per la lista completa delle variabili d'ambiente SMTP.
+## `metrics.py`
+
+Responsabilita principali:
+
+- inserimento batch metriche (endpoint legacy diretto)
+- lettura metriche per esperimento
+- denormalizzazione lato write per query veloci
+
+Durante il write ogni `ExperimentMetric` riceve:
+
+- `experiment_id`
+- `dataset_id`
+- `dataset_version_id`
+- `pipeline_id`
+- `model_id`
+- eventuali `submitted_by_user_id`/`team_id`
+
+Questo mantiene la leaderboard senza join costose.
+
+---
+
+## `metric_imports.py`
+
+Gestisce import CSV asincrono.
+
+Flusso:
+
+1. crea `MetricImportJob` (`uploaded`)
+2. worker async porta a `processing`
+3. parse CSV
+4. sostituisce metriche precedenti della run e salva nuove `ExperimentMetric`
+5. aggiorna stato job (`completed`/`failed`)
+
+Anche qui le metriche persistite includono `pipeline_id` denormalizzato.
+
+---
+
+## `leaderboard.py`
+
+Responsabilita principali:
+
+- leaderboard single metric (`get_leaderboard`)
+- leaderboard multi-metric (`get_multi_metric_leaderboard`)
+- validazione coerenza tra `dataset_uuid`, `dataset_version_uuid` e `pipeline_uuid`
+
+Regola importante:
+
+- se filtri per dataset version, il filtro pipeline deve essere consistente con quella versione
+
+Query model:
+
+- filtro diretto su collezione `metrics`
+- ordinamento per `value` con indici composti
+- batch fetch di `Experiment`, `MLModel`, `Pipeline`, `DatasetVersion` per arricchire response
+
+---
+
+## `email.py`
+
+Gestisce token di verifica email e invio SMTP.
+
+- `create_verification_token(user_uuid)`
+- `verify_email_token(token)`
+- `send_verification_email(to_email, token)`
+
+Se SMTP non e configurato, in sviluppo logga il link senza bloccare la registrazione.
+
+---
+
+## Relazione con il dominio
+
+Il service layer implementa concretamente il modello:
+
+`Dataset -> DatasetVersion -> Pipeline -> Experiment -> ExperimentMetric`
+
+e mantiene separati:
+
+- dataset characteristics (in `DatasetVersion`)
+- experiment performance metrics (in `ExperimentMetric`)

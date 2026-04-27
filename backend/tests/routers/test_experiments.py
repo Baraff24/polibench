@@ -18,14 +18,28 @@ async def _create_dataset(client, headers) -> str:
     return resp.json()["uuid"]
 
 
-async def _create_dataset_version(client, headers, dataset_uuid: str) -> str:
+async def _create_dataset_version(client, headers, dataset_uuid: str) -> tuple[str, str]:
     resp = await client.post(
         f"{API}/datasets/{dataset_uuid}/versions",
-        json={"version": "1.0", "status": "ready"},
+        json={
+            "version": "1.0",
+            "status": "ready",
+            "pipeline_yaml_raw": """
+pipeline:
+  - name: parse
+    operation: parse_csv
+""".strip(),
+        },
         headers=headers,
     )
     assert resp.status_code == 200
-    return resp.json()["uuid"]
+    version_uuid = resp.json()["uuid"]
+
+    pipelines_resp = await client.get(f"{API}/dataset-versions/{version_uuid}/pipelines")
+    assert pipelines_resp.status_code == 200
+    pipelines = pipelines_resp.json()
+    assert len(pipelines) >= 1
+    return version_uuid, pipelines[0]["uuid"]
 
 
 async def _create_model(client, headers, name: str = "BPR-MF") -> str:
@@ -44,7 +58,7 @@ async def test_submit_experiment_and_metrics_then_get_detail(
     superuser_token_headers: dict[str, str],
 ) -> None:
     dataset_uuid = await _create_dataset(client, superuser_token_headers)
-    dataset_version_uuid = await _create_dataset_version(
+    dataset_version_uuid, pipeline_uuid = await _create_dataset_version(
         client,
         superuser_token_headers,
         dataset_uuid,
@@ -54,7 +68,7 @@ async def test_submit_experiment_and_metrics_then_get_detail(
     exp_resp = await client.post(
         f"{API}/experiments",
         json={
-            "dataset_version_uuid": dataset_version_uuid,
+            "pipeline_uuid": pipeline_uuid,
             "model_uuid": model_uuid,
             "run_name": "run-001",
             "seed": 42,
@@ -69,6 +83,7 @@ async def test_submit_experiment_and_metrics_then_get_detail(
     assert "_id" not in exp_data
     assert exp_data["dataset_uuid"] == dataset_uuid
     assert exp_data["dataset_version_uuid"] == dataset_version_uuid
+    assert exp_data["pipeline_uuid"] == pipeline_uuid
     assert exp_data["model_uuid"] == model_uuid
     assert exp_data["status"] == "queued"
     experiment_uuid = exp_data["uuid"]
@@ -125,7 +140,7 @@ async def test_metric_import_csv_flow(
     superuser_token_headers: dict[str, str],
 ) -> None:
     dataset_uuid = await _create_dataset(client, superuser_token_headers)
-    dataset_version_uuid = await _create_dataset_version(
+    _, pipeline_uuid = await _create_dataset_version(
         client,
         superuser_token_headers,
         dataset_uuid,
@@ -134,7 +149,7 @@ async def test_metric_import_csv_flow(
 
     create_resp = await client.post(
         f"{API}/experiments",
-        json={"dataset_version_uuid": dataset_version_uuid, "model_uuid": model_uuid},
+        json={"pipeline_uuid": pipeline_uuid, "model_uuid": model_uuid},
         headers=superuser_token_headers,
     )
     assert create_resp.status_code == 200
@@ -167,7 +182,7 @@ async def test_metric_import_csv_flow(
     assert metrics_resp.status_code == 200
     by_split = metrics_resp.json()["metrics_by_split"]
     assert "test" in by_split
-    assert by_split["test"][0]["dataset_version_uuid"] == dataset_version_uuid
+    assert by_split["test"][0]["pipeline_uuid"] == pipeline_uuid
 
 
 @pytest.mark.anyio
@@ -176,7 +191,7 @@ async def test_get_experiment_public(
     superuser_token_headers: dict[str, str],
 ) -> None:
     dataset_uuid = await _create_dataset(client, superuser_token_headers)
-    dataset_version_uuid = await _create_dataset_version(
+    dataset_version_uuid, pipeline_uuid = await _create_dataset_version(
         client,
         superuser_token_headers,
         dataset_uuid,
@@ -185,7 +200,7 @@ async def test_get_experiment_public(
 
     create_resp = await client.post(
         f"{API}/experiments",
-        json={"dataset_version_uuid": dataset_version_uuid, "model_uuid": model_uuid},
+        json={"pipeline_uuid": pipeline_uuid, "model_uuid": model_uuid},
         headers=superuser_token_headers,
     )
     assert create_resp.status_code == 200
@@ -200,12 +215,13 @@ async def test_get_experiment_public(
     assert data["uuid"] == exp_uuid
     assert data["dataset_uuid"] == dataset_uuid
     assert data["dataset_version_uuid"] == dataset_version_uuid
+    assert data["pipeline_uuid"] == pipeline_uuid
     assert data["model_uuid"] == model_uuid
     assert "_id" not in data
 
 
 @pytest.mark.anyio
-async def test_submit_experiment_invalid_dataset_version_uuid(
+async def test_submit_experiment_invalid_pipeline_uuid(
     client: AsyncClient,
     superuser_token_headers: dict[str, str],
 ) -> None:
@@ -214,7 +230,7 @@ async def test_submit_experiment_invalid_dataset_version_uuid(
 
     resp = await client.post(
         f"{API}/experiments",
-        json={"dataset_version_uuid": fake_uuid, "model_uuid": model_uuid},
+        json={"pipeline_uuid": fake_uuid, "model_uuid": model_uuid},
         headers=superuser_token_headers,
     )
     assert resp.status_code == 404
@@ -225,7 +241,7 @@ async def test_submit_experiment_requires_auth(client: AsyncClient) -> None:
     resp = await client.post(
         f"{API}/experiments",
         json={
-            "dataset_version_uuid": "00000000-0000-0000-0000-000000000001",
+            "pipeline_uuid": "00000000-0000-0000-0000-000000000001",
             "model_uuid": "00000000-0000-0000-0000-000000000002",
         },
     )

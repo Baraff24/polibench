@@ -1,79 +1,67 @@
 # Backend — Panoramica Generale
 
-> Nota (22 aprile 2026): questa panoramica descrive il dominio **attualmente implementato**.
-> L'evoluzione verso dominio versionato (`DatasetVersion`, `Source/Resource`, import metriche async)
-> è descritta in [10_decisions.md](./10_decisions.md) (ADR-07).
+Polibench e una piattaforma web per benchmark comparativo di recommender systems,
+allineata al modello DataRec:
 
-## Cos'è Polibench
+- `Dataset` catalografico
+- `DatasetVersion` operativa
+- `Pipeline` separata dalla versione
+- `Experiment` agganciato a pipeline
+- `ExperimentMetric` per performance
+- `MetricImportJob` per import CSV async
 
-Polibench è una piattaforma web per il **benchmarking comparativo di modelli di raccomandazione**. L'obiettivo è fornire
-un ambiente strutturato in cui ricercatori e team possano:
+---
 
-- registrare dataset di valutazione con le relative partizioni (train/test/validation)
-- registrare algoritmi di raccomandazione (MLModel) con le loro caratteristiche
-- sottomettere esperimenti (Experiment) che associano un algoritmo a un dataset
-- registrare le metriche di valutazione prodotte da ogni esperimento
-- consultare una leaderboard che mostra i risultati ordinati per metrica
+## Obiettivo
 
-Il sistema è pensato per contesti accademici e di ricerca, dove la riproducibilità e la trasparenza dei risultati sono
-requisiti fondamentali.
+Fornire un backend che renda tracciabili e confrontabili i risultati sperimentali, separando in modo netto:
 
-## Perché un benchmark dedicato
+- dataset characteristics (strutturali del dataset)
+- experiment performance metrics (NDCG, Recall, RMSE, ...)
 
-Nei sistemi di raccomandazione, confrontare modelli diversi è storicamente difficile perché:
+---
 
-- dataset diversi portano a risultati non comparabili
-- le partizioni train/test variano da paper a paper
-- le implementazioni di riferimento non sempre coincidono
-- le metriche (@k, split, direzione) vengono calcolate con varianti diverse
+## Architettura
 
-Polibench affronta questi problemi centralizzando dataset, partizioni e metriche in un unico sistema con un contratto
-API ben definito.
-
-## Struttura del backend
-
-Il backend è un'applicazione **FastAPI** che espone una REST API. Si compone di sei strati distinti:
-
-```
-┌─────────────────────────────────────────┐
-│              HTTP (FastAPI)              │  ← routers/
-├─────────────────────────────────────────┤
-│          Schemi API (Pydantic)           │  ← schemas/
-├─────────────────────────────────────────┤
-│         Service Layer (logica)           │  ← services/
-├─────────────────────────────────────────┤
-│          Autenticazione (JWT)            │  ← auth/
-├─────────────────────────────────────────┤
-│       Modelli dati (Beanie/ODM)          │  ← models/
-├─────────────────────────────────────────┤
-│          Database (MongoDB)              │  ← via Motor (async)
-└─────────────────────────────────────────┘
+```text
+HTTP (FastAPI routers)
+  -> Schemi API (Pydantic)
+    -> Service layer (business logic)
+      -> Modelli dati (Beanie)
+        -> MongoDB (Motor)
 ```
 
-Ogni strato ha una responsabilità precisa e non conosce i dettagli degli strati al di sotto del successivo.
-I **router** sono volutamente sottili: ricevono la richiesta HTTP, delegano al **service layer** e restituiscono
-la risposta. Tutta la logica (risoluzione UUID→ObjectId, denormalizzazione, query) vive nei service.
+Router sottili, logica nei service.
 
-## Entità principali
+---
 
-Il dominio del problema si articola attorno a sei entità:
+## Entita principali
 
-| Entità       | Descrizione                                                                |
-|--------------|----------------------------------------------------------------------------|
-| `User`       | Utente della piattaforma, con ruolo e metodo di autenticazione             |
-| `Team`       | Gruppo di ricerca, raggruppa utenti sotto uno stesso namespace             |
-| `Dataset`    | Dataset di valutazione con task, versione e partizioni                     |
-| `MLModel`    | Algoritmo di raccomandazione registrato nel sistema                        |
-| `Experiment` | Associazione dataset–modello con configurazione e stato                    |
-| `Metric`     | Risultato numerico di un esperimento per uno split e una metrica specifica |
+| Entita | Descrizione |
+|--------|-------------|
+| `User` | utente con ruoli (`admin`, `researcher`, `viewer`) |
+| `Team` | namespace di ricerca |
+| `Dataset` | catalogo logico |
+| `DatasetVersion` | versione reale con YAML dataset/version/characteristics |
+| `Pipeline` | configurazione eseguibile (YAML + blocks) su una versione |
+| `Source` / `Resource` | provenance parse dal version YAML |
+| `MLModel` | algoritmo registrato |
+| `Experiment` | run su pipeline + modello |
+| `ExperimentMetric` | metriche performance denormalizzate per leaderboard |
+| `MetricImportJob` | job async CSV (`uploaded/processing/completed/failed`) |
 
-## File di ingresso
+Relazione core:
 
-Il punto di ingresso dell'applicazione è `app/main.py`. Questo file:
+`Dataset -> DatasetVersion -> Pipeline -> Experiment -> ExperimentMetric`
 
-1. definisce il **lifespan** dell'applicazione (startup/shutdown)
-2. connette l'applicazione a MongoDB tramite Motor
-3. inizializza Beanie con tutti i Document registrati in `DOCUMENT_MODELS`
-4. crea il superutente iniziale se non esiste
-5. configura il middleware CORS
-6. registra il router principale (`api_router`) con prefisso `/api/v1`
+---
+
+## Entry point
+
+`app/main.py`:
+
+1. apre connessione MongoDB
+2. inizializza Beanie con `DOCUMENT_MODELS`
+3. crea superuser iniziale (se assente)
+4. configura CORS
+5. monta `api_router` su `/api/v1`

@@ -120,6 +120,7 @@ frontend/
 | `/datasets/new`                  | `CreateDataset`    | Autenticato | `RequireAuth`           |
 | `/datasets/:uuid`                | `DatasetDetail`    | Pubblico    | —                       |
 | `/dataset-versions/:uuid`        | `DatasetVersionDetail` | Pubblico | —                       |
+| `/pipelines/:uuid`               | `PipelineDetail`   | Pubblico    | —                       |
 | `/models`                        | `Models`           | Pubblico    | —                       |
 | `/models/new`                    | `CreateModel`      | Autenticato | `RequireAuth`           |
 | `/models/:uuid`                  | `ModelDetail`      | Pubblico    | —                       |
@@ -133,6 +134,8 @@ Nota flusso DatasetVersion:
 - `CreateDataset` crea solo l'entità catalografica `Dataset`.
 - La `DatasetVersion` si crea dalla pagina `/datasets/:uuid` tramite form YAML
   (dataset/version/pipeline/characteristics) con preview parse prima del submit.
+- Le pipeline sono visualizzate e navigabili da `/dataset-versions/:uuid`; la pagina
+  `/pipelines/:uuid` mostra blocchi, YAML e lista esperimenti della pipeline.
 
 ---
 

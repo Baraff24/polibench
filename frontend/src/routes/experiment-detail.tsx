@@ -74,6 +74,14 @@ export default function ExperimentDetail() {
             <div className='detail-field__label'>Status</div>
             <div className='detail-field__value'>{experiment.status}</div>
           </div>
+          {experiment.pipeline_uuid && (
+            <div className='detail-field'>
+              <div className='detail-field__label'>Pipeline</div>
+              <div className='detail-field__value'>
+                <a href={`/pipelines/${experiment.pipeline_uuid}`}>{experiment.pipeline_uuid}</a>
+              </div>
+            </div>
+          )}
           {experiment.seed !== null && (
             <div className='detail-field'>
               <div className='detail-field__label'>Seed</div>

@@ -1,247 +1,140 @@
 # Indici, Query Critiche e Performance
 
-Questo documento descrive le query più importanti del sistema, gli indici MongoDB che le supportano e le decisioni
-di progettazione che impattano le performance. È complementare a [03_data_models.md](./03_data_models.md) (che descrive
-la struttura dei dati) e a [10_decisions.md](./10_decisions.md) (che motiva la denormalizzazione).
+Questo documento riepiloga le query piu importanti e gli indici MongoDB che le sostengono nel modello pipeline-first.
 
 ---
 
-## Query critiche del sistema
+## Query critiche
 
-### Query 1 — Leaderboard (la più critica)
+### 1) Leaderboard (single metric)
 
-**Dove**: `services/leaderboard.py` → `GET /api/v1/leaderboard`
+Dove: `services/leaderboard.py` (`GET /api/v1/leaderboard`)
 
-**Descrizione**: recupera i top-N risultati per un dataset, uno split e una metrica specifici, ordinati per valore.
-È la query che viene eseguita ogni volta che un utente apre la pagina di un dataset.
-
-**Query Beanie**:
+Query tipica:
 
 ```python
 await Metric.find(
-    Metric.dataset_id == dataset_object_id,
-    Metric.metric == "ndcg@10",
-    Metric.split == Split.TEST,
-).sort([("value", pymongo.DESCENDING)]).limit(10).to_list()
+    Metric.dataset_id == dataset_id,
+    Metric.dataset_version_id == dataset_version_id,
+    Metric.pipeline_id == pipeline_id,
+    Metric.metric == metric_name,
+    Metric.split == split,
+).sort([("value", pymongo.DESCENDING)]).limit(top_n).to_list()
 ```
 
-**Indice usato**:
+Indice principale usato:
 
-```
-{ dataset_id: 1, metric: 1, split: 1, value: -1 }
-```
-
-**Perché questo indice è efficiente**: i tre campi di filtro (`dataset_id`, `metric`, `split`) riducono il set di
-documenti al minimo prima che MongoDB applichi l'ordinamento. L'ordinamento `value: -1` è incluso nell'indice stesso,
-quindi MongoDB non deve fare un sort in memoria: scorre l'indice al contrario e prende i primi N.
-
-**Senza denormalizzazione (scenario alternativo)**:
-
-```
-Metric.find(Metric.experiment_id == ...) + $lookup su Experiment per filtrare per dataset_id
+```text
+{ dataset_id: 1, dataset_version_id: 1, pipeline_id: 1, split: 1, metric: 1, value: -1 }
 ```
 
-Questa query richiederebbe un `$lookup` (join) su tutti i Metric → Experiment, non indicizzabile nello stesso modo.
-Con la denormalizzazione, `dataset_id` è già nel documento `Metric` e l'indice è sfruttabile direttamente.
+Vantaggio: niente `$lookup` sui run per filtrare dataset/version/pipeline; i campi sono denormalizzati su `metrics`.
 
 ---
 
-### Query 2 — Metriche per Experiment
+### 2) Leaderboard multi-metrica
 
-**Dove**: `services/metrics.py` → `GET /api/v1/experiments/{uuid}/metrics`
+Dove: `services/leaderboard.py` (`GET /api/v1/leaderboard/multi`)
 
-**Descrizione**: recupera tutte le metriche associate a un Experiment specifico. Usata nella pagina di dettaglio run.
+Strategia:
 
-**Query Beanie**:
+1. fetch metriche per dataset/version/pipeline + split
+2. gruppo per `experiment_id`
+3. ordinamento secondo `sort_by` (ASC/DESC in base alla direction)
+
+L'indice composto sopra riduce il working set anche in modalita multi.
+
+---
+
+### 3) Metriche per experiment
+
+Dove: `services/metrics.py` (`GET /api/v1/experiments/{uuid}/metrics`)
 
 ```python
-await Metric.find(Metric.experiment_id == experiment_object_id).to_list()
+await Metric.find(Metric.experiment_id == experiment_id).to_list()
 ```
 
-**Indice usato**:
+Indice utile:
 
+```text
+{ experiment_id: 1, metric: 1, split: 1 }
 ```
-{ experiment_id: 1 }
-```
-
-**Note**: questa query restituisce in genere un numero piccolo di documenti (O(10) metriche per experiment), quindi
-l'overhead è basso. L'indice è comunque utile perché evita una collection scan su una collezione potenzialmente grande.
 
 ---
 
-### Query 3 — Risoluzione UUID → Document
+### 4) Pipelines per versione
 
-**Dove**: tutti i service (pattern `get_XXX_by_uuid`)
-
-**Descrizione**: dato un UUID pubblico, trova il documento corrispondente. Usata in ogni operazione di creazione o
-lettura che riceve UUID dal client.
-
-**Query Beanie**:
+Dove: `services/pipelines.py` (`GET /api/v1/dataset-versions/{uuid}/pipelines`)
 
 ```python
-await Dataset.find_one(Dataset.uuid == dataset_uuid)
+await Pipeline.find(Pipeline.dataset_version_id == version_id).sort([("created_at", -1)]).to_list()
 ```
 
-**Indice usato**:
+Indice usato:
 
+```text
+{ dataset_version_id: 1, created_at: -1 }
 ```
-{ uuid: 1 }  (unique)
-```
-
-Ogni entità ha questo indice dichiarato con `Indexed(unique=True)`. Garantisce che:
-
-- la risoluzione UUID→Document sia O(log N) (indice B-tree)
-- non possano esistere duplicati UUID (vincolo di integrità)
 
 ---
 
-### Query 4 — Batch fetch per costruzione leaderboard
+## Indici per collezione
 
-**Dove**: `services/leaderboard.py`, dopo aver ottenuto i Metric
+### `dataset_versions`
 
-**Descrizione**: dopo aver recuperato i top-N Metric dalla query di leaderboard, il service deve risolvere
-`model_id → MLModel` e `experiment_id → Experiment` per costruire le `LeaderboardEntry`. Invece di farlo in loop
-(N+1 query), usa un batch fetch:
+- unique composito: `{ dataset_id: 1, version: 1 }`
+- supporto listing per dataset: `{ dataset_id: 1, created_at: -1 }`
 
-```python
-# raccogli tutti gli ObjectId distinti
-model_ids = {m.model_id for m in metrics}
-experiment_ids = {m.experiment_id for m in metrics}
+### `pipelines`
 
-# una sola query per tutti i modelli
-models = await MLModel.find({"_id": {"$in": list(model_ids)}}).to_list()
+- unique composito: `{ dataset_version_id: 1, code: 1 }`
+- listing cronologico per versione: `{ dataset_version_id: 1, created_at: -1 }`
 
-# una sola query per tutti gli experiment
-experiments = await Experiment.find({"_id": {"$in": list(experiment_ids)}}).to_list()
-```
+### `experiments`
 
-**Indice usato**: `_id` (indice primario di MongoDB, sempre presente)
+Indici dichiarati sui campi:
 
-**Perché è importante**: senza batch fetch, per 10 risultati in leaderboard si avrebbero 20 query aggiuntive
-(10 per MLModel + 10 per Experiment). Con il batch fetch sono 2 query totali, indipendentemente da N.
+- `uuid` (unique)
+- `pipeline_id`
+- `dataset_version_id`
+- `dataset_id`
+- `model_id`
+- `submitted_by_user_id`
+- `team_id`
 
----
+### `metrics`
 
-### Query 5 — Lista Dataset / MLModel
+Indici principali:
 
-**Dove**: `services/datasets.py` → `GET /api/v1/datasets`, `GET /api/v1/ml-models`
-
-**Descrizione**: listing paginato di tutte le entità del catalogo.
-
-**Query Beanie**:
-
-```python
-await Dataset.find_all().skip(offset).limit(limit).to_list()
-```
-
-**Indice usato**: scansione naturale (nessun filtro). Accettabile perché:
-
-- il numero di dataset e modelli è tipicamente piccolo (O(10)–O(100)) in un sistema di benchmark accademico
-- la paginazione limita comunque i documenti restituiti
-
-Se il volume crescesse, si potrebbe aggiungere un indice su `created_at` per ordinamento cronologico stabile.
+- `uuid` (unique)
+- indice composto leaderboard:
+  `{ dataset_id: 1, dataset_version_id: 1, pipeline_id: 1, split: 1, metric: 1, value: -1 }`
+- indice composto per lettura run:
+  `{ experiment_id: 1, metric: 1, split: 1 }`
 
 ---
 
-## Indici dichiarati per collezione
+## Denormalizzazione: costo e vantaggio
 
-### Collezione `users`
+In `ExperimentMetric` vengono duplicati campi dal run (`dataset_id`, `dataset_version_id`, `pipeline_id`, `model_id`).
 
-| Campo   | Tipo   | Nota                    |
-|---------|--------|-------------------------|
-| `uuid`  | unique | Identificatore pubblico |
-| `email` | unique | Login e deduplicazione  |
+Costo:
 
-### Collezione `datasets`
+- piu spazio per documento
+- write leggermente piu pesanti
 
-| Campo                | Tipo     | Nota                    |
-|----------------------|----------|-------------------------|
-| `uuid`               | unique   | Identificatore pubblico |
-| `team_id`            | semplice | Filtro per team         |
-| `created_by_user_id` | semplice | Filtro per autore       |
+Vantaggio:
 
-### Collezione `models` (MLModel)
+- leaderboard veloce senza join
+- filtri `dataset/version/pipeline` direttamente indicizzabili
 
-| Campo                | Tipo     | Nota                    |
-|----------------------|----------|-------------------------|
-| `uuid`               | unique   | Identificatore pubblico |
-| `name`               | unique   | Nome univoco algoritmo  |
-| `created_by_user_id` | semplice | Filtro per autore       |
-
-### Collezione `experiments`
-
-| Campo                  | Tipo     | Nota                    |
-|------------------------|----------|-------------------------|
-| `uuid`                 | unique   | Identificatore pubblico |
-| `dataset_id`           | semplice | Filtro per dataset      |
-| `model_id`             | semplice | Filtro per modello      |
-| `submitted_by_user_id` | semplice | Filtro per autore       |
-| `team_id`              | semplice | Filtro per team         |
-
-> **Nota**: un indice composto `{dataset_id, model_id, created_at: -1}` potrebbe essere utile per trovare
-> tutti gli experiment di una coppia (dataset, model). Non è dichiarato nell'implementazione corrente;
-> può essere aggiunto se la query diventa frequente.
-
-### Collezione `metrics` (la più importante)
-
-| Campo/Indice                                                  | Tipo     | Query supportata               |
-|---------------------------------------------------------------|----------|--------------------------------|
-| `uuid`                                                        | unique   | Risoluzione UUID               |
-| `experiment_id`                                               | semplice | Metriche per experiment        |
-| `dataset_id`                                                  | semplice | —                              |
-| `model_id`                                                    | semplice | —                              |
-| `submitted_by_user_id`                                        | semplice | Metriche per utente            |
-| `team_id`                                                     | semplice | Metriche per team              |
-| `metric`                                                      | semplice | Filtro per nome metrica        |
-| `{dataset_id, split, metric, value: -1}`                      | composto | **Leaderboard principale**     |
-| `{dataset_id, metric, split}`                                 | composto | Filtri leaderboard alternativi |
-| `{team_id, dataset_id, split, metric, value: -1}`             | composto | Leaderboard per team           |
-| `{submitted_by_user_id, dataset_id, split, metric, value:-1}` | composto | Leaderboard per utente         |
+Per il benchmark e un trade-off intenzionale.
 
 ---
 
-## Costo della denormalizzazione
+## Rischi futuri e miglioramenti
 
-La denormalizzazione di `Metric` introduce un costo di consistenza che vale la pena esplicitare:
-
-| Aspetto             | Costo                                                                    |
-|---------------------|--------------------------------------------------------------------------|
-| Spazio disco        | `dataset_id` + `model_id` duplicati in ogni Metric (≈24 byte per Metric) |
-| Scrittura           | Al momento dell'inserimento batch, il service deve copiare i campi       |
-| Consistenza         | Se un Experiment venisse modificato, le Metric non si aggiornerebbero    |
-| Manutenzione indici | Ogni indice composto su `Metric` rallenta leggermente le scritture       |
-
-**Perché è accettabile**: in Polibench le submission sono **immutabili** dopo la creazione. Un Experiment non viene
-modificato dopo che le sue metriche sono state sottomesse. Quindi il rischio di inconsistenza per modifica è teorico,
-non pratico.
-
----
-
-## Possibili colli di bottiglia futuri
-
-### 1. Leaderboard senza caching
-
-La query di leaderboard viene eseguita ogni volta che un utente apre la pagina. Con un numero elevato di metriche
-per un dataset molto popolare, anche con gli indici ottimali ci sarà un costo non nullo.
-
-**Soluzione futura**: aggiungere un layer di caching (es. Redis) che materializza la leaderboard per i dataset più
-acceduti e la invalida solo quando arrivano nuove submission. Non implementato nell'MVP corrente.
-
-### 2. Batch di metriche molto grandi
-
-`POST /experiments/{uuid}/metrics` accetta un intero batch in un singolo request. Se un esperimento produce
-centinaia di metriche (es. @k per k in {1,5,10,20,50,100} × N split × M metriche), il payload può diventare grande.
-
-**Soluzione futura**: aggiungere un limite massimo al batch (es. 200 metriche per request) o supportare upload
-asincrono con job queue.
-
-### 3. Indici composti non coperti
-
-La query di leaderboard filtrata per team (`{team_id, dataset_id, split, metric, value: -1}`) è dichiarata ma non
-ancora usata nei router correnti. Se aggiunta, sarà già supportata dall'indice.
-
-### 4. Nessun TTL o archivio
-
-Non esiste un meccanismo di archivio o TTL (Time-To-Live) per le metriche vecchie. In un sistema di benchmark
-a lungo termine, le collezioni crescono indefinitamente.
-
+1. Caching leaderboard (es. Redis) per dataset/version/pipeline ad alta frequenza.
+2. Materialized leaderboard periodica per viste statiche.
+3. Limiti e chunking per import CSV molto grandi.
+4. Monitoraggio cardinalita metriche (nome metrica + split) per evitare esplosione indici non necessari.

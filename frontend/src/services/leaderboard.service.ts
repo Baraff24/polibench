@@ -10,6 +10,7 @@ class LeaderboardService {
     split: Split,
     topN: number = 10,
     datasetVersionUuid?: string,
+    pipelineUuid?: string,
   ): Promise<LeaderboardEntry[]> {
     const params = new URLSearchParams({
       dataset_uuid: datasetUuid,
@@ -19,6 +20,9 @@ class LeaderboardService {
     })
     if (datasetVersionUuid) {
       params.set('dataset_version_uuid', datasetVersionUuid)
+    }
+    if (pipelineUuid) {
+      params.set('pipeline_uuid', pipelineUuid)
     }
     const response = await axios.get(API_URL + `leaderboard?${params}`)
     return response.data
@@ -31,6 +35,7 @@ class LeaderboardService {
     sortBy: string,
     topN: number = 20,
     datasetVersionUuid?: string,
+    pipelineUuid?: string,
   ): Promise<MultiMetricLeaderboardEntry[]> {
     const params = new URLSearchParams({
       dataset_uuid: datasetUuid,
@@ -41,6 +46,9 @@ class LeaderboardService {
     })
     if (datasetVersionUuid) {
       params.set('dataset_version_uuid', datasetVersionUuid)
+    }
+    if (pipelineUuid) {
+      params.set('pipeline_uuid', pipelineUuid)
     }
     const response = await axios.get(API_URL + `leaderboard/multi?${params}`)
     return response.data

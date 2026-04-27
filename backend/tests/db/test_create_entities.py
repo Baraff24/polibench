@@ -5,6 +5,7 @@ from app.models.datasets import Dataset, TaskType, Visibility
 from app.models.experiments import Artifacts, CodeInfo, Experiment, Status
 from app.models.metrics import Direction, Metric, Split
 from app.models.ml_models import MLModel
+from app.models.pipelines import Pipeline
 
 
 @pytest.mark.anyio
@@ -69,11 +70,15 @@ async def test_create_experiment(db):
     await dataset.create()
     version = DatasetVersion(dataset_id=dataset.id, version="1.0")
     await version.create()
+    pipeline = Pipeline(dataset_version_id=version.id, code="P001")
+    await pipeline.create()
     model = MLModel(name="EASE")
     await model.create()
 
     experiment = Experiment(
+        pipeline_id=pipeline.id,
         dataset_version_id=version.id,
+        dataset_id=dataset.id,
         model_id=model.id,
         submitted_by_user_id=dataset.id,
         run_name="EASE baseline run #1",
@@ -106,10 +111,14 @@ async def test_create_metrics(db):
     await dataset.create()
     version = DatasetVersion(dataset_id=dataset.id, version="1.0")
     await version.create()
+    pipeline = Pipeline(dataset_version_id=version.id, code="P001")
+    await pipeline.create()
     model = MLModel(name="BPR-MF")
     await model.create()
     experiment = Experiment(
+        pipeline_id=pipeline.id,
         dataset_version_id=version.id,
+        dataset_id=dataset.id,
         model_id=model.id,
         submitted_by_user_id=dataset.id,
         status=Status.FINISHED,
@@ -126,6 +135,7 @@ async def test_create_metrics(db):
             experiment_id=experiment.id,
             dataset_id=dataset.id,
             dataset_version_id=version.id,
+            pipeline_id=pipeline.id,
             model_id=model.id,
             split=split,
             metric=name,

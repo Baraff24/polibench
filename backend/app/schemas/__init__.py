@@ -1,6 +1,5 @@
 from .dataset_versions import (
     DatasetVersionCreate,
-    DatasetVersionPipelinePublic,
     DatasetVersionPublic,
     DatasetVersionSummary,
     DatasetVersionYamlPublic,
@@ -18,5 +17,13 @@ from .metrics import (
     MetricsBatchCreate,
 )
 from .ml_models import MLModelCreate, MLModelPublic, MLModelSummary
+from .pipelines import (
+    PipelineBlockPublic,
+    PipelineCreate,
+    PipelinePreviewPublic,
+    PipelinePublic,
+    PipelineSummary,
+    PipelineYamlPublic,
+)
 from .tokens import Token, TokenPayload
 from .users import User, UserUpdate

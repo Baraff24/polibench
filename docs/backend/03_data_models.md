@@ -11,7 +11,19 @@ applicazione.
 
 ```python
 # models/__init__.py
-DOCUMENT_MODELS = [Dataset, Experiment, Metric, MLModel, Team, User]
+DOCUMENT_MODELS = [
+    User,
+    Team,
+    Dataset,
+    DatasetVersion,
+    Pipeline,
+    Source,
+    Resource,
+    MLModel,
+    Experiment,
+    MetricImportJob,
+    ExperimentMetric,
+]
 ```
 
 ---
@@ -128,7 +140,7 @@ Rappresenta il **catalogo logico** del dataset (livello `datasets/*.yml`), senza
 **File**: `models/dataset_versions.py`  
 **Collezione MongoDB**: `dataset_versions`
 
-Rappresenta l'unità operativa reale (livello `versions/*_*.yml` + `metrics/*_*.yml` + `pipeline`).
+Rappresenta l'unità operativa reale (livello `versions/*_*.yml` + `metrics/*_*.yml`).
 
 | Campo                     | Tipo                     | Indice | Note |
 |---------------------------|--------------------------|--------|------|
@@ -137,9 +149,7 @@ Rappresenta l'unità operativa reale (livello `versions/*_*.yml` + `metrics/*_*.
 | `version`                 | `str`                    | unique composito con `dataset_id` | Versione funzionale |
 | `dataset_yaml_raw`        | `str \| None`            | —      | YAML dataset-level (metadata) |
 | `version_yaml_raw`        | `str \| None`            | —      | YAML version-level (sources/resources) |
-| `pipeline_yaml_raw`       | `str \| None`            | —      | YAML pipeline raw |
 | `characteristics_yaml_raw`| `str \| None`            | —      | YAML metrics/characteristics raw |
-| `pipeline_blocks`         | `list[dict] \| None`     | —      | Rappresentazione normalizzata per UI |
 | `n_users`                 | `int \| None`            | —      | Dataset characteristics denormalizzate |
 | `n_items`                 | `int \| None`            | —      | Dataset characteristics denormalizzate |
 | `n_interactions`          | `int \| None`            | —      | Dataset characteristics denormalizzate |
@@ -148,6 +158,25 @@ Rappresenta l'unità operativa reale (livello `versions/*_*.yml` + `metrics/*_*.
 | `gini_item`               | `float \| None`          | —      | Dataset characteristics denormalizzate |
 | `status`                  | `VersionStatus`          | —      | `draft` \| `ready` \| `processing` \| `failed` |
 | `created_at`              | `datetime`               | —      | Timestamp creazione |
+
+---
+
+## Pipeline
+
+**File**: `models/pipelines.py`  
+**Collezione MongoDB**: `pipelines`
+
+Rappresenta una configurazione eseguibile sopra una `DatasetVersion`.
+
+| Campo                | Tipo                  | Indice | Note |
+|----------------------|-----------------------|--------|------|
+| `uuid`               | `UUID`                | unique | Identificatore pubblico |
+| `dataset_version_id` | `PydanticObjectId`    | sì     | FK verso `DatasetVersion` |
+| `code`               | `str`                 | unique composito con `dataset_version_id` | Identificatore non semantico (`P001`, `P002`, ...) |
+| `yaml_raw`           | `str \| None`         | —      | YAML pipeline raw |
+| `blocks`             | `list[dict[str, Any]]`| —      | Blocchi normalizzati per UI |
+| `status`             | `PipelineStatus`      | —      | `draft` \| `ready` \| `processing` \| `failed` |
+| `created_at`         | `datetime`            | —      | Timestamp creazione |
 
 ---
 
@@ -187,7 +216,9 @@ l'entità centrale del sistema.
 | Campo                  | Tipo                       | Indice | Note                            |
 |------------------------|----------------------------|--------|---------------------------------|
 | `uuid`                 | `UUID`                     | unique | Identificatore pubblico         |
-| `dataset_version_id`   | `PydanticObjectId`         | sì     | FK verso DatasetVersion         |
+| `pipeline_id`          | `PydanticObjectId \| None` | sì     | FK verso Pipeline (source of truth) |
+| `dataset_version_id`   | `PydanticObjectId`         | sì     | FK denormalizzato da Pipeline   |
+| `dataset_id`           | `PydanticObjectId \| None` | sì     | FK denormalizzato               |
 | `model_id`             | `PydanticObjectId`         | sì     | FK verso MLModel                |
 | `submitted_by_user_id` | `PydanticObjectId`         | sì     | FK verso User                   |
 | `team_id`              | `PydanticObjectId \| None` | sì     | FK verso Team (opzionale)       |
@@ -223,7 +254,7 @@ class Artifacts(BaseModel):
 
 ---
 
-## Metric
+## ExperimentMetric (`Metric` alias)
 
 **File**: `models/metrics.py`  
 **Collezione MongoDB**: `metrics`
@@ -237,6 +268,7 @@ performance, in quanto è quello su cui si eseguono le query di leaderboard.
 | `experiment_id`        | `PydanticObjectId`         | sì     | FK verso Experiment               |
 | `dataset_id`           | `PydanticObjectId`         | sì     | FK denormalizzato da Experiment   |
 | `dataset_version_id`   | `PydanticObjectId`         | sì     | FK denormalizzato da Experiment   |
+| `pipeline_id`          | `PydanticObjectId \| None` | sì     | FK denormalizzato da Experiment   |
 | `model_id`             | `PydanticObjectId`         | sì     | FK denormalizzato da Experiment   |
 | `submitted_by_user_id` | `PydanticObjectId \| None` | sì     | FK denormalizzato                 |
 | `team_id`              | `PydanticObjectId \| None` | sì     | FK denormalizzato                 |
@@ -290,11 +322,11 @@ User ──────────────────────── ap
 Team ──────────────────────── possiede ──→ Dataset
 Team ──────────────────────── possiede ──→ Experiment
 
-Dataset ──→ DatasetVersion ──→ Experiment ──→ Metric (×N)
+Dataset ──→ DatasetVersion ──→ Pipeline ──→ Experiment ──→ Metric (×N)
                           ├──→ Source
                           └──→ Resource
-MLModel ──────────────────┘
+MLModel ────────────────────────────────┘
 ```
 
-Una singola coppia `(DatasetVersion, MLModel)` può avere più `Experiment` (run diverse con seed/config).  
+Una singola coppia `(Pipeline, MLModel)` può avere più `Experiment` (run diverse con seed/config).  
 Ogni `Experiment` produce N `Metric`, una per ogni combinazione di `(split, metric_name)`.

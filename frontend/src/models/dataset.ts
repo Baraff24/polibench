@@ -1,6 +1,7 @@
 export type TaskType = 'ranking' | 'rating_prediction' | 'ctr'
 export type Visibility = 'public' | 'private'
 export type VersionStatus = 'draft' | 'ready' | 'processing' | 'failed'
+export type PipelineStatus = 'draft' | 'ready' | 'processing' | 'failed'
 
 export interface DatasetSummary {
   uuid: string
@@ -48,6 +49,12 @@ export interface DatasetVersionCreate {
   characteristics_yaml_raw?: string | null
 }
 
+export interface PipelineCreate {
+  code?: string | null
+  yaml_raw?: string | null
+  status?: PipelineStatus
+}
+
 export interface DatasetVersionSummary {
   uuid: string
   dataset_uuid: string
@@ -66,7 +73,6 @@ export interface DatasetVersionPublic {
   version: string
   release_notes: string | null
   status: VersionStatus
-  pipeline_blocks: PipelineBlockPublic[]
   n_users: number | null
   n_items: number | null
   n_interactions: number | null
@@ -105,11 +111,6 @@ export interface ResourcePublic {
   created_at: string
 }
 
-export interface DatasetVersionPipelinePublic {
-  dataset_version_uuid: string
-  blocks: PipelineBlockPublic[]
-}
-
 export interface DatasetVersionYamlPublic {
   dataset_version_uuid: string
   kind: string
@@ -134,4 +135,35 @@ export interface DatasetVersionPreviewPublic {
   resource_count: number
   pipeline_steps_count: number
   characteristics: DatasetVersionCharacteristicsPreview
+}
+
+export interface PipelineSummary {
+  uuid: string
+  dataset_version_uuid: string
+  code: string
+  status: PipelineStatus
+  steps_count: number
+  created_at: string
+}
+
+export interface PipelinePublic {
+  uuid: string
+  dataset_version_uuid: string
+  code: string
+  status: PipelineStatus
+  blocks: PipelineBlockPublic[]
+  created_at: string
+}
+
+export interface PipelineYamlPublic {
+  pipeline_uuid: string
+  content: string
+}
+
+export interface PipelinePreviewPublic {
+  dataset_version_uuid: string
+  requested_code: string | null
+  recognized_dataset_name: string | null
+  recognized_version: string | null
+  pipeline_steps_count: number
 }

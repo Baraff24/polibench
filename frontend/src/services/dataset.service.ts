@@ -3,8 +3,13 @@ import type {
   DatasetCreate,
   DatasetPublic,
   DatasetSummary,
+  ExperimentSummary,
+  PipelineCreate,
+  PipelinePreviewPublic,
+  PipelinePublic,
+  PipelineSummary,
+  PipelineYamlPublic,
   DatasetVersionCreate,
-  DatasetVersionPipelinePublic,
   DatasetVersionPreviewPublic,
   DatasetVersionPublic,
   DatasetVersionSummary,
@@ -67,8 +72,47 @@ class DatasetService {
     return response.data
   }
 
-  async getVersionPipeline(versionUuid: string): Promise<DatasetVersionPipelinePublic> {
-    const response = await axios.get(API_URL + `dataset-versions/${versionUuid}/pipeline`)
+  async getVersionPipelines(versionUuid: string): Promise<PipelineSummary[]> {
+    const response = await axios.get(API_URL + `dataset-versions/${versionUuid}/pipelines`)
+    return response.data
+  }
+
+  async createPipeline(versionUuid: string, data: PipelineCreate): Promise<PipelinePublic> {
+    const response = await axios.post(API_URL + `dataset-versions/${versionUuid}/pipelines`, data)
+    return response.data
+  }
+
+  async previewPipeline(
+    versionUuid: string,
+    data: PipelineCreate,
+  ): Promise<PipelinePreviewPublic> {
+    const response = await axios.post(
+      API_URL + `dataset-versions/${versionUuid}/pipelines/preview`,
+      data,
+    )
+    return response.data
+  }
+
+  async getPipelineByUuid(pipelineUuid: string): Promise<PipelinePublic> {
+    const response = await axios.get(API_URL + `pipelines/${pipelineUuid}`)
+    return response.data
+  }
+
+  async getPipelineYaml(pipelineUuid: string): Promise<PipelineYamlPublic> {
+    const response = await axios.get(API_URL + `pipelines/${pipelineUuid}/yaml`)
+    return response.data
+  }
+
+  async downloadPipelineYamlRaw(pipelineUuid: string): Promise<string> {
+    const response = await axios.get(API_URL + `pipelines/${pipelineUuid}/yaml/raw`, {
+      responseType: 'text',
+      transformResponse: [(data) => data],
+    })
+    return response.data as string
+  }
+
+  async getPipelineExperiments(pipelineUuid: string): Promise<ExperimentSummary[]> {
+    const response = await axios.get(API_URL + `pipelines/${pipelineUuid}/experiments`)
     return response.data
   }
 

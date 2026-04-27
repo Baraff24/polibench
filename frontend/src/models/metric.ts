@@ -19,6 +19,7 @@ export interface MetricPublic {
   experiment_uuid: string
   dataset_uuid: string
   dataset_version_uuid: string
+  pipeline_uuid: string | null
   model_uuid: string
   split: Split
   metric: string

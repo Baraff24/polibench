@@ -13,7 +13,7 @@ import type {
 } from '../models'
 import type { Params } from 'react-router'
 
-type VersionYamlKind = 'dataset' | 'version' | 'pipeline' | 'characteristics'
+type VersionYamlKind = 'dataset' | 'version' | 'characteristics'
 
 export async function loader({ params }: { params: Params }) {
   const datasetUuid = params.uuid as string
@@ -229,9 +229,12 @@ export default function DatasetDetail() {
                   <button
                     type='button'
                     className='btn btn--outline btn--sm'
-                    onClick={(e) => downloadVersionYaml(e, version, 'pipeline')}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      navigate(`/dataset-versions/${version.uuid}`)
+                    }}
                   >
-                    Pipeline YAML
+                    Pipelines
                   </button>
                   <button
                     type='button'

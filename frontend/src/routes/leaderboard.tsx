@@ -7,6 +7,7 @@ import type {
   DatasetSummary,
   DatasetVersionSummary,
   MultiMetricLeaderboardEntry,
+  PipelineSummary,
   Split,
 } from '../models'
 import LeaderboardChart, { type LeaderboardChartMode } from '../components/leaderboard/LeaderboardChart'
@@ -45,6 +46,8 @@ export default function Leaderboard() {
   const [datasetUuid, setDatasetUuid] = useState('')
   const [datasetVersions, setDatasetVersions] = useState<DatasetVersionSummary[]>([])
   const [datasetVersionUuid, setDatasetVersionUuid] = useState('')
+  const [pipelines, setPipelines] = useState<PipelineSummary[]>([])
+  const [pipelineUuid, setPipelineUuid] = useState('')
   const [split, setSplit] = useState<Split>('test')
   const [topN, setTopN] = useState(20)
   const [entries, setEntries] = useState<MultiMetricLeaderboardEntry[]>([])
@@ -71,6 +74,8 @@ export default function Leaderboard() {
       .then((versions) => setDatasetVersions(versions))
       .catch(() => setDatasetVersions([]))
     setDatasetVersionUuid('')
+    setPipelines([])
+    setPipelineUuid('')
     const preset = METRIC_PRESETS[ds.task] || METRIC_PRESETS['ranking']
     setMetricNames(preset.metrics)
     setSortBy(preset.sortBy)
@@ -80,13 +85,47 @@ export default function Leaderboard() {
   // Fetch multi-metric leaderboard when filters change
   useEffect(() => {
     if (!datasetUuid || metricNames.length === 0 || !sortBy) return
+    if (datasetVersionUuid && !pipelineUuid) {
+      setEntries([])
+      return
+    }
     setLoading(true)
     leaderboardService
-      .getMultiMetric(datasetUuid, metricNames, split, sortBy, topN, datasetVersionUuid || undefined)
+      .getMultiMetric(
+        datasetUuid,
+        metricNames,
+        split,
+        sortBy,
+        topN,
+        datasetVersionUuid || undefined,
+        pipelineUuid || undefined,
+      )
       .then(setEntries)
       .catch(() => setEntries([]))
       .finally(() => setLoading(false))
-  }, [datasetUuid, datasetVersionUuid, metricNames, split, sortBy, topN])
+  }, [datasetUuid, datasetVersionUuid, pipelineUuid, metricNames, split, sortBy, topN])
+
+  useEffect(() => {
+    if (!datasetVersionUuid) {
+      setPipelines([])
+      setPipelineUuid('')
+      return
+    }
+    datasetService
+      .getVersionPipelines(datasetVersionUuid)
+      .then((loadedPipelines) => {
+        setPipelines(loadedPipelines)
+        if (loadedPipelines.length > 0) {
+          setPipelineUuid(loadedPipelines[0].uuid)
+        } else {
+          setPipelineUuid('')
+        }
+      })
+      .catch(() => {
+        setPipelines([])
+        setPipelineUuid('')
+      })
+  }, [datasetVersionUuid])
 
   function handleDatasetChange(uuid: string) {
     const ds = datasets.find((d) => d.uuid === uuid)
@@ -193,6 +232,11 @@ export default function Leaderboard() {
       header: sortableHeader('Model', 'model'),
       render: (e) => <span className='leaderboard-model'>{e.model_name || e.model_uuid}</span>,
     },
+    {
+      key: 'pipeline',
+      header: 'Pipeline',
+      render: (e) => e.pipeline_code || '—',
+    },
     // Una colonna per ogni metrica richiesta
     ...metricNames.map((m) => ({
       key: m,
@@ -249,12 +293,34 @@ export default function Leaderboard() {
           <select
             className='leaderboard-filters__select'
             value={datasetVersionUuid}
-            onChange={(e) => setDatasetVersionUuid(e.target.value)}
+            onChange={(e) => {
+              setDatasetVersionUuid(e.target.value)
+              setPipelineUuid('')
+            }}
           >
             <option value=''>All versions</option>
             {datasetVersions.map((version) => (
               <option key={version.uuid} value={version.uuid}>
                 v{version.version} ({version.status})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className='leaderboard-filters__field'>
+          <label className='leaderboard-filters__label'>Pipeline</label>
+          <select
+            className='leaderboard-filters__select'
+            value={pipelineUuid}
+            onChange={(e) => setPipelineUuid(e.target.value)}
+            disabled={!datasetVersionUuid}
+          >
+            <option value=''>
+              {datasetVersionUuid ? 'Select pipeline...' : 'Select version first...'}
+            </option>
+            {pipelines.map((pipeline) => (
+              <option key={pipeline.uuid} value={pipeline.uuid}>
+                {pipeline.code}
               </option>
             ))}
           </select>

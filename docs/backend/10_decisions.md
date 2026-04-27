@@ -254,8 +254,9 @@ eseguito LightGCN in questo esperimento specifico).
 Il dominio viene evoluto verso un modello versionato:
 
 - `Dataset` diventa entità catalografica (nome, task, ownership, visibilità)
-- `DatasetVersion` diventa il nodo operativo che contiene YAML, pipeline, characteristics e provenance
-- `Experiment` referenzia `dataset_version_id` (non più `dataset_id`)
+- `DatasetVersion` diventa il nodo operativo per YAML dataset/version/characteristics e provenance
+- `Pipeline` diventa entità autonoma collegata a `DatasetVersion`
+- `Experiment` referenzia `pipeline_id` (con `dataset_version_id` denormalizzato)
 - le metriche vengono separate in:
   - `Dataset characteristics` (strutturali, per versione dataset)
   - `Experiment performance metrics` (leaderboard)
@@ -266,7 +267,7 @@ Il dominio viene evoluto verso un modello versionato:
 La richiesta accademica attuale non è più un benchmark "piatto" dataset/modello, ma un benchmark con:
 
 1. provenance (`sources` e `resources`)
-2. pipeline esplicita e versionata
+2. pipeline esplicita, separata dalla versione e referenziabile
 3. caratteristiche dataset distinte dalle metriche prestazionali del modello
 4. tracciamento del processo di import metriche asincrono
 
@@ -302,4 +303,4 @@ Cambia il **core del dominio**, non la struttura tecnica del backend.
 | ADR-04 | Denormalizzazione di `Metric`     | Join via `$lookup`               |
 | ADR-05 | Service layer separato            | Logica nei router                |
 | ADR-06 | `hyperparams` in `MLModel`        | `hyperparams` solo in Experiment |
-| ADR-07 | DatasetVersion come unità operativa | Dataset con versione "piatta"  |
+| ADR-07 | Dominio pipeline-first (`Dataset -> DatasetVersion -> Pipeline -> Experiment`) | Dataset con versione "piatta"  |

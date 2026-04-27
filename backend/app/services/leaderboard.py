@@ -30,21 +30,66 @@ async def _resolve_dataset_version_id(
     return version.id
 
 
+async def _resolve_pipeline_id(
+    dataset_uuid: UUID,
+    dataset_version_uuid: UUID | None,
+    pipeline_uuid: UUID | None,
+):
+    if pipeline_uuid is None:
+        return None
+
+    from app.models.dataset_versions import DatasetVersion
+    from app.models.pipelines import Pipeline
+
+    dataset = await get_dataset_by_uuid(dataset_uuid)
+    pipeline = await Pipeline.find_one(Pipeline.uuid == pipeline_uuid)
+    if pipeline is None:
+        raise HTTPException(status_code=404, detail="Pipeline non trovata")
+
+    version = await DatasetVersion.get(pipeline.dataset_version_id)
+    if version is None:
+        raise HTTPException(
+            status_code=404,
+            detail="DatasetVersion della pipeline non trovata",
+        )
+
+    if version.dataset_id != dataset.id:
+        raise HTTPException(
+            status_code=400,
+            detail="Pipeline non appartiene al dataset specificato",
+        )
+
+    if dataset_version_uuid is not None and version.uuid != dataset_version_uuid:
+        raise HTTPException(
+            status_code=400,
+            detail="Pipeline non appartiene alla dataset_version specificata",
+        )
+
+    return pipeline.id
+
+
 async def get_leaderboard(
     dataset_uuid: UUID,
     metric: str,
     split: Split,
     top_n: int = 10,
     dataset_version_uuid: UUID | None = None,
+    pipeline_uuid: UUID | None = None,
 ) -> list[LeaderboardEntry]:
     from app.models.dataset_versions import DatasetVersion
     from app.models.experiments import Experiment
     from app.models.ml_models import MLModel
+    from app.models.pipelines import Pipeline
 
     dataset = await get_dataset_by_uuid(dataset_uuid)
     dataset_version_id = await _resolve_dataset_version_id(
         dataset_uuid,
         dataset_version_uuid,
+    )
+    pipeline_id = await _resolve_pipeline_id(
+        dataset_uuid,
+        dataset_version_uuid,
+        pipeline_uuid,
     )
 
     filters = [
@@ -54,6 +99,8 @@ async def get_leaderboard(
     ]
     if dataset_version_id is not None:
         filters.append(Metric.dataset_version_id == dataset_version_id)
+    if pipeline_id is not None:
+        filters.append(Metric.pipeline_id == pipeline_id)
 
     rows = await (
         Metric.find(*filters)
@@ -76,6 +123,10 @@ async def get_leaderboard(
     version_ids = list({r.dataset_version_id for r in rows})
     versions = await DatasetVersion.find({"_id": {"$in": version_ids}}).to_list()
     version_uuid_by_id = {v.id: v.uuid for v in versions}
+    pipeline_ids = list({r.pipeline_id for r in rows if r.pipeline_id is not None})
+    pipelines = await Pipeline.find({"_id": {"$in": pipeline_ids}}).to_list()
+    pipeline_uuid_by_id = {p.id: p.uuid for p in pipelines}
+    pipeline_code_by_id = {p.id: p.code for p in pipelines}
 
     return [
         LeaderboardEntry(
@@ -84,6 +135,16 @@ async def get_leaderboard(
             model_name=model_name_by_id.get(row.model_id),
             dataset_uuid=dataset.uuid,
             dataset_version_uuid=version_uuid_by_id[row.dataset_version_id],
+            pipeline_uuid=(
+                pipeline_uuid_by_id.get(row.pipeline_id)
+                if row.pipeline_id is not None
+                else None
+            ),
+            pipeline_code=(
+                pipeline_code_by_id.get(row.pipeline_id)
+                if row.pipeline_id is not None
+                else None
+            ),
             split=row.split,
             metric=row.metric,
             k=row.k,
@@ -102,15 +163,22 @@ async def get_multi_metric_leaderboard(
     sort_by: str,
     top_n: int = 20,
     dataset_version_uuid: UUID | None = None,
+    pipeline_uuid: UUID | None = None,
 ) -> list[MultiMetricLeaderboardEntry]:
     from app.models.dataset_versions import DatasetVersion
     from app.models.experiments import Experiment
     from app.models.ml_models import MLModel
+    from app.models.pipelines import Pipeline
 
     dataset = await get_dataset_by_uuid(dataset_uuid)
     dataset_version_id = await _resolve_dataset_version_id(
         dataset_uuid,
         dataset_version_uuid,
+    )
+    pipeline_id = await _resolve_pipeline_id(
+        dataset_uuid,
+        dataset_version_uuid,
+        pipeline_uuid,
     )
 
     filters = [
@@ -120,6 +188,8 @@ async def get_multi_metric_leaderboard(
     ]
     if dataset_version_id is not None:
         filters.append(Metric.dataset_version_id == dataset_version_id)
+    if pipeline_id is not None:
+        filters.append(Metric.pipeline_id == pipeline_id)
 
     rows = await Metric.find(*filters).to_list()
     if not rows:
@@ -168,6 +238,17 @@ async def get_multi_metric_leaderboard(
     )
     versions = await DatasetVersion.find({"_id": {"$in": version_ids}}).to_list()
     version_uuid_by_id = {v.id: v.uuid for v in versions}
+    pipeline_ids = list(
+        {
+            metric_row.pipeline_id
+            for _, metric_map, _ in aggregated
+            for metric_row in metric_map.values()
+            if metric_row.pipeline_id is not None
+        }
+    )
+    pipelines = await Pipeline.find({"_id": {"$in": pipeline_ids}}).to_list()
+    pipeline_uuid_by_id = {p.id: p.uuid for p in pipelines}
+    pipeline_code_by_id = {p.id: p.code for p in pipelines}
 
     result = []
     for rank, (exp_id, metric_map, _) in enumerate(aggregated, start=1):
@@ -178,6 +259,8 @@ async def get_multi_metric_leaderboard(
         metrics_dict = {}
         directions_dict = {}
         row_dataset_version_uuid = None
+        row_pipeline_uuid = None
+        row_pipeline_code = None
         for metric_name in metrics_list:
             m = metric_map.get(metric_name)
             if m is not None:
@@ -187,6 +270,9 @@ async def get_multi_metric_leaderboard(
                     row_dataset_version_uuid = version_uuid_by_id.get(
                         m.dataset_version_id
                     )
+                if row_pipeline_uuid is None and m.pipeline_id is not None:
+                    row_pipeline_uuid = pipeline_uuid_by_id.get(m.pipeline_id)
+                    row_pipeline_code = pipeline_code_by_id.get(m.pipeline_id)
 
         if row_dataset_version_uuid is None:
             continue
@@ -200,6 +286,8 @@ async def get_multi_metric_leaderboard(
                 model_name=model_name_by_id.get(exp.model_id),
                 dataset_uuid=dataset.uuid,
                 dataset_version_uuid=row_dataset_version_uuid,
+                pipeline_uuid=row_pipeline_uuid,
+                pipeline_code=row_pipeline_code,
                 split=split,
                 metrics=metrics_dict,
                 directions=directions_dict,

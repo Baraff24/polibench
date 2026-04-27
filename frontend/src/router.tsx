@@ -13,6 +13,7 @@ import DatasetDetail, { loader as datasetDetailLoader } from './routes/dataset-d
 import DatasetVersionDetail, {
   loader as datasetVersionDetailLoader,
 } from './routes/dataset-version-detail'
+import PipelineDetail, { loader as pipelineDetailLoader } from './routes/pipeline-detail'
 import Models, { loader as modelsLoader } from './routes/models'
 import ModelDetail, { loader as modelDetailLoader } from './routes/model-detail'
 import ExperimentDetail, { loader as experimentDetailLoader } from './routes/experiment-detail'
@@ -95,6 +96,12 @@ export const routes = [
         Component: DatasetVersionDetail,
         HydrateFallback: HydrateFallback,
         loader: datasetVersionDetailLoader,
+      },
+      {
+        path: 'pipelines/:uuid',
+        Component: PipelineDetail,
+        HydrateFallback: HydrateFallback,
+        loader: pipelineDetailLoader,
       },
       {
         path: 'models',

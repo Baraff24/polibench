@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 
 from app.auth.auth import get_current_active_user, get_current_verified_user
 from app.models.metrics import Split
@@ -105,13 +105,23 @@ async def get_leaderboard(
     split: Split,
     top_n: int = 10,
     dataset_version_uuid: UUID | None = None,
+    pipeline_uuid: UUID | None = None,
 ) -> list[LeaderboardEntry]:
+    if dataset_version_uuid is not None and pipeline_uuid is None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "pipeline_uuid è obbligatorio quando viene specificata "
+                "dataset_version_uuid"
+            ),
+        )
     return await lb_service.get_leaderboard(
         dataset_uuid,
         metric,
         split,
         top_n,
         dataset_version_uuid=dataset_version_uuid,
+        pipeline_uuid=pipeline_uuid,
     )
 
 
@@ -127,7 +137,16 @@ async def get_multi_metric_leaderboard(
     sort_by: str,
     top_n: int = 20,
     dataset_version_uuid: UUID | None = None,
+    pipeline_uuid: UUID | None = None,
 ) -> list[MultiMetricLeaderboardEntry]:
+    if dataset_version_uuid is not None and pipeline_uuid is None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "pipeline_uuid è obbligatorio quando viene specificata "
+                "dataset_version_uuid"
+            ),
+        )
     metrics_list = [m.strip() for m in metrics.split(",") if m.strip()]
     return await lb_service.get_multi_metric_leaderboard(
         dataset_uuid,
@@ -136,4 +155,5 @@ async def get_multi_metric_leaderboard(
         sort_by,
         top_n,
         dataset_version_uuid=dataset_version_uuid,
+        pipeline_uuid=pipeline_uuid,
     )

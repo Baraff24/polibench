@@ -12,16 +12,16 @@ from app.models.sources import Source
 from app.schemas.dataset_versions import (
     DatasetVersionCharacteristicsPreview,
     DatasetVersionCreate,
-    DatasetVersionPipelinePublic,
     DatasetVersionPreviewPublic,
     DatasetVersionPublic,
     DatasetVersionSummary,
     DatasetVersionYamlPublic,
-    PipelineBlockPublic,
     ResourcePublic,
     SourcePublic,
 )
+from app.schemas.pipelines import PipelineCreate
 from app.services.datasets import get_dataset_by_uuid
+from app.services.pipelines import create_pipeline_for_version
 
 try:
     import yaml
@@ -508,9 +508,6 @@ def _to_dataset_version_public(
         version=version.version,
         release_notes=version.release_notes,
         status=version.status,
-        pipeline_blocks=[
-            PipelineBlockPublic(**block) for block in (version.pipeline_blocks or [])
-        ],
         n_users=version.n_users,
         n_items=version.n_items,
         n_interactions=version.n_interactions,
@@ -666,9 +663,9 @@ async def create_dataset_version(
         release_notes=data.release_notes,
         dataset_yaml_raw=data.dataset_yaml_raw,
         version_yaml_raw=data.version_yaml_raw,
-        pipeline_yaml_raw=data.pipeline_yaml_raw,
+        pipeline_yaml_raw=None,
         characteristics_yaml_raw=data.characteristics_yaml_raw,
-        pipeline_blocks=parsed.pipeline_blocks,
+        pipeline_blocks=None,
         n_users=parsed.characteristics["n_users"],
         n_items=parsed.characteristics["n_items"],
         n_interactions=parsed.characteristics["n_interactions"],
@@ -701,6 +698,17 @@ async def create_dataset_version(
         )
         await resource.create()
 
+    # Transitional compatibility: if pipeline YAML is provided during DatasetVersion
+    # creation, create a first Pipeline entity and keep that as source of truth.
+    if data.pipeline_yaml_raw is not None and data.pipeline_yaml_raw.strip() != "":
+        await create_pipeline_for_version(
+            version.uuid,
+            PipelineCreate(
+                yaml_raw=data.pipeline_yaml_raw,
+                status=data.status.value,
+            ),
+        )
+
     return _to_dataset_version_public(dataset.uuid, version)
 
 
@@ -732,23 +740,12 @@ async def list_resources_for_version(version_uuid: UUID) -> list[ResourcePublic]
     ]
 
 
-async def get_pipeline_for_version(version_uuid: UUID) -> DatasetVersionPipelinePublic:
-    version = await get_dataset_version_by_uuid(version_uuid)
-    return DatasetVersionPipelinePublic(
-        dataset_version_uuid=version.uuid,
-        blocks=[
-            PipelineBlockPublic(**block) for block in (version.pipeline_blocks or [])
-        ],
-    )
-
-
 async def get_yaml_for_version(version_uuid: UUID, kind: str) -> DatasetVersionYamlPublic:
     version = await get_dataset_version_by_uuid(version_uuid)
     normalized_kind = "characteristics" if kind == "metrics" else kind
     field_map = {
         "dataset": version.dataset_yaml_raw,
         "version": version.version_yaml_raw,
-        "pipeline": version.pipeline_yaml_raw,
         "characteristics": version.characteristics_yaml_raw,
     }
     if normalized_kind not in field_map:

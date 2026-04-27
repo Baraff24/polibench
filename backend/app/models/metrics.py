@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from beanie import Document, Indexed, PydanticObjectId
 from pydantic import Field
+from pymongo import IndexModel
 
 
 class Split(str, Enum):
@@ -26,6 +27,7 @@ class ExperimentMetric(Document):
     # Denormalized for fast leaderboard queries
     dataset_id: Annotated[PydanticObjectId, Indexed()]
     dataset_version_id: Annotated[PydanticObjectId, Indexed()]
+    pipeline_id: Annotated[PydanticObjectId | None, Indexed()] = None
     model_id: Annotated[PydanticObjectId, Indexed()]
     submitted_by_user_id: Annotated[PydanticObjectId | None, Indexed()] = None
     team_id: Annotated[PydanticObjectId | None, Indexed()] = None
@@ -43,6 +45,19 @@ class ExperimentMetric(Document):
 
     class Settings:
         name = "metrics"
+        indexes = [
+            IndexModel(
+                [
+                    ("dataset_id", 1),
+                    ("dataset_version_id", 1),
+                    ("pipeline_id", 1),
+                    ("split", 1),
+                    ("metric", 1),
+                    ("value", -1),
+                ]
+            ),
+            IndexModel([("experiment_id", 1), ("metric", 1), ("split", 1)]),
+        ]
 
 
 # Transitional alias to keep compatibility with existing imports.

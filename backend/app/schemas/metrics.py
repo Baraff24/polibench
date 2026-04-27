@@ -24,6 +24,7 @@ class MetricPublic(BaseModel):
     experiment_uuid: UUID
     dataset_uuid: UUID
     dataset_version_uuid: UUID
+    pipeline_uuid: UUID | None = None
     model_uuid: UUID
     split: Split
     metric: str
@@ -39,6 +40,8 @@ class LeaderboardEntry(BaseModel):
     model_name: str | None = None
     dataset_uuid: UUID
     dataset_version_uuid: UUID
+    pipeline_uuid: UUID | None = None
+    pipeline_code: str | None = None
     split: Split
     metric: str
     k: int | None = None
@@ -58,6 +61,8 @@ class MultiMetricLeaderboardEntry(BaseModel):
     model_name: str | None = None
     dataset_uuid: UUID
     dataset_version_uuid: UUID
+    pipeline_uuid: UUID | None = None
+    pipeline_code: str | None = None
     split: Split
     metrics: dict[str, float]
     directions: dict[str, Direction]

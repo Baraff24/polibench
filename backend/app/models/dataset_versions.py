@@ -24,10 +24,14 @@ class DatasetVersion(Document):
     # Raw source of truth (downloadable as YAML)
     dataset_yaml_raw: str | None = None
     version_yaml_raw: str | None = None
+    # Deprecated: pipeline source of truth moved to Pipeline model.
+    # Kept for migration compatibility with old records.
     pipeline_yaml_raw: str | None = None
     characteristics_yaml_raw: str | None = None
 
     # Parsed/denormalized fields for fast reads
+    # Deprecated: normalized pipeline blocks moved to Pipeline.blocks.
+    # Kept for migration compatibility with old records.
     pipeline_blocks: list[dict[str, Any]] | None = None
     n_users: int | None = None
     n_items: int | None = None

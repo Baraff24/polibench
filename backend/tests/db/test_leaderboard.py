@@ -5,6 +5,7 @@ from app.models.datasets import Dataset, TaskType
 from app.models.experiments import Experiment, Status
 from app.models.metrics import Direction, Metric, Split
 from app.models.ml_models import MLModel
+from app.models.pipelines import Pipeline
 
 
 @pytest.mark.anyio
@@ -13,6 +14,8 @@ async def test_leaderboard_top_n_ordered(db):
     await dataset.create()
     version = DatasetVersion(dataset_id=dataset.id, version="1.0")
     await version.create()
+    pipeline = Pipeline(dataset_version_id=version.id, code="P001")
+    await pipeline.create()
 
     model_data = [
         ("iALS", 0.3990),
@@ -26,7 +29,9 @@ async def test_leaderboard_top_n_ordered(db):
         await model.create()
 
         exp = Experiment(
+            pipeline_id=pipeline.id,
             dataset_version_id=version.id,
+            dataset_id=dataset.id,
             model_id=model.id,
             submitted_by_user_id=fake_user_id,
             status=Status.FINISHED,
@@ -37,6 +42,7 @@ async def test_leaderboard_top_n_ordered(db):
             experiment_id=exp.id,
             dataset_id=dataset.id,
             dataset_version_id=version.id,
+            pipeline_id=pipeline.id,
             model_id=model.id,
             split=Split.TEST,
             metric="ndcg@10",
@@ -72,11 +78,15 @@ async def test_leaderboard_filters_by_split(db):
     await dataset.create()
     version = DatasetVersion(dataset_id=dataset.id, version="2.0")
     await version.create()
+    pipeline = Pipeline(dataset_version_id=version.id, code="P001")
+    await pipeline.create()
 
     model = MLModel(name="ItemKNN")
     await model.create()
     exp = Experiment(
+        pipeline_id=pipeline.id,
         dataset_version_id=version.id,
+        dataset_id=dataset.id,
         model_id=model.id,
         submitted_by_user_id=dataset.id,
         status=Status.FINISHED,
@@ -87,6 +97,7 @@ async def test_leaderboard_filters_by_split(db):
         experiment_id=exp.id,
         dataset_id=dataset.id,
         dataset_version_id=version.id,
+        pipeline_id=pipeline.id,
         model_id=model.id,
         split=Split.TEST,
         metric="ndcg@10",
@@ -98,6 +109,7 @@ async def test_leaderboard_filters_by_split(db):
         experiment_id=exp.id,
         dataset_id=dataset.id,
         dataset_version_id=version.id,
+        pipeline_id=pipeline.id,
         model_id=model.id,
         split=Split.VALIDATION,
         metric="ndcg@10",

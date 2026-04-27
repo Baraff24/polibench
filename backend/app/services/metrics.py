@@ -13,6 +13,7 @@ from app.schemas.metrics import (
 async def create_metrics_batch(data: MetricsBatchCreate) -> None:
     from app.models.dataset_versions import DatasetVersion
     from app.models.datasets import Dataset
+    from app.models.pipelines import Pipeline
     from app.services.experiments import get_experiment_by_uuid
 
     exp = await get_experiment_by_uuid(data.experiment_uuid)
@@ -25,12 +26,24 @@ async def create_metrics_batch(data: MetricsBatchCreate) -> None:
     dataset = await Dataset.get(dataset_version.dataset_id)
     if dataset is None:
         raise HTTPException(status_code=404, detail="Dataset dell'experiment non trovato")
+    if exp.pipeline_id is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Experiment non collegato a nessuna pipeline",
+        )
+    pipeline = await Pipeline.get(exp.pipeline_id)
+    if pipeline is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Pipeline dell'experiment non trovata",
+        )
 
     documents = [
         Metric(
             experiment_id=exp.id,
             dataset_id=dataset.id,
             dataset_version_id=dataset_version.id,
+            pipeline_id=pipeline.id,
             model_id=exp.model_id,
             submitted_by_user_id=exp.submitted_by_user_id,
             team_id=exp.team_id,
@@ -51,6 +64,7 @@ async def get_experiment_metrics(experiment_uuid: UUID) -> ExperimentMetrics:
     from app.models.dataset_versions import DatasetVersion
     from app.models.datasets import Dataset
     from app.models.ml_models import MLModel
+    from app.models.pipelines import Pipeline
     from app.services.experiments import get_experiment_by_uuid
 
     exp = await get_experiment_by_uuid(experiment_uuid)
@@ -65,11 +79,17 @@ async def get_experiment_metrics(experiment_uuid: UUID) -> ExperimentMetrics:
 
     dataset = await Dataset.get(dataset_version.dataset_id)
     model = await MLModel.get(exp.model_id)
+    pipeline = await Pipeline.get(exp.pipeline_id) if exp.pipeline_id else None
 
     if dataset is None:
         raise HTTPException(status_code=404, detail="Dataset dell'experiment non trovato")
     if model is None:
         raise HTTPException(status_code=404, detail="MLModel dell'experiment non trovato")
+    if exp.pipeline_id is not None and pipeline is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Pipeline dell'experiment non trovata",
+        )
 
     by_split: dict = {}
     for m in metrics:
@@ -78,6 +98,7 @@ async def get_experiment_metrics(experiment_uuid: UUID) -> ExperimentMetrics:
             experiment_uuid=exp.uuid,
             dataset_uuid=dataset.uuid,
             dataset_version_uuid=dataset_version.uuid,
+            pipeline_uuid=pipeline.uuid if pipeline else None,
             model_uuid=model.uuid,
             split=m.split,
             metric=m.metric,

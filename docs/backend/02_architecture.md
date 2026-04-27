@@ -159,23 +159,42 @@ principale (`api.py`) include i sotto-router:
 │   └── /{uuid}                ← GET/PATCH/DELETE: utente specifico (admin)
 ├── /datasets/
 │   ├── /                      ← POST: crea Dataset, GET: lista
-│   └── /{dataset_uuid}        ← GET: dettaglio Dataset
+│   ├── /{dataset_uuid}        ← GET: dettaglio Dataset
+│   └── /{dataset_uuid}/versions ← GET/POST + preview DatasetVersion
+├── /dataset-versions/
+│   ├── /{version_uuid}        ← GET: dettaglio versione
+│   ├── /{version_uuid}/sources ← GET: sources parse dal version YAML
+│   ├── /{version_uuid}/resources ← GET: resources parse dal version YAML
+│   ├── /{version_uuid}/pipelines ← GET/POST + preview Pipeline
+│   ├── /{version_uuid}/yaml/... ← GET: dataset/version/characteristics YAML
+│   └── /{version_uuid}/experiments ← GET: run aggregate della versione
+├── /pipelines/
+│   ├── /{pipeline_uuid}       ← GET: dettaglio pipeline
+│   ├── /{pipeline_uuid}/yaml  ← GET: YAML pipeline
+│   └── /{pipeline_uuid}/experiments ← GET: run della pipeline
 ├── /ml-models/
 │   ├── /                      ← POST: registra MLModel, GET: lista
 │   └── /{model_uuid}          ← GET: dettaglio MLModel
 ├── /experiments/
 │   ├── /                      ← POST: sottometti Experiment (UUID input)
 │   ├── /{uuid}                ← GET: dettaglio Experiment
+│   ├── /{uuid}/metric-import  ← POST: upload CSV (async)
+│   ├── /{uuid}/metric-imports ← GET: lista job import
 │   ├── /{uuid}/metrics        ← POST: batch metriche, GET: metriche per split
 └── /leaderboard/
-    └── /                      ← GET: top-N per (dataset, metric, split)
+    ├── /                      ← GET: top-N per (dataset/version/pipeline, metric, split)
+    └── /multi                 ← GET: leaderboard multi-metrica
 ```
 
 Ogni gruppo di endpoint delega al service layer corrispondente:
 
 - `/datasets` e `/ml-models` → `services/datasets.py`
-- `/experiments` e `/{uuid}/metrics` → `services/experiments.py` + `services/metrics.py`
-- `/leaderboard` → `services/leaderboard.py`
+- `/datasets/{uuid}/versions` + `/dataset-versions/*` → `services/dataset_versions.py`
+- `/dataset-versions/{uuid}/pipelines` + `/pipelines/*` → `services/pipelines.py`
+- `/experiments` → `services/experiments.py`
+- `/{uuid}/metrics` → `services/metrics.py`
+- `/{uuid}/metric-import*` → `services/metric_imports.py`
+- `/leaderboard*` → `services/leaderboard.py`
 
 Vedi [06_routers.md](./06_routers.md) per la documentazione dettagliata di ogni endpoint
 e [09_services.md](./09_services.md) per la logica di business.

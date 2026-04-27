@@ -10,6 +10,7 @@ from fastapi import HTTPException, UploadFile
 from app.models.experiments import Experiment
 from app.models.metric_import_jobs import ImportStatus, MetricImportJob
 from app.models.metrics import Direction, Metric, Split
+from app.models.pipelines import Pipeline
 from app.models.users import User
 from app.schemas.metric_imports import MetricImportPublic
 from app.services.experiments import get_experiment_by_uuid
@@ -168,6 +169,13 @@ async def process_metric_import_job(job_uuid: UUID) -> None:
         dataset = await Dataset.get(dataset_version.dataset_id)
         if dataset is None:
             raise ValueError("Dataset associato non trovato")
+        pipeline = (
+            await Pipeline.get(experiment.pipeline_id)
+            if experiment.pipeline_id
+            else None
+        )
+        if experiment.pipeline_id is not None and pipeline is None:
+            raise ValueError("Pipeline associata non trovata")
 
         csv_content = Path(job.csv_storage_path).read_text(encoding="utf-8")
         reader = csv.DictReader(io.StringIO(csv_content))
@@ -200,6 +208,7 @@ async def process_metric_import_job(job_uuid: UUID) -> None:
                     experiment_id=experiment.id,
                     dataset_id=dataset.id,
                     dataset_version_id=dataset_version.id,
+                    pipeline_id=pipeline.id if pipeline else None,
                     model_id=experiment.model_id,
                     submitted_by_user_id=experiment.submitted_by_user_id,
                     team_id=experiment.team_id,

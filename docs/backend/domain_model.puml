@@ -49,9 +49,7 @@ class DatasetVersion {
   +version: string
   +dataset_yaml_raw: string?
   +version_yaml_raw: string?
-  +pipeline_yaml_raw: string?
   +characteristics_yaml_raw: string?
-  +pipeline_blocks: object[]?
   +n_users: int?
   +n_items: int?
   +n_interactions: int?
@@ -59,6 +57,17 @@ class DatasetVersion {
   +gini_user: float?
   +gini_item: float?
   +status: VersionStatus
+  +created_at: datetime
+}
+
+class Pipeline {
+  +_id: ObjectId
+  +uuid: UUID <<unique>>
+  +dataset_version_id: ObjectId <<indexed>>
+  +code: string
+  +yaml_raw: string?
+  +blocks: object[]
+  +status: PipelineStatus
   +created_at: datetime
 }
 
@@ -108,7 +117,9 @@ class MLModel {
 class Experiment {
   +_id: ObjectId
   +uuid: UUID <<unique>>
+  +pipeline_id: ObjectId? <<indexed>>
   +dataset_version_id: ObjectId <<indexed>>
+  +dataset_id: ObjectId? <<indexed>>
   +model_id: ObjectId <<indexed>>
   +submitted_by_user_id: ObjectId <<indexed>>
   +team_id: ObjectId? <<indexed>>
@@ -143,6 +154,7 @@ class ExperimentMetric {
   +experiment_id: ObjectId <<indexed>>
   +dataset_id: ObjectId <<indexed>>
   +dataset_version_id: ObjectId <<indexed>>
+  +pipeline_id: ObjectId? <<indexed>>
   +model_id: ObjectId <<indexed>>
   +submitted_by_user_id: ObjectId? <<indexed>>
   +team_id: ObjectId? <<indexed>>
@@ -166,8 +178,9 @@ Team "1" -- "0..*" Experiment : owns >
 Dataset "1" -- "1..*" DatasetVersion : has >
 DatasetVersion "1" -- "0..*" Source : declares >
 DatasetVersion "1" -- "0..*" Resource : exposes >
+DatasetVersion "1" -- "0..*" Pipeline : defines >
 
-DatasetVersion "1" -- "0..*" Experiment : evaluated on >
+Pipeline "1" -- "0..*" Experiment : runs >
 MLModel "1" -- "0..*" Experiment : runs >
 Experiment "1" -- "0..*" MetricImportJob : imports >
 Experiment "1" -- "0..*" ExperimentMetric : produces >

@@ -52,6 +52,11 @@ class ExperimentService {
     )
     return response.data
   }
+
+  async listByPipeline(pipelineUuid: string): Promise<ExperimentSummary[]> {
+    const response = await axios.get(API_URL + `pipelines/${pipelineUuid}/experiments`)
+    return response.data
+  }
 }
 
 export default new ExperimentService()

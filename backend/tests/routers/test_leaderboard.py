@@ -6,7 +6,7 @@ from app.config.config import settings
 API = settings.API_V1_STR
 
 
-async def _setup_leaderboard(client, headers) -> tuple[str, str, list[str]]:
+async def _setup_leaderboard(client, headers) -> tuple[str, str, str, list[str]]:
     ds_resp = await client.post(
         f"{API}/datasets",
         json={"name": "LB-Dataset", "task": "ranking"},
@@ -16,10 +16,23 @@ async def _setup_leaderboard(client, headers) -> tuple[str, str, list[str]]:
 
     version_resp = await client.post(
         f"{API}/datasets/{dataset_uuid}/versions",
-        json={"version": "1.0", "status": "ready"},
+        json={
+            "version": "1.0",
+            "status": "ready",
+            "pipeline_yaml_raw": """
+pipeline:
+  - name: parse
+    operation: parse_csv
+""".strip(),
+        },
         headers=headers,
     )
     dataset_version_uuid = version_resp.json()["uuid"]
+    pipelines_resp = await client.get(
+        f"{API}/dataset-versions/{dataset_version_uuid}/pipelines"
+    )
+    assert pipelines_resp.status_code == 200
+    pipeline_uuid = pipelines_resp.json()[0]["uuid"]
 
     scores = [
         ("iALS", 0.3990),
@@ -39,7 +52,7 @@ async def _setup_leaderboard(client, headers) -> tuple[str, str, list[str]]:
         e_resp = await client.post(
             f"{API}/experiments",
             json={
-                "dataset_version_uuid": dataset_version_uuid,
+                "pipeline_uuid": pipeline_uuid,
                 "model_uuid": model_uuid,
             },
             headers=headers,
@@ -71,7 +84,7 @@ async def _setup_leaderboard(client, headers) -> tuple[str, str, list[str]]:
             headers=headers,
         )
 
-    return dataset_uuid, dataset_version_uuid, exp_uuids
+    return dataset_uuid, dataset_version_uuid, pipeline_uuid, exp_uuids
 
 
 @pytest.mark.anyio
@@ -79,7 +92,7 @@ async def test_leaderboard_top_n_sorted(
     client: AsyncClient,
     superuser_token_headers: dict[str, str],
 ) -> None:
-    dataset_uuid, dataset_version_uuid, _ = await _setup_leaderboard(
+    dataset_uuid, dataset_version_uuid, pipeline_uuid, _ = await _setup_leaderboard(
         client,
         superuser_token_headers,
     )
@@ -89,6 +102,7 @@ async def test_leaderboard_top_n_sorted(
         params={
             "dataset_uuid": dataset_uuid,
             "dataset_version_uuid": dataset_version_uuid,
+            "pipeline_uuid": pipeline_uuid,
             "metric": "ndcg@10",
             "split": "test",
             "top_n": 10,
@@ -109,6 +123,7 @@ async def test_leaderboard_top_n_sorted(
     for e in entries:
         assert e["dataset_uuid"] == dataset_uuid
         assert e["dataset_version_uuid"] == dataset_version_uuid
+        assert e["pipeline_uuid"] == pipeline_uuid
 
 
 @pytest.mark.anyio
@@ -116,7 +131,7 @@ async def test_leaderboard_filters_by_split(
     client: AsyncClient,
     superuser_token_headers: dict[str, str],
 ) -> None:
-    dataset_uuid, dataset_version_uuid, _ = await _setup_leaderboard(
+    dataset_uuid, dataset_version_uuid, pipeline_uuid, _ = await _setup_leaderboard(
         client,
         superuser_token_headers,
     )
@@ -126,6 +141,7 @@ async def test_leaderboard_filters_by_split(
         params={
             "dataset_uuid": dataset_uuid,
             "dataset_version_uuid": dataset_version_uuid,
+            "pipeline_uuid": pipeline_uuid,
             "metric": "ndcg@10",
             "split": "test",
         },
@@ -135,6 +151,7 @@ async def test_leaderboard_filters_by_split(
         params={
             "dataset_uuid": dataset_uuid,
             "dataset_version_uuid": dataset_version_uuid,
+            "pipeline_uuid": pipeline_uuid,
             "metric": "ndcg@10",
             "split": "validation",
         },
@@ -152,7 +169,7 @@ async def test_leaderboard_empty_for_unknown_metric(
     client: AsyncClient,
     superuser_token_headers: dict[str, str],
 ) -> None:
-    dataset_uuid, dataset_version_uuid, _ = await _setup_leaderboard(
+    dataset_uuid, dataset_version_uuid, pipeline_uuid, _ = await _setup_leaderboard(
         client,
         superuser_token_headers,
     )
@@ -162,6 +179,7 @@ async def test_leaderboard_empty_for_unknown_metric(
         params={
             "dataset_uuid": dataset_uuid,
             "dataset_version_uuid": dataset_version_uuid,
+            "pipeline_uuid": pipeline_uuid,
             "metric": "metrica_che_non_esiste",
             "split": "test",
         },
@@ -175,7 +193,7 @@ async def test_leaderboard_top_n_limit(
     client: AsyncClient,
     superuser_token_headers: dict[str, str],
 ) -> None:
-    dataset_uuid, dataset_version_uuid, _ = await _setup_leaderboard(
+    dataset_uuid, dataset_version_uuid, pipeline_uuid, _ = await _setup_leaderboard(
         client,
         superuser_token_headers,
     )
@@ -185,6 +203,7 @@ async def test_leaderboard_top_n_limit(
         params={
             "dataset_uuid": dataset_uuid,
             "dataset_version_uuid": dataset_version_uuid,
+            "pipeline_uuid": pipeline_uuid,
             "metric": "ndcg@10",
             "split": "test",
             "top_n": 1,

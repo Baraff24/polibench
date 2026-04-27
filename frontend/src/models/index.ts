@@ -3,6 +3,7 @@ export type {
   TaskType,
   Visibility,
   VersionStatus,
+  PipelineStatus,
   DatasetSummary,
   DatasetPublic,
   DatasetCreate,
@@ -12,10 +13,14 @@ export type {
   DatasetVersionPublic,
   SourcePublic,
   ResourcePublic,
-  DatasetVersionPipelinePublic,
   DatasetVersionYamlPublic,
   DatasetVersionPreviewPublic,
   DatasetVersionCharacteristicsPreview,
+  PipelineCreate,
+  PipelineSummary,
+  PipelinePublic,
+  PipelineYamlPublic,
+  PipelinePreviewPublic,
 } from './dataset'
 export type { MLModelSummary, MLModelPublic, MLModelCreate } from './ml-model'
 export type {

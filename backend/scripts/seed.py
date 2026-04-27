@@ -42,6 +42,7 @@ from app.models.experiments import Experiment, Status
 from app.models.metric_import_jobs import ImportStatus, MetricImportJob
 from app.models.metrics import Direction, Metric, Split
 from app.models.ml_models import MLModel
+from app.models.pipelines import Pipeline, PipelineStatus
 from app.models.resources import Resource
 from app.models.sources import Source
 from app.models.users import User, UserRole
@@ -49,6 +50,7 @@ from app.schemas.dataset_versions import DatasetVersionCreate
 from app.schemas.datasets import DatasetCreate
 from app.schemas.experiments import ExperimentCreate
 from app.schemas.ml_models import MLModelCreate
+from app.schemas.pipelines import PipelineCreate
 from app.services.dataset_versions import create_dataset_version
 from app.services.datasets import create_dataset, create_ml_model
 from app.services.experiments import create_experiment
@@ -56,6 +58,7 @@ from app.services.metric_imports import (
     create_metric_import_job,
     process_metric_import_job,
 )
+from app.services.pipelines import create_pipeline_for_version
 
 try:
     import yaml
@@ -113,6 +116,15 @@ class ModelFixture:
 
 
 @dataclass(frozen=True)
+class PipelineFixture:
+    dataset_name: str
+    dataset_version: str
+    code: str
+    pipeline_yaml_raw: str
+    status: PipelineStatus = PipelineStatus.READY
+
+
+@dataclass(frozen=True)
 class ExperimentFixture:
     dataset_name: str
     dataset_version: str
@@ -120,6 +132,7 @@ class ExperimentFixture:
     run_name: str
     seed: int
     status: Status
+    pipeline_code: str = "P001"
     submitted_by: str = "admin"
     metrics: list[MetricCsvRow] = field(default_factory=list)
 
@@ -128,6 +141,7 @@ class ExperimentFixture:
 class SeedScenario:
     datasets: list[DatasetFixture]
     models: list[ModelFixture]
+    pipelines: list[PipelineFixture]
     experiments: list[ExperimentFixture]
 
 
@@ -1335,6 +1349,125 @@ MODEL_FIXTURES_EDGE = [
     ),
 ]
 
+PIPELINE_FIXTURES_MINIMAL: list[PipelineFixture] = []
+
+PIPELINE_FIXTURES_DEMO = [
+    PipelineFixture(
+        dataset_name="Alibaba-iFashion",
+        dataset_version="v2",
+        code="P002",
+        pipeline_yaml_raw=_pipeline_yaml(
+            [
+                {
+                    "name": "load",
+                    "operation": "load_csv",
+                    "params": {"file": "events.csv"},
+                },
+                {
+                    "name": "sessionize",
+                    "operation": "build_sessions",
+                    "params": {"max_gap_minutes": 30},
+                },
+                {
+                    "name": "split",
+                    "operation": "temporal_split",
+                    "params": {"train_ratio": 0.82, "validation_ratio": 0.08},
+                },
+            ]
+        ),
+    ),
+    PipelineFixture(
+        dataset_name="MovieLens-100K",
+        dataset_version="v2",
+        code="P002",
+        pipeline_yaml_raw=_pipeline_yaml(
+            [
+                {
+                    "name": "load",
+                    "operation": "load_csv",
+                    "params": {"file": "ratings.csv"},
+                },
+                {
+                    "name": "filter",
+                    "operation": "filter_min_interactions",
+                    "params": {"min_user_interactions": 10},
+                },
+                {
+                    "name": "split",
+                    "operation": "random_split",
+                    "params": {"train_ratio": 0.8, "validation_ratio": 0.1},
+                },
+            ]
+        ),
+    ),
+    PipelineFixture(
+        dataset_name="Amazon-Books",
+        dataset_version="2024",
+        code="P002",
+        pipeline_yaml_raw=_pipeline_yaml(
+            [
+                {
+                    "name": "load",
+                    "operation": "load_parquet",
+                    "params": {"file": "ratings.parquet"},
+                },
+                {
+                    "name": "deduplicate",
+                    "operation": "drop_duplicates",
+                    "params": {"subset": ["user_id", "item_id", "timestamp"]},
+                },
+                {
+                    "name": "split",
+                    "operation": "temporal_split",
+                    "params": {"train_ratio": 0.84, "validation_ratio": 0.06},
+                },
+            ]
+        ),
+    ),
+    PipelineFixture(
+        dataset_name="LastFM",
+        dataset_version="2014",
+        code="P002",
+        pipeline_yaml_raw=_pipeline_yaml(
+            [
+                {
+                    "name": "load",
+                    "operation": "parse_tsv",
+                    "params": {"delimiter": "\\t"},
+                },
+                {
+                    "name": "graph-features",
+                    "operation": "join_graph_features",
+                    "params": {"resource": "social_graph"},
+                },
+                {"name": "split", "operation": "leave_one_out", "params": {}},
+            ]
+        ),
+    ),
+]
+
+PIPELINE_FIXTURES_EDGE = [
+    PipelineFixture(
+        dataset_name="Tiny-Edge-Ranking",
+        dataset_version="v1",
+        code="P002",
+        pipeline_yaml_raw=_pipeline_yaml(
+            [
+                {
+                    "name": "load",
+                    "operation": "load_csv",
+                    "params": {"file": "small.csv"},
+                },
+                {
+                    "name": "split",
+                    "operation": "random_split",
+                    "params": {"train_ratio": 0.7},
+                },
+            ]
+        ),
+    )
+]
+
 EXPERIMENT_FIXTURES_MINIMAL = [
     ExperimentFixture(
         dataset_name="Alibaba-iFashion",
@@ -1396,6 +1529,7 @@ EXPERIMENT_FIXTURES_DEMO = [
         run_name="seed-demo-neumf-alibaba-v2-running",
         seed=24,
         status=Status.RUNNING,
+        pipeline_code="P002",
         submitted_by="researcher",
     ),
     ExperimentFixture(
@@ -1491,6 +1625,7 @@ EXPERIMENT_FIXTURES_DEMO = [
         run_name="seed-demo-svd-ml100k-v2-finished",
         seed=104,
         status=Status.FINISHED,
+        pipeline_code="P002",
         submitted_by="researcher",
         metrics=_rating_metrics("best"),
     ),
@@ -1511,6 +1646,7 @@ EXPERIMENT_FIXTURES_DEMO = [
         run_name="seed-demo-itemknn-ml100k-v2-running",
         seed=106,
         status=Status.RUNNING,
+        pipeline_code="P002",
         submitted_by="researcher",
     ),
     ExperimentFixture(
@@ -1577,6 +1713,7 @@ EXPERIMENT_FIXTURES_DEMO = [
         run_name="seed-demo-svd-amazon-books-2024-finished",
         seed=204,
         status=Status.FINISHED,
+        pipeline_code="P002",
         submitted_by="researcher",
         metrics=_rating_metrics("best"),
     ),
@@ -1597,6 +1734,7 @@ EXPERIMENT_FIXTURES_DEMO = [
         run_name="seed-demo-userknn-amazon-books-2024-running",
         seed=206,
         status=Status.RUNNING,
+        pipeline_code="P002",
         submitted_by="researcher",
     ),
     ExperimentFixture(
@@ -1635,6 +1773,7 @@ EXPERIMENT_FIXTURES_DEMO = [
         run_name="seed-demo-lightgcn-lastfm-2014-finished",
         seed=304,
         status=Status.FINISHED,
+        pipeline_code="P002",
         submitted_by="researcher",
         metrics=_ranking_metrics("best"),
     ),
@@ -1655,6 +1794,7 @@ EXPERIMENT_FIXTURES_DEMO = [
         run_name="seed-demo-poprank-lastfm-2014-running",
         seed=306,
         status=Status.RUNNING,
+        pipeline_code="P002",
         submitted_by="viewer",
     ),
 ]
@@ -1697,16 +1837,19 @@ SEED_SCENARIOS: dict[SeedMode, SeedScenario] = {
     SeedMode.MINIMAL: SeedScenario(
         datasets=DATASET_FIXTURES_MINIMAL,
         models=MODEL_FIXTURES_MINIMAL,
+        pipelines=PIPELINE_FIXTURES_MINIMAL,
         experiments=EXPERIMENT_FIXTURES_MINIMAL,
     ),
     SeedMode.DEMO: SeedScenario(
         datasets=DATASET_FIXTURES_DEMO,
         models=MODEL_FIXTURES_DEMO,
+        pipelines=PIPELINE_FIXTURES_DEMO,
         experiments=EXPERIMENT_FIXTURES_DEMO,
     ),
     SeedMode.EDGE: SeedScenario(
         datasets=DATASET_FIXTURES_EDGE,
         models=MODEL_FIXTURES_EDGE,
+        pipelines=PIPELINE_FIXTURES_EDGE,
         experiments=EXPERIMENT_FIXTURES_EDGE,
     ),
 }
@@ -1851,19 +1994,53 @@ async def _upsert_model(fixture: ModelFixture, owner: User) -> tuple[MLModel, bo
     return created, True
 
 
+async def _upsert_pipeline(
+    fixture: PipelineFixture,
+    dataset_version: DatasetVersion,
+) -> tuple[Pipeline, bool]:
+    existing = await Pipeline.find_one(
+        {"dataset_version_id": dataset_version.id, "code": fixture.code}
+    )
+    if existing is not None:
+        return existing, False
+
+    public = await create_pipeline_for_version(
+        dataset_version.uuid,
+        PipelineCreate(
+            code=fixture.code,
+            yaml_raw=fixture.pipeline_yaml_raw,
+            status=fixture.status,
+        ),
+    )
+    created = await Pipeline.find_one(Pipeline.uuid == public.uuid)
+    if created is None:
+        raise RuntimeError(f"Pipeline appena creata non trovata: {fixture.code}")
+    return created, True
+
+
 async def _upsert_experiment(
     fixture: ExperimentFixture,
+    pipeline: Pipeline,
     dataset_version: DatasetVersion,
     model: MLModel,
     submitter: User,
 ) -> tuple[Experiment, bool]:
     existing = await Experiment.find_one(Experiment.run_name == fixture.run_name)
     if existing is not None:
+        changed = False
+        if existing.pipeline_id is None:
+            existing.pipeline_id = pipeline.id
+            changed = True
+        if existing.dataset_id is None:
+            existing.dataset_id = dataset_version.dataset_id
+            changed = True
+        if changed:
+            await existing.save()
         return existing, False
 
     public = await create_experiment(
         ExperimentCreate(
-            dataset_version_uuid=dataset_version.uuid,
+            pipeline_uuid=pipeline.uuid,
             model_uuid=model.uuid,
             run_name=fixture.run_name,
             seed=fixture.seed,
@@ -1918,6 +2095,7 @@ async def _import_metrics_from_csv_if_needed(
 
 async def _consistency_checks(
     dataset_versions: dict[tuple[str, str], DatasetVersion],
+    pipelines: dict[tuple[str, str, str], Pipeline],
     experiments: list[Experiment],
 ) -> list[str]:
     issues: list[str] = []
@@ -1944,6 +2122,25 @@ async def _consistency_checks(
     for exp in experiments:
         if await DatasetVersion.get(exp.dataset_version_id) is None:
             issues.append(f"experiment senza dataset_version valido: {exp.run_name}")
+        if exp.pipeline_id is None:
+            issues.append(f"experiment senza pipeline valida: {exp.run_name}")
+            continue
+        pipeline = await Pipeline.get(exp.pipeline_id)
+        if pipeline is None:
+            issues.append(f"experiment con pipeline non trovata: {exp.run_name}")
+            continue
+        if pipeline.dataset_version_id != exp.dataset_version_id:
+            issues.append(
+                "experiment con pipeline non coerente rispetto alla dataset_version: "
+                f"{exp.run_name}"
+            )
+
+    for (dataset_name, version_name, pipeline_code), pipeline in pipelines.items():
+        if await DatasetVersion.get(pipeline.dataset_version_id) is None:
+            issues.append(
+                "pipeline senza dataset_version valida: "
+                f"{dataset_name}:{version_name}:{pipeline_code}"
+            )
 
     bad_metrics = await Metric.find(
         {"metric": {"$in": list(FORBIDDEN_DATASET_CHARACTERISTICS_METRICS)}}
@@ -1974,6 +2171,7 @@ async def seed(mode: str = SeedMode.MINIMAL.value, reset: bool = False) -> None:
         await Metric.delete_all()
         await MetricImportJob.delete_all()
         await Experiment.delete_all()
+        await Pipeline.delete_all()
         await Resource.delete_all()
         await Source.delete_all()
         await DatasetVersion.delete_all()
@@ -1986,12 +2184,14 @@ async def seed(mode: str = SeedMode.MINIMAL.value, reset: bool = False) -> None:
 
     datasets: dict[str, Dataset] = {}
     dataset_versions: dict[tuple[str, str], DatasetVersion] = {}
+    pipelines: dict[tuple[str, str, str], Pipeline] = {}
     models: dict[str, MLModel] = {}
     experiments: list[Experiment] = []
 
     created_datasets = 0
     created_versions = 0
     created_models = 0
+    created_pipelines = 0
     created_experiments = 0
     created_sources = 0
     created_resources = 0
@@ -2025,6 +2225,54 @@ async def seed(mode: str = SeedMode.MINIMAL.value, reset: bool = False) -> None:
             f"({'created' if version_created else 'existing'})"
         )
 
+        existing_pipelines = await Pipeline.find(
+            Pipeline.dataset_version_id == dataset_version.id
+        ).to_list()
+        for existing_pipeline in existing_pipelines:
+            pipelines[(fixture.name, fixture.version, existing_pipeline.code)] = (
+                existing_pipeline
+            )
+
+        has_pipeline_for_version = any(
+            key[0] == fixture.name and key[1] == fixture.version for key in pipelines
+        )
+        if not has_pipeline_for_version and fixture.pipeline_yaml_raw.strip():
+            base_pipeline_fixture = PipelineFixture(
+                dataset_name=fixture.name,
+                dataset_version=fixture.version,
+                code="P001",
+                pipeline_yaml_raw=fixture.pipeline_yaml_raw,
+                status=PipelineStatus.READY,
+            )
+            base_pipeline, base_pipeline_created = await _upsert_pipeline(
+                base_pipeline_fixture,
+                dataset_version,
+            )
+            pipelines[(fixture.name, fixture.version, base_pipeline.code)] = base_pipeline
+            created_pipelines += 1 if base_pipeline_created else 0
+
+    print("pipelines:")
+    for fixture in scenario.pipelines:
+        dataset_version = dataset_versions.get(
+            (fixture.dataset_name, fixture.dataset_version)
+        )
+        if dataset_version is None:
+            print(
+                f"  - {fixture.code} ({fixture.dataset_name}:{fixture.dataset_version}) "
+                "(skipped: missing dataset version)"
+            )
+            continue
+
+        pipeline, was_created = await _upsert_pipeline(fixture, dataset_version)
+        pipelines[(fixture.dataset_name, fixture.dataset_version, fixture.code)] = (
+            pipeline
+        )
+        created_pipelines += 1 if was_created else 0
+        print(
+            f"  - {fixture.code} ({fixture.dataset_name}:{fixture.dataset_version}) "
+            f"({'created' if was_created else 'existing'})"
+        )
+
     print("models:")
     for fixture in scenario.models:
         owner = _require_user(user_map, fixture.owner)
@@ -2041,16 +2289,21 @@ async def seed(mode: str = SeedMode.MINIMAL.value, reset: bool = False) -> None:
         dataset_version = dataset_versions.get(
             (fixture.dataset_name, fixture.dataset_version)
         )
+        pipeline = pipelines.get(
+            (fixture.dataset_name, fixture.dataset_version, fixture.pipeline_code)
+        )
         model = models.get(fixture.model_name)
-        if dataset_version is None or model is None:
+        if dataset_version is None or pipeline is None or model is None:
             print(
-                f"  - {fixture.run_name} (skipped: missing dataset version or model)"
+                f"  - {fixture.run_name} "
+                "(skipped: missing dataset version, pipeline or model)"
             )
             continue
 
         submitter = _require_user(user_map, fixture.submitted_by)
         exp, exp_created = await _upsert_experiment(
             fixture,
+            pipeline,
             dataset_version,
             model,
             submitter,
@@ -2071,16 +2324,18 @@ async def seed(mode: str = SeedMode.MINIMAL.value, reset: bool = False) -> None:
         experiments.append(exp)
         print(
             f"  - {fixture.run_name} status={fixture.status.value} "
+            f"pipeline={fixture.pipeline_code} "
             f"submitter={fixture.submitted_by} "
             f"({'created' if exp_created else 'existing'}, "
             f"metrics_csv={'imported' if metrics_imported else 'skipped'})"
         )
 
-    issues = await _consistency_checks(dataset_versions, experiments)
+    issues = await _consistency_checks(dataset_versions, pipelines, experiments)
 
     status_counts = Counter(e.status.value for e in experiments)
     total_sources = await Source.find_all().count()
     total_resources = await Resource.find_all().count()
+    total_pipelines = await Pipeline.find_all().count()
     completed_jobs = await MetricImportJob.find(
         MetricImportJob.status == ImportStatus.COMPLETED
     ).count()
@@ -2091,12 +2346,14 @@ async def seed(mode: str = SeedMode.MINIMAL.value, reset: bool = False) -> None:
     print(f"  sources_created: {created_sources}")
     print(f"  resources_created: {created_resources}")
     print(f"  models_created: {created_models}")
+    print(f"  pipelines_created: {created_pipelines}")
     print(f"  experiments_created: {created_experiments}")
     print(f"  experiments_by_status: {dict(status_counts)}")
     print(f"  metric_import_jobs_created: {imported_metrics_jobs}")
     print(f"  metric_import_jobs_completed_total: {completed_jobs}")
     print(f"  sources_total: {total_sources}")
     print(f"  resources_total: {total_resources}")
+    print(f"  pipelines_total: {total_pipelines}")
 
     if issues:
         print("consistency_issues:")

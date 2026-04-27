@@ -19,11 +19,13 @@ facilitare la riproducibilità.
 
 ## Funzionalità principali
 
-- **Gestione Dataset** — registrazione di dataset con task (`ranking`, `rating_prediction`, `ctr`), versione,
-  partizioni (train/test/validation) e visibilità (public/private).
+- **Gestione Dataset e Versioni** — dataset catalografico + dataset versioning con YAML (`dataset`, `version`,
+  `characteristics`) e tracciamento `sources/resources`.
+- **Pipeline Registry** — pipeline separate dalla versione (`P001`, `P002`, …), visualizzazione a blocchi/chain e YAML
+  dedicato per pipeline.
 - **Registrazione Modelli** — catalogo di algoritmi di raccomandazione (BPR, LightGCN, SGL, …) con iperparametri di
   riferimento, paper e implementazione.
-- **Submission di Esperimenti** — associazione dataset–modello con configurazione di training, seed, codice sorgente e
+- **Submission di Esperimenti** — associazione pipeline–modello con configurazione di training, seed, codice sorgente e
   artefatti per la riproducibilità.
 - **Metriche di Valutazione** — registrazione batch di metriche (AUC, LogLoss, NDCG@k, Recall@k, …) per split (
   test/validation) con direzione (max/min).
@@ -150,9 +152,10 @@ Tutta la logica (risoluzione UUID → ObjectId, denormalizzazione, query leaderb
 | **User**       | Utente della piattaforma con ruolo (`admin`, `researcher`, `viewer`), autenticazione e verifica email |
 | **Team**       | Gruppo di ricerca che aggrega utenti sotto uno stesso namespace                                       |
 | **Dataset**    | Catalogo logico del dataset (nome, task, visibilità, metadati)                                        |
-| **DatasetVersion** | Unità operativa versionata con YAML raw, sources/resources, pipeline e caratteristiche            |
+| **DatasetVersion** | Unità operativa versionata con YAML raw, sources/resources e dataset characteristics               |
+| **Pipeline**   | Configurazione eseguibile su una DatasetVersion (YAML + blocchi normalizzati + status)                 |
 | **MLModel**    | Algoritmo di raccomandazione con iperparametri di riferimento                                         |
-| **Experiment** | Associazione datasetVersion–modello con configurazione, seed, codice e stato                          |
+| **Experiment** | Associazione pipeline–modello con configurazione, seed, codice e stato                                |
 | **ExperimentMetric** | Risultato numerico di performance (CSV import) denormalizzato per leaderboard/query veloci      |
 | **MetricImportJob** | Job async di import metriche da CSV con stati (`uploaded`, `processing`, `completed`, `failed`) |
 
@@ -368,11 +371,11 @@ Nel file `.env` aggiorna almeno:
 | Metodo  | Endpoint                             | Descrizione                                       |
 |---------|--------------------------------------|---------------------------------------------------|
 | `POST`  | `/api/v1/login/access-token`         | Ottieni JWT (email/password)                      |
-| `GET`   | `/api/v1/login/google/authorize`     | Avvia OAuth2 con Google                           |
+| `GET`   | `/api/v1/login/google`               | Avvia OAuth2 con Google                           |
 | `POST`  | `/api/v1/users`                      | Registrazione utente                              |
 | `GET`   | `/api/v1/users/me`                   | Profilo utente corrente                           |
 | `PATCH` | `/api/v1/users/me`                   | Aggiorna profilo                                  |
-| `GET`   | `/api/v1/users/verify-email`         | Verifica email con token                          |
+| `GET`   | `/api/v1/users/verify/{token}`       | Verifica email con token                          |
 | `GET`   | `/api/v1/datasets`                   | Lista dataset                                     |
 | `POST`  | `/api/v1/datasets`                   | Crea dataset (autenticato + verificato)           |
 | `GET`   | `/api/v1/datasets/{uuid}`            | Dettaglio dataset                                 |
@@ -382,8 +385,13 @@ Nel file `.env` aggiorna almeno:
 | `GET`   | `/api/v1/dataset-versions/{uuid}`    | Dettaglio DatasetVersion                          |
 | `GET`   | `/api/v1/dataset-versions/{uuid}/sources` | Sources della DatasetVersion                 |
 | `GET`   | `/api/v1/dataset-versions/{uuid}/resources` | Resources della DatasetVersion              |
-| `GET`   | `/api/v1/dataset-versions/{uuid}/pipeline` | Pipeline normalizzata                         |
-| `GET`   | `/api/v1/dataset-versions/{uuid}/yaml/{kind}` | YAML (`dataset`, `version`, `pipeline`, `characteristics`) |
+| `GET`   | `/api/v1/dataset-versions/{uuid}/pipelines` | Lista pipeline della DatasetVersion          |
+| `POST`  | `/api/v1/dataset-versions/{uuid}/pipelines` | Crea pipeline per DatasetVersion             |
+| `POST`  | `/api/v1/dataset-versions/{uuid}/pipelines/preview` | Preview parse pipeline YAML            |
+| `GET`   | `/api/v1/pipelines/{uuid}`           | Dettaglio Pipeline                                |
+| `GET`   | `/api/v1/pipelines/{uuid}/yaml`      | YAML della Pipeline                               |
+| `GET`   | `/api/v1/pipelines/{uuid}/experiments` | Esperimenti collegati alla Pipeline            |
+| `GET`   | `/api/v1/dataset-versions/{uuid}/yaml/{kind}` | YAML (`dataset`, `version`, `characteristics`) |
 | `GET`   | `/api/v1/dataset-versions/{uuid}/experiments` | Esperimenti collegati alla versione         |
 | `GET`   | `/api/v1/ml-models`                  | Lista modelli                                     |
 | `POST`  | `/api/v1/ml-models`                  | Registra modello (autenticato + verificato)       |
@@ -392,7 +400,7 @@ Nel file `.env` aggiorna almeno:
 | `GET`   | `/api/v1/experiments/{uuid}`         | Dettaglio esperimento                             |
 | `GET`   | `/api/v1/experiments/{uuid}/metrics` | Metriche dell'esperimento                         |
 | `POST`  | `/api/v1/experiments/{uuid}/metric-import` | Import metriche da CSV (async)              |
-| `GET`   | `/api/v1/leaderboard`                | Leaderboard filtrata per dataset, metrica e split |
+| `GET`   | `/api/v1/leaderboard`                | Leaderboard filtrata per dataset/version/pipeline |
 
 La documentazione interattiva completa è disponibile su `/docs` (Swagger UI) e `/redoc`.
 
@@ -401,7 +409,8 @@ La documentazione interattiva completa è disponibile su `/docs` (Swagger UI) e 
 - `dataset_yaml_raw`: metadata catalografici dataset-level (`datasets/*.yml`)
 - `version_yaml_raw`: definizione version-level con `sources` e `resources` (`versions/*_*.yml`)
 - `characteristics_yaml_raw`: dataset characteristics (`metrics/*_*.yml`)
-- `pipeline_yaml_raw`: pipeline raw + normalizzazione in `pipeline_blocks`
+- `pipeline_yaml_raw`: compatibilità transitoria in create-version; la source of truth pipeline è il model `Pipeline`
+  (`yaml_raw` + `blocks`)
 
 Le **dataset characteristics** (`n_users`, `density`, `gini_*`) restano in `DatasetVersion`;  
 le **experiment metrics** (`ndcg`, `recall`, `rmse`, ...) entrano solo in `ExperimentMetric` via CSV import.
@@ -454,7 +463,9 @@ La cartella [`docs/`](docs/) contiene documentazione estesa divisa per area:
 | Verifica email        | `/verify-email`                  | Conferma indirizzo email                            |
 | Profilo               | `/profile`                       | Profilo utente (protetta)                           |
 | Datasets              | `/datasets`                      | Lista di tutti i dataset                            |
-| Dettaglio dataset     | `/datasets/:uuid`                | Informazioni, statistiche e leaderboard del dataset |
+| Dettaglio dataset     | `/datasets/:uuid`                | Informazioni dataset + lista versioni               |
+| Dettaglio versione    | `/dataset-versions/:uuid`        | Sources, resources, YAML e lista pipeline           |
+| Dettaglio pipeline    | `/pipelines/:uuid`               | Chain blocchi pipeline, YAML e lista esperimenti    |
 | Nuovo dataset         | `/datasets/new`                  | Form creazione dataset (protetta)                   |
 | Modelli               | `/models`                        | Lista di tutti i modelli                            |
 | Dettaglio modello     | `/models/:uuid`                  | Informazioni e esperimenti del modello              |

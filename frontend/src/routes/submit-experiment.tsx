@@ -3,7 +3,12 @@ import { useNavigate } from 'react-router'
 import { PageHeader } from '../components'
 import { datasetService, experimentService, mlModelService } from '../services'
 import { useSnackBar } from '../contexts/snackbar'
-import type { DatasetSummary, DatasetVersionSummary, MLModelSummary } from '../models'
+import type {
+  DatasetSummary,
+  DatasetVersionSummary,
+  MLModelSummary,
+  PipelineSummary,
+} from '../models'
 
 export default function SubmitExperiment() {
   const navigate = useNavigate()
@@ -12,10 +17,12 @@ export default function SubmitExperiment() {
 
   const [datasets, setDatasets] = useState<DatasetSummary[]>([])
   const [versions, setVersions] = useState<DatasetVersionSummary[]>([])
+  const [pipelines, setPipelines] = useState<PipelineSummary[]>([])
   const [models, setModels] = useState<MLModelSummary[]>([])
 
   const [datasetUuid, setDatasetUuid] = useState('')
   const [datasetVersionUuid, setDatasetVersionUuid] = useState('')
+  const [pipelineUuid, setPipelineUuid] = useState('')
   const [modelUuid, setModelUuid] = useState('')
   const [runName, setRunName] = useState('')
   const [seed, setSeed] = useState('')
@@ -30,6 +37,8 @@ export default function SubmitExperiment() {
     if (!datasetUuid) {
       setVersions([])
       setDatasetVersionUuid('')
+      setPipelines([])
+      setPipelineUuid('')
       return
     }
     datasetService
@@ -45,19 +54,43 @@ export default function SubmitExperiment() {
       .catch(() => {
         setVersions([])
         setDatasetVersionUuid('')
+        setPipelines([])
+        setPipelineUuid('')
       })
   }, [datasetUuid])
 
+  useEffect(() => {
+    if (!datasetVersionUuid) {
+      setPipelines([])
+      setPipelineUuid('')
+      return
+    }
+    datasetService
+      .getVersionPipelines(datasetVersionUuid)
+      .then((loadedPipelines) => {
+        setPipelines(loadedPipelines)
+        if (loadedPipelines.length > 0) {
+          setPipelineUuid(loadedPipelines[0].uuid)
+        } else {
+          setPipelineUuid('')
+        }
+      })
+      .catch(() => {
+        setPipelines([])
+        setPipelineUuid('')
+      })
+  }, [datasetVersionUuid])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!datasetVersionUuid || !modelUuid) {
-      showSnackBar('Please select a dataset version and a model.', 'error')
+    if (!datasetVersionUuid || !pipelineUuid || !modelUuid) {
+      showSnackBar('Please select dataset version, pipeline and model.', 'error')
       return
     }
     setLoading(true)
     try {
       const experiment = await experimentService.create({
-        dataset_version_uuid: datasetVersionUuid,
+        pipeline_uuid: pipelineUuid,
         model_uuid: modelUuid,
         run_name: runName.trim() || undefined,
         seed: seed ? Number(seed) : undefined,
@@ -115,6 +148,29 @@ export default function SubmitExperiment() {
             {versions.map((v) => (
               <option key={v.uuid} value={v.uuid}>
                 v{v.version} ({v.status})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className='field'>
+          <label className='field__label' htmlFor='exp-pipeline'>
+            Pipeline
+          </label>
+          <select
+            id='exp-pipeline'
+            className='field__input'
+            value={pipelineUuid}
+            onChange={(e) => setPipelineUuid(e.target.value)}
+            required
+            disabled={!datasetVersionUuid || pipelines.length === 0}
+          >
+            <option value=''>
+              {datasetVersionUuid ? 'Select a pipeline...' : 'Select version first...'}
+            </option>
+            {pipelines.map((p) => (
+              <option key={p.uuid} value={p.uuid}>
+                {p.code} ({p.status}, {p.steps_count} steps)
               </option>
             ))}
           </select>

@@ -9,6 +9,8 @@ from app.models.experiments import Artifacts, CodeInfo, Status
 
 class ExperimentBase(BaseModel):
     # Main path in the new domain
+    pipeline_uuid: UUID | None = None
+    # Transitional compatibility path
     dataset_version_uuid: UUID | None = None
     # Transitional compatibility path
     dataset_uuid: UUID | None = None
@@ -30,6 +32,7 @@ class ExperimentPublic(BaseModel):
     uuid: UUID
     dataset_uuid: UUID
     dataset_version_uuid: UUID
+    pipeline_uuid: UUID | None = None
     model_uuid: UUID
     team_uuid: UUID | None = None
     submitted_by_user_uuid: UUID | None = None
@@ -48,6 +51,8 @@ class ExperimentSummary(BaseModel):
     uuid: UUID
     dataset_uuid: UUID
     dataset_version_uuid: UUID
+    pipeline_uuid: UUID | None = None
+    pipeline_code: str | None = None
     model_uuid: UUID
     model_name: str | None = None
     run_name: str | None = None

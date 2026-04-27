@@ -5,6 +5,7 @@ from app.models.datasets import Dataset, TaskType
 from app.models.experiments import Experiment, Status
 from app.models.metrics import Direction, Metric, Split
 from app.models.ml_models import MLModel
+from app.models.pipelines import Pipeline
 
 
 @pytest.mark.anyio
@@ -13,6 +14,8 @@ async def test_experiment_detail_returns_own_metrics(db):
     await dataset.create()
     version = DatasetVersion(dataset_id=dataset.id, version="v1")
     await version.create()
+    pipeline = Pipeline(dataset_version_id=version.id, code="P001")
+    await pipeline.create()
 
     model = MLModel(name="SVD++")
     await model.create()
@@ -20,7 +23,9 @@ async def test_experiment_detail_returns_own_metrics(db):
     fake_user_id = dataset.id
 
     exp_target = Experiment(
+        pipeline_id=pipeline.id,
         dataset_version_id=version.id,
+        dataset_id=dataset.id,
         model_id=model.id,
         submitted_by_user_id=fake_user_id,
         run_name="SVD++ seed=42",
@@ -29,7 +34,9 @@ async def test_experiment_detail_returns_own_metrics(db):
     await exp_target.create()
 
     exp_other = Experiment(
+        pipeline_id=pipeline.id,
         dataset_version_id=version.id,
+        dataset_id=dataset.id,
         model_id=model.id,
         submitted_by_user_id=fake_user_id,
         run_name="SVD++ seed=99",
@@ -47,6 +54,7 @@ async def test_experiment_detail_returns_own_metrics(db):
             experiment_id=exp_target.id,
             dataset_id=dataset.id,
             dataset_version_id=version.id,
+            pipeline_id=pipeline.id,
             model_id=model.id,
             split=split,
             metric=metric_name,
@@ -59,6 +67,7 @@ async def test_experiment_detail_returns_own_metrics(db):
             experiment_id=exp_other.id,
             dataset_id=dataset.id,
             dataset_version_id=version.id,
+            pipeline_id=pipeline.id,
             model_id=model.id,
             split=Split.TEST,
             metric="rmse",

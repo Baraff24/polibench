@@ -127,9 +127,11 @@ characteristics:
     assert get_resources.status_code == 200
     assert len(get_resources.json()) == 1
 
-    get_pipeline = await client.get(f"{API}/dataset-versions/{version_uuid}/pipeline")
-    assert get_pipeline.status_code == 200
-    assert len(get_pipeline.json()["blocks"]) == 1
+    list_pipelines = await client.get(f"{API}/dataset-versions/{version_uuid}/pipelines")
+    assert list_pipelines.status_code == 200
+    pipelines = list_pipelines.json()
+    assert len(pipelines) >= 1
+    pipeline_uuid = pipelines[0]["uuid"]
 
     get_version_yaml = await client.get(
         f"{API}/dataset-versions/{version_uuid}/yaml/version"
@@ -141,6 +143,15 @@ characteristics:
         f"{API}/dataset-versions/{version_uuid}/yaml/metrics"
     )
     assert get_metrics_yaml.status_code == 200
+
+    get_pipeline = await client.get(f"{API}/pipelines/{pipeline_uuid}")
+    assert get_pipeline.status_code == 200
+    assert get_pipeline.json()["code"] == "P001"
+    assert len(get_pipeline.json()["blocks"]) == 1
+
+    get_pipeline_yaml = await client.get(f"{API}/pipelines/{pipeline_uuid}/yaml")
+    assert get_pipeline_yaml.status_code == 200
+    assert "parse_csv" in get_pipeline_yaml.json()["content"]
 
 
 @pytest.mark.anyio
@@ -158,11 +169,22 @@ async def test_list_experiments_for_dataset_version(
 
     version_resp = await client.post(
         f"{API}/datasets/{dataset_uuid}/versions",
-        json={"version": "v1", "status": "ready"},
+        json={
+            "version": "v1",
+            "status": "ready",
+            "pipeline_yaml_raw": """
+pipeline:
+  - name: parse
+    operation: parse_csv
+""".strip(),
+        },
         headers=superuser_token_headers,
     )
     assert version_resp.status_code == 200
     version_uuid = version_resp.json()["uuid"]
+    pipelines_resp = await client.get(f"{API}/dataset-versions/{version_uuid}/pipelines")
+    assert pipelines_resp.status_code == 200
+    pipeline_uuid = pipelines_resp.json()[0]["uuid"]
 
     model_resp = await client.post(
         f"{API}/ml-models",
@@ -174,7 +196,7 @@ async def test_list_experiments_for_dataset_version(
 
     exp_resp = await client.post(
         f"{API}/experiments",
-        json={"dataset_version_uuid": version_uuid, "model_uuid": model_uuid},
+        json={"pipeline_uuid": pipeline_uuid, "model_uuid": model_uuid},
         headers=superuser_token_headers,
     )
     assert exp_resp.status_code == 200
@@ -187,6 +209,7 @@ async def test_list_experiments_for_dataset_version(
     assert rows[0]["uuid"] == exp_uuid
     assert rows[0]["dataset_uuid"] == dataset_uuid
     assert rows[0]["dataset_version_uuid"] == version_uuid
+    assert rows[0]["pipeline_uuid"] == pipeline_uuid
     assert rows[0]["model_uuid"] == model_uuid
     assert rows[0]["model_name"] == "Version-Experiments-Model"
 

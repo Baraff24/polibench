@@ -146,8 +146,11 @@ export const routes = [
             {path: 'leaderboard', Component: Leaderboard},
             {path: 'datasets', Component: Datasets, loader: datasetsLoader},
             {path: 'datasets/:uuid', Component: DatasetDetail, loader: datasetDetailLoader},
+            {path: 'dataset-versions/:uuid', Component: DatasetVersionDetail, loader: datasetVersionDetailLoader},
+            {path: 'pipelines/:uuid', Component: PipelineDetail, loader: pipelineDetailLoader},
             {path: 'models', Component: Models, loader: modelsLoader},
             {path: 'models/:uuid', Component: ModelDetail, loader: modelDetailLoader},
+            {path: 'experiments/new', Component: SubmitExperiment},
             {path: 'experiments/:uuid', Component: ExperimentDetail, loader: experimentDetailLoader},
         ],
     },
@@ -308,21 +311,26 @@ Tutti i service sono accessibili tramite il barrel `services/index.ts`.
 
 ### `experiment.service.ts`
 
-| Metodo             | Endpoint                          | Descrizione                    |
-|--------------------|-----------------------------------|--------------------------------|
-| `getByUuid(uuid)`  | `GET /experiments/{uuid}`         | Dettaglio singolo experiment   |
-| `getMetrics(uuid)` | `GET /experiments/{uuid}/metrics` | Metriche raggruppate per split |
+| Metodo                           | Endpoint                                     | Descrizione                              |
+|----------------------------------|----------------------------------------------|------------------------------------------|
+| `create(data)`                   | `POST /experiments`                          | Crea run (path principale: `pipeline_uuid`) |
+| `getByUuid(uuid)`                | `GET /experiments/{uuid}`                    | Dettaglio singolo experiment             |
+| `getMetrics(uuid)`               | `GET /experiments/{uuid}/metrics`            | Metriche raggruppate per split           |
+| `importMetricsCsv(uuid, file)`   | `POST /experiments/{uuid}/metric-import`     | Upload CSV async                         |
+| `listMetricImports(uuid)`        | `GET /experiments/{uuid}/metric-imports`     | Storico job import                       |
+| `listByDatasetVersion(uuid)`     | `GET /dataset-versions/{uuid}/experiments`   | Esperimenti della versione               |
+| `listByPipeline(uuid)`           | `GET /pipelines/{uuid}/experiments`          | Esperimenti della pipeline               |
 
 ### `leaderboard.service.ts`
 
-| Metodo                               | Endpoint               | Descrizione              |
-|--------------------------------------|------------------------|--------------------------|
-| `get(datasetUuid, metric, split, n)` | `GET /leaderboard?...` | Top-N risultati filtrati |
-| `getMultiMetric(datasetUuid, metrics, split, sortBy, n)` | `GET /leaderboard/multi?...` | Leaderboard multi-metrica |
+| Metodo | Endpoint | Descrizione |
+|--------|----------|-------------|
+| `get(datasetUuid, metric, split, n, datasetVersionUuid?, pipelineUuid?)` | `GET /leaderboard?...` | Top-N con filtri dataset/version/pipeline |
+| `getMultiMetric(datasetUuid, metrics, split, sortBy, n, datasetVersionUuid?, pipelineUuid?)` | `GET /leaderboard/multi?...` | Leaderboard multi-metrica con filtri dataset/version/pipeline |
 
 ### Comportamento `routes/leaderboard.tsx`
 
-- filtri server-side: `dataset`, `split`, `sort_by`, `top_n` (`leaderboard/multi`)
+- filtri server-side: `dataset`, `dataset_version`, `pipeline`, `split`, `sort_by`, `top_n`
 - filtro client-side sempre visibile: `chart_mode` (`auto` | `line` | `bar`)
 - tabella con sort client-side su header cliccabili (`#`, `Model`, metriche, `Running Steps`)
 - toggle asc/desc per ogni colonna; icona direzione nell'intestazione

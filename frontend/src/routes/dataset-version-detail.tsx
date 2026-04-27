@@ -2,97 +2,26 @@ import { useLoaderData, useNavigate } from 'react-router'
 import { useState } from 'react'
 import { Badge, DataTable, EmptyState, PageHeader, StatCard } from '../components'
 import type { Column } from '../components'
-import { datasetService, experimentService } from '../services'
+import { datasetService } from '../services'
 import type {
-  DatasetVersionPipelinePublic,
   DatasetVersionPublic,
   DatasetVersionYamlPublic,
-  ExperimentSummary,
+  PipelineSummary,
   ResourcePublic,
   SourcePublic,
 } from '../models'
 import type { Params } from 'react-router'
 
-type YamlKind = 'dataset' | 'version' | 'pipeline' | 'characteristics'
-type PipelineRow = DatasetVersionPipelinePublic['blocks'][number]
-type PipelinePhase = 'ingest' | 'transform' | 'split' | 'features' | 'other'
-
-const pipelinePhaseLabel: Record<PipelinePhase, string> = {
-  ingest: 'Ingest',
-  transform: 'Transform',
-  split: 'Split',
-  features: 'Features',
-  other: 'Generic',
-}
-
-const resolvePipelinePhase = (operation: string): PipelinePhase => {
-  const normalized = operation.trim().toLowerCase()
-  if (
-    normalized.includes('load') ||
-    normalized.includes('read') ||
-    normalized.includes('parse') ||
-    normalized.includes('ingest')
-  ) {
-    return 'ingest'
-  }
-  if (
-    normalized.includes('split') ||
-    normalized.includes('leave_one_out') ||
-    normalized.includes('temporal')
-  ) {
-    return 'split'
-  }
-  if (
-    normalized.includes('feature') ||
-    normalized.includes('encode') ||
-    normalized.includes('token')
-  ) {
-    return 'features'
-  }
-  if (
-    normalized.includes('normalize') ||
-    normalized.includes('clean') ||
-    normalized.includes('filter') ||
-    normalized.includes('dedup') ||
-    normalized.includes('map')
-  ) {
-    return 'transform'
-  }
-  return 'other'
-}
-
-const stringifyParamValue = (value: unknown): string => {
-  if (value === null || value === undefined) {
-    return '—'
-  }
-  if (typeof value === 'string') {
-    return value
-  }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value)
-  }
-  try {
-    return JSON.stringify(value)
-  } catch {
-    return String(value)
-  }
-}
-
-const pipelineColumns: Column<PipelineRow>[] = [
-  { key: 'name', header: 'Step', render: (row) => row.name },
-  { key: 'operation', header: 'Operation', render: (row) => row.operation },
-  {
-    key: 'params',
-    header: 'Params',
-    render: (row) =>
-      Object.keys(row.params).length > 0 ? JSON.stringify(row.params) : '—',
-  },
-]
+type YamlKind = 'dataset' | 'version' | 'characteristics'
 
 const sourceColumns: Column<SourcePublic>[] = [
   { key: 'name', header: 'Name', render: (row) => row.name },
   { key: 'source_type', header: 'Type', render: (row) => row.source_type },
-  { key: 'downloadable', header: 'Downloadable', render: (row) => (row.downloadable ? 'yes' : 'no') },
+  {
+    key: 'downloadable',
+    header: 'Downloadable',
+    render: (row) => (row.downloadable ? 'yes' : 'no'),
+  },
   { key: 'url', header: 'URL', render: (row) => row.url || '—' },
 ]
 
@@ -103,10 +32,10 @@ const resourceColumns: Column<ResourcePublic>[] = [
   { key: 'required', header: 'Required', render: (row) => (row.required ? 'yes' : 'no') },
 ]
 
-const experimentColumns: Column<ExperimentSummary>[] = [
-  { key: 'run_name', header: 'Run', render: (row) => row.run_name || '—' },
-  { key: 'model', header: 'Model', render: (row) => row.model_name || row.model_uuid },
+const pipelineColumns: Column<PipelineSummary>[] = [
+  { key: 'code', header: 'Code', render: (row) => row.code },
   { key: 'status', header: 'Status', render: (row) => row.status },
+  { key: 'steps', header: 'Steps', render: (row) => row.steps_count },
   {
     key: 'created_at',
     header: 'Created',
@@ -129,37 +58,25 @@ export async function loader({ params }: { params: Params }) {
     }
   }
 
-  const [
-    version,
-    sources,
-    resources,
-    pipeline,
-    datasetYaml,
-    versionYaml,
-    pipelineYaml,
-    characteristicsYaml,
-    experiments,
-  ] = await Promise.all([
-    datasetService.getVersionByUuid(versionUuid),
-    datasetService.getVersionSources(versionUuid),
-    datasetService.getVersionResources(versionUuid),
-    datasetService.getVersionPipeline(versionUuid),
-    safeGetYaml('dataset'),
-    safeGetYaml('version'),
-    safeGetYaml('pipeline'),
-    safeGetYaml('characteristics'),
-    experimentService.listByDatasetVersion(versionUuid),
-  ])
+  const [version, sources, resources, pipelines, datasetYaml, versionYaml, characteristicsYaml] =
+    await Promise.all([
+      datasetService.getVersionByUuid(versionUuid),
+      datasetService.getVersionSources(versionUuid),
+      datasetService.getVersionResources(versionUuid),
+      datasetService.getVersionPipelines(versionUuid),
+      safeGetYaml('dataset'),
+      safeGetYaml('version'),
+      safeGetYaml('characteristics'),
+    ])
+
   return {
     version,
     sources,
     resources,
-    pipeline,
-    experiments,
+    pipelines,
     yamls: {
       dataset: datasetYaml,
       version: versionYaml,
-      pipeline: pipelineYaml,
       characteristics: characteristicsYaml,
     },
   }
@@ -169,23 +86,17 @@ export default function DatasetVersionDetail() {
   const navigate = useNavigate()
   const [visibleYaml, setVisibleYaml] = useState<YamlKind | null>(null)
 
-  const { version, sources, resources, pipeline, experiments, yamls } =
-    useLoaderData() as {
+  const { version, sources, resources, pipelines, yamls } = useLoaderData() as {
     version: DatasetVersionPublic
     sources: SourcePublic[]
     resources: ResourcePublic[]
-    pipeline: DatasetVersionPipelinePublic
-    experiments: ExperimentSummary[]
+    pipelines: PipelineSummary[]
     yamls: Record<YamlKind, DatasetVersionYamlPublic>
   }
-  const uniqueOperationsCount = new Set(
-    pipeline.blocks.map((block) => block.operation || 'operation'),
-  ).size
 
   const yamlKinds: { kind: YamlKind; label: string }[] = [
     { kind: 'dataset', label: 'Dataset YAML' },
     { kind: 'version', label: 'Version YAML' },
-    { kind: 'pipeline', label: 'Pipeline YAML' },
     { kind: 'characteristics', label: 'Characteristics YAML' },
   ]
 
@@ -227,62 +138,19 @@ export default function DatasetVersionDetail() {
       </div>
 
       <section className='detail-section'>
-        <h2 className='detail-section__title'>Pipeline</h2>
-        {pipeline.blocks.length === 0 ? (
-          <EmptyState title='No pipeline steps' description='No pipeline YAML parsed yet.' />
+        <h2 className='detail-section__title'>Pipelines</h2>
+        {pipelines.length === 0 ? (
+          <EmptyState
+            title='No pipelines yet'
+            description='Create a pipeline for this dataset version to run experiments.'
+          />
         ) : (
-          <>
-            <div className='pipeline-chain__summary'>
-              <span className='pipeline-chain__summary-item'>{pipeline.blocks.length} steps</span>
-              <span className='pipeline-chain__summary-item'>{uniqueOperationsCount} operations</span>
-            </div>
-            <div className='pipeline-chain'>
-              {pipeline.blocks.map((block, index) => {
-                const phase = resolvePipelinePhase(block.operation || 'operation')
-                const paramsCount = Object.keys(block.params).length
-                return (
-                  <div key={`${block.name}-${index}`} className='pipeline-chain__item'>
-                    <div className='pipeline-chain__block'>
-                      <div className='pipeline-chain__header'>
-                        <span className='pipeline-chain__index'>{index + 1}</span>
-                        <div>
-                          <div className='pipeline-chain__title'>{block.name}</div>
-                          <div className='pipeline-chain__op'>{block.operation || 'operation'}</div>
-                        </div>
-                      </div>
-                      <div className='pipeline-chain__meta'>
-                        <span className={`pipeline-chain__badge pipeline-chain__badge--${phase}`}>
-                          {pipelinePhaseLabel[phase]}
-                        </span>
-                        <span className='pipeline-chain__badge pipeline-chain__badge--neutral'>
-                          {paramsCount} params
-                        </span>
-                      </div>
-                      <details className='pipeline-chain__details'>
-                        <summary>{paramsCount > 0 ? 'View parameters' : 'No parameters'}</summary>
-                        {paramsCount > 0 && (
-                          <div className='pipeline-chain__params'>
-                            {Object.entries(block.params).map(([key, value]) => (
-                              <div key={key} className='pipeline-chain__param'>
-                                <span className='pipeline-chain__param-key'>{key}</span>
-                                <span className='pipeline-chain__param-value'>
-                                  {stringifyParamValue(value)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </details>
-                    </div>
-                    {index < pipeline.blocks.length - 1 && (
-                      <div className='pipeline-chain__arrow'>→</div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-            <DataTable columns={pipelineColumns} rows={pipeline.blocks} rowKey={(row) => row.name} />
-          </>
+          <DataTable
+            columns={pipelineColumns}
+            rows={pipelines}
+            rowKey={(row) => row.uuid}
+            onRowClick={(row) => navigate(`/pipelines/${row.uuid}`)}
+          />
         )}
       </section>
 
@@ -323,7 +191,7 @@ export default function DatasetVersionDetail() {
       <section className='detail-section'>
         <h2 className='detail-section__title'>Sources</h2>
         {sources.length === 0 ? (
-          <EmptyState title='No sources' description='No sources found in dataset YAML.' />
+          <EmptyState title='No sources' description='No sources found in version YAML.' />
         ) : (
           <DataTable columns={sourceColumns} rows={sources} rowKey={(row) => row.uuid} />
         )}
@@ -332,26 +200,9 @@ export default function DatasetVersionDetail() {
       <section className='detail-section'>
         <h2 className='detail-section__title'>Resources</h2>
         {resources.length === 0 ? (
-          <EmptyState title='No resources' description='No resources found in dataset YAML.' />
+          <EmptyState title='No resources' description='No resources found in version YAML.' />
         ) : (
           <DataTable columns={resourceColumns} rows={resources} rowKey={(row) => row.uuid} />
-        )}
-      </section>
-
-      <section className='detail-section'>
-        <h2 className='detail-section__title'>Experiments</h2>
-        {experiments.length === 0 ? (
-          <EmptyState
-            title='No experiments yet'
-            description='No experiment has been submitted for this dataset version.'
-          />
-        ) : (
-          <DataTable
-            columns={experimentColumns}
-            rows={experiments}
-            rowKey={(row) => row.uuid}
-            onRowClick={(row) => navigate(`/experiments/${row.uuid}`)}
-          />
         )}
       </section>
     </div>

@@ -4,6 +4,7 @@ from .experiments import Experiment
 from .metric_import_jobs import MetricImportJob
 from .metrics import ExperimentMetric, Metric
 from .ml_models import MLModel
+from .pipelines import Pipeline
 from .resources import Resource
 from .sources import Source
 from .teams import Team
@@ -13,6 +14,7 @@ from .users import User
 DOCUMENT_MODELS = [
     Dataset,
     DatasetVersion,
+    Pipeline,
     Source,
     Resource,
     Experiment,
