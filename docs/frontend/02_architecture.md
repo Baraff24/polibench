@@ -306,6 +306,12 @@ Tutti i service sono accessibili tramite il barrel `services/index.ts`.
 | `getVersionPipelines(versionUuid)` | `GET /dataset-versions/{uuid}/pipelines` | Lista pipeline della versione |
 | `getVersionYaml(versionUuid, kind)` | `GET /dataset-versions/{uuid}/yaml/{kind}` | YAML dataset/version/characteristics |
 
+### Comportamento `routes/dataset-version-detail.tsx`
+
+- unica sezione `Sources & Resources` (non due tabelle separate)
+- ogni source e' cliccabile (accordion) e mostra sotto solo le resource figlie
+- i dati arrivano da `getVersionSourcesWithResources(versionUuid)` per mantenere la gerarchia padre→figlie
+
 ### `ml-model.service.ts`
 
 | Metodo            | Endpoint                | Descrizione               |

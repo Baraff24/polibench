@@ -72,6 +72,7 @@ export async function loader({ params }: { params: Params }) {
 export default function DatasetVersionDetail() {
   const navigate = useNavigate()
   const [visibleYaml, setVisibleYaml] = useState<YamlKind | null>(null)
+  const [expandedSourceUuids, setExpandedSourceUuids] = useState<Set<string>>(new Set())
 
   const { version, sourcesWithResources, pipelines, yamls } = useLoaderData() as {
     version: DatasetVersionPublic
@@ -92,6 +93,18 @@ export default function DatasetVersionDetail() {
       return
     }
     setVisibleYaml(kind)
+  }
+
+  const toggleSource = (sourceUuid: string) => {
+    setExpandedSourceUuids((previous) => {
+      const next = new Set(previous)
+      if (next.has(sourceUuid)) {
+        next.delete(sourceUuid)
+      } else {
+        next.add(sourceUuid)
+      }
+      return next
+    })
   }
 
   const downloadYaml = (kind: YamlKind) => {
@@ -176,36 +189,55 @@ export default function DatasetVersionDetail() {
       {sourcesWithResources.length > 0 && (
         <section className='detail-section'>
           <h2 className='detail-section__title'>Sources & Resources</h2>
-          <div className='detail-grid' style={{ gridTemplateColumns: '1fr' }}>
+          <div className='sources-accordion'>
             {sourcesWithResources.map((source) => (
-              <details key={source.uuid} className='pipeline-chain__details' open>
-                <summary>
-                  {source.name} ({source.source_type}) - {source.resources.length} resources
-                </summary>
-                <div className='detail-grid' style={{ marginTop: '0.75rem' }}>
-                  <div className='detail-field'>
-                    <div className='detail-field__label'>Downloadable</div>
-                    <div className='detail-field__value'>{source.downloadable ? 'yes' : 'no'}</div>
+              <article key={source.uuid} className='sources-accordion__item'>
+                <button
+                  type='button'
+                  className='sources-accordion__trigger'
+                  onClick={() => toggleSource(source.uuid)}
+                  aria-expanded={expandedSourceUuids.has(source.uuid)}
+                >
+                  <div className='sources-accordion__heading'>
+                    <span className='sources-accordion__symbol'>
+                      {expandedSourceUuids.has(source.uuid) ? '-' : '+'}
+                    </span>
+                    <span className='sources-accordion__name'>{source.name}</span>
+                    <span className='sources-accordion__type'>{source.source_type}</span>
                   </div>
-                  <div className='detail-field'>
-                    <div className='detail-field__label'>URL</div>
-                    <div className='detail-field__value'>{source.url || '—'}</div>
-                  </div>
-                  <div className='detail-field'>
-                    <div className='detail-field__label'>Filename</div>
-                    <div className='detail-field__value'>{source.filename || '—'}</div>
-                  </div>
-                </div>
-                {source.resources.length > 0 && (
-                  <div style={{ marginTop: '0.75rem' }}>
-                    <DataTable
-                      columns={resourceColumns}
-                      rows={source.resources}
-                      rowKey={(row) => row.uuid}
-                    />
+                  <span className='sources-accordion__count'>{source.resources.length} resources</span>
+                </button>
+
+                {expandedSourceUuids.has(source.uuid) && (
+                  <div className='sources-accordion__content'>
+                    <div className='detail-grid'>
+                      <div className='detail-field'>
+                        <div className='detail-field__label'>Downloadable</div>
+                        <div className='detail-field__value'>{source.downloadable ? 'yes' : 'no'}</div>
+                      </div>
+                      <div className='detail-field'>
+                        <div className='detail-field__label'>URL</div>
+                        <div className='detail-field__value'>{source.url || '—'}</div>
+                      </div>
+                      <div className='detail-field'>
+                        <div className='detail-field__label'>Filename</div>
+                        <div className='detail-field__value'>{source.filename || '—'}</div>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: '0.75rem' }}>
+                      {source.resources.length > 0 ? (
+                        <DataTable
+                          columns={resourceColumns}
+                          rows={source.resources}
+                          rowKey={(row) => row.uuid}
+                        />
+                      ) : (
+                        <div className='detail-field__value'>No resources linked to this source.</div>
+                      )}
+                    </div>
                   </div>
                 )}
-              </details>
+              </article>
             ))}
           </div>
         </section>

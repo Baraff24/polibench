@@ -473,7 +473,7 @@ La cartella [`docs/`](docs/) contiene documentazione estesa divisa per area:
 | Profilo               | `/profile`                       | Profilo utente (protetta)                           |
 | Datasets              | `/datasets`                      | Lista di tutti i dataset                            |
 | Dettaglio dataset     | `/datasets/:uuid`                | Informazioni dataset + lista versioni               |
-| Dettaglio versione    | `/dataset-versions/:uuid`        | Sources, resources, YAML e lista pipeline           |
+| Dettaglio versione    | `/dataset-versions/:uuid`        | Sources & Resources ad accordion (padre→figlie), YAML e lista pipeline |
 | Dettaglio pipeline    | `/pipelines/:uuid`               | Chain blocchi pipeline, YAML e lista esperimenti    |
 | Nuovo dataset         | `/datasets/new`                  | Form creazione dataset (protetta)                   |
 | Modelli               | `/models`                        | Lista di tutti i modelli                            |
