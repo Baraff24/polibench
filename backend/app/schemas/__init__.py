@@ -5,13 +5,18 @@ from .dataset_versions import (
     DatasetVersionYamlPublic,
     ResourcePublic,
     SourcePublic,
+    SourceWithResourcesPublic,
 )
 from .datasets import DatasetCreate, DatasetPublic, DatasetSummary
 from .experiments import ExperimentCreate, ExperimentPublic, ExperimentSummary
 from .metric_imports import MetricImportPublic
 from .metrics import (
+    BestConfigurationGroup,
+    BestConfigurationQuery,
+    BestConfigurationResponse,
     ExperimentMetrics,
     LeaderboardEntry,
+    LeaderboardQuery,
     MetricCreate,
     MetricPublic,
     MetricsBatchCreate,

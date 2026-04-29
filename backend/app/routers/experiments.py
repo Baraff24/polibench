@@ -8,8 +8,11 @@ from app.models.users import User
 from app.schemas.experiments import ExperimentCreate, ExperimentPublic
 from app.schemas.metric_imports import MetricImportPublic
 from app.schemas.metrics import (
+    BestConfigurationQuery,
+    BestConfigurationResponse,
     ExperimentMetrics,
     LeaderboardEntry,
+    LeaderboardQuery,
     MetricsBatchCreate,
     MultiMetricLeaderboardEntry,
 )
@@ -106,6 +109,8 @@ async def get_leaderboard(
     top_n: int = 10,
     dataset_version_uuid: UUID | None = None,
     pipeline_uuid: UUID | None = None,
+    model_uuids: str | None = None,
+    author_uuids: str | None = None,
 ) -> list[LeaderboardEntry]:
     if dataset_version_uuid is not None and pipeline_uuid is None:
         raise HTTPException(
@@ -115,6 +120,19 @@ async def get_leaderboard(
                 "dataset_version_uuid"
             ),
         )
+    try:
+        parsed_model_uuids = (
+            [UUID(item.strip()) for item in model_uuids.split(",") if item.strip()]
+            if model_uuids
+            else None
+        )
+        parsed_author_uuids = (
+            [UUID(item.strip()) for item in author_uuids.split(",") if item.strip()]
+            if author_uuids
+            else None
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="UUID non valido nei filtri") from exc
     return await lb_service.get_leaderboard(
         dataset_uuid,
         metric,
@@ -122,6 +140,8 @@ async def get_leaderboard(
         top_n,
         dataset_version_uuid=dataset_version_uuid,
         pipeline_uuid=pipeline_uuid,
+        model_uuids=parsed_model_uuids,
+        author_uuids=parsed_author_uuids,
     )
 
 
@@ -138,6 +158,8 @@ async def get_multi_metric_leaderboard(
     top_n: int = 20,
     dataset_version_uuid: UUID | None = None,
     pipeline_uuid: UUID | None = None,
+    model_uuids: str | None = None,
+    author_uuids: str | None = None,
 ) -> list[MultiMetricLeaderboardEntry]:
     if dataset_version_uuid is not None and pipeline_uuid is None:
         raise HTTPException(
@@ -148,6 +170,19 @@ async def get_multi_metric_leaderboard(
             ),
         )
     metrics_list = [m.strip() for m in metrics.split(",") if m.strip()]
+    try:
+        parsed_model_uuids = (
+            [UUID(item.strip()) for item in model_uuids.split(",") if item.strip()]
+            if model_uuids
+            else None
+        )
+        parsed_author_uuids = (
+            [UUID(item.strip()) for item in author_uuids.split(",") if item.strip()]
+            if author_uuids
+            else None
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="UUID non valido nei filtri") from exc
     return await lb_service.get_multi_metric_leaderboard(
         dataset_uuid,
         metrics_list,
@@ -156,4 +191,24 @@ async def get_multi_metric_leaderboard(
         top_n,
         dataset_version_uuid=dataset_version_uuid,
         pipeline_uuid=pipeline_uuid,
+        model_uuids=parsed_model_uuids,
+        author_uuids=parsed_author_uuids,
     )
+
+
+@router.post(
+    "/leaderboard/query",
+    response_model=list[MultiMetricLeaderboardEntry],
+    tags=["leaderboard"],
+)
+async def query_leaderboard(data: LeaderboardQuery) -> list[MultiMetricLeaderboardEntry]:
+    return await lb_service.query_leaderboard(data)
+
+
+@router.post(
+    "/leaderboard/best-configuration",
+    response_model=BestConfigurationResponse,
+    tags=["leaderboard"],
+)
+async def best_configuration(data: BestConfigurationQuery) -> BestConfigurationResponse:
+    return await lb_service.get_best_configuration(data)

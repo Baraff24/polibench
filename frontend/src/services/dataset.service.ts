@@ -16,6 +16,7 @@ import type {
   DatasetVersionYamlPublic,
   ResourcePublic,
   SourcePublic,
+  SourceWithResourcesPublic,
 } from '../models'
 
 const API_URL = import.meta.env.VITE_BACKEND_API_URL
@@ -69,6 +70,15 @@ class DatasetService {
 
   async getVersionResources(versionUuid: string): Promise<ResourcePublic[]> {
     const response = await axios.get(API_URL + `dataset-versions/${versionUuid}/resources`)
+    return response.data
+  }
+
+  async getVersionSourcesWithResources(
+    versionUuid: string,
+  ): Promise<SourceWithResourcesPublic[]> {
+    const response = await axios.get(
+      API_URL + `dataset-versions/${versionUuid}/sources-with-resources`,
+    )
     return response.data
   }
 

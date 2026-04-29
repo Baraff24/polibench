@@ -75,6 +75,7 @@ Prefisso: `/api/v1/users`
 | `/api/v1/dataset-versions/{version_uuid}` | GET | pubblico | `DatasetVersionPublic` |
 | `/api/v1/dataset-versions/{version_uuid}/sources` | GET | pubblico | `list[SourcePublic]` |
 | `/api/v1/dataset-versions/{version_uuid}/resources` | GET | pubblico | `list[ResourcePublic]` |
+| `/api/v1/dataset-versions/{version_uuid}/sources-with-resources` | GET | pubblico | `list[SourceWithResourcesPublic]` |
 | `/api/v1/dataset-versions/{version_uuid}/yaml/dataset` | GET | pubblico | `DatasetVersionYamlPublic` |
 | `/api/v1/dataset-versions/{version_uuid}/yaml/version` | GET | pubblico | `DatasetVersionYamlPublic` |
 | `/api/v1/dataset-versions/{version_uuid}/yaml/characteristics` | GET | pubblico | `DatasetVersionYamlPublic` |
@@ -139,8 +140,10 @@ Flusso preferito per `POST /experiments`:
 
 | Endpoint | Metodo | Auth | Query principali | Response |
 |----------|--------|------|------------------|----------|
-| `/api/v1/leaderboard` | GET | pubblico | `dataset_uuid`, `metric`, `split`, `top_n=10`, `dataset_version_uuid?`, `pipeline_uuid?` | `list[LeaderboardEntry]` |
-| `/api/v1/leaderboard/multi` | GET | pubblico | `dataset_uuid`, `metrics`, `split`, `sort_by`, `top_n=20`, `dataset_version_uuid?`, `pipeline_uuid?` | `list[MultiMetricLeaderboardEntry]` |
+| `/api/v1/leaderboard` | GET | pubblico | `dataset_uuid`, `metric`, `split`, `top_n=10`, `dataset_version_uuid?`, `pipeline_uuid?`, `model_uuids?`, `author_uuids?` | `list[LeaderboardEntry]` |
+| `/api/v1/leaderboard/multi` | GET | pubblico | `dataset_uuid`, `metrics`, `split`, `sort_by`, `top_n=20`, `dataset_version_uuid?`, `pipeline_uuid?`, `model_uuids?`, `author_uuids?` | `list[MultiMetricLeaderboardEntry]` |
+| `/api/v1/leaderboard/query` | POST | pubblico | body `LeaderboardQuery` (metriche multiple, filtri model/author/hyperparams) | `list[MultiMetricLeaderboardEntry]` |
+| `/api/v1/leaderboard/best-configuration` | POST | pubblico | body `BestConfigurationQuery` | `BestConfigurationResponse` |
 
 Regola validazione:
 

@@ -295,11 +295,16 @@ Tutti i service sono accessibili tramite il barrel `services/index.ts`.
 
 ### `dataset.service.ts`
 
-| Metodo            | Endpoint               | Descrizione               |
-|-------------------|------------------------|---------------------------|
-| `getAll()`        | `GET /datasets`        | Lista tutti i dataset     |
+| Metodo | Endpoint | Descrizione |
+|--------|----------|-------------|
+| `getAll()` | `GET /datasets` | Lista tutti i dataset |
 | `getByUuid(uuid)` | `GET /datasets/{uuid}` | Dettaglio singolo dataset |
-| `create(data)`    | `POST /datasets`       | Crea nuovo dataset        |
+| `create(data)` | `POST /datasets` | Crea nuovo dataset |
+| `getVersions(datasetUuid)` | `GET /datasets/{uuid}/versions` | Lista versioni dataset |
+| `getVersionByUuid(versionUuid)` | `GET /dataset-versions/{uuid}` | Dettaglio versione |
+| `getVersionSourcesWithResources(versionUuid)` | `GET /dataset-versions/{uuid}/sources-with-resources` | Sources annidate con resources |
+| `getVersionPipelines(versionUuid)` | `GET /dataset-versions/{uuid}/pipelines` | Lista pipeline della versione |
+| `getVersionYaml(versionUuid, kind)` | `GET /dataset-versions/{uuid}/yaml/{kind}` | YAML dataset/version/characteristics |
 
 ### `ml-model.service.ts`
 
@@ -325,14 +330,20 @@ Tutti i service sono accessibili tramite il barrel `services/index.ts`.
 
 | Metodo | Endpoint | Descrizione |
 |--------|----------|-------------|
-| `get(datasetUuid, metric, split, n, datasetVersionUuid?, pipelineUuid?)` | `GET /leaderboard?...` | Top-N con filtri dataset/version/pipeline |
-| `getMultiMetric(datasetUuid, metrics, split, sortBy, n, datasetVersionUuid?, pipelineUuid?)` | `GET /leaderboard/multi?...` | Leaderboard multi-metrica con filtri dataset/version/pipeline |
+| `get(datasetUuid, metric, split, n, datasetVersionUuid?, pipelineUuid?, modelUuids?, authorUuids?)` | `GET /leaderboard?...` | Top-N con filtri dataset/version/pipeline/model/author |
+| `getMultiMetric(datasetUuid, metrics, split, sortBy, n, datasetVersionUuid?, pipelineUuid?, modelUuids?, authorUuids?)` | `GET /leaderboard/multi?...` | Leaderboard multi-metrica con filtri estesi |
+| `query(payload)` | `POST /leaderboard/query` | Query avanzata con hyperparam filters |
+| `getBestConfiguration(payload)` | `POST /leaderboard/best-configuration` | Best configuration server-side |
 
 ### Comportamento `routes/leaderboard.tsx`
 
-- filtri server-side: `dataset`, `dataset_version`, `pipeline`, `split`, `sort_by`, `top_n`
+- filtri server-side: `dataset`, `dataset_version`, `pipeline`, `split`, `sort_by`, `top_n`, `model_uuids`, `author_uuids`, `hyperparam_filters`
+- tabella mostrata prima del grafico (tabella come vista primaria)
+- column picker persistito in `localStorage` (colonne base + metriche + hyperparams)
+- bottone `Show best configuration` (modal con grouping per hyperparams)
+- bottone `Export LaTeX` sulla tabella visibile/filtrata
 - filtro client-side sempre visibile: `chart_mode` (`auto` | `line` | `bar`)
-- tabella con sort client-side su header cliccabili (`#`, `Model`, metriche, `Running Steps`)
+- tabella con sort client-side su header cliccabili
 - toggle asc/desc per ogni colonna; icona direzione nell'intestazione
 - ranking visuale ricalcolato in base all'ordine corrente della tabella
 - grafico adattivo:

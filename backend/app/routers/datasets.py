@@ -12,6 +12,7 @@ from app.schemas.dataset_versions import (
     DatasetVersionYamlPublic,
     ResourcePublic,
     SourcePublic,
+    SourceWithResourcesPublic,
 )
 from app.schemas.datasets import DatasetCreate, DatasetPublic, DatasetSummary
 from app.schemas.experiments import ExperimentSummary
@@ -30,6 +31,7 @@ from app.services.dataset_versions import (
     list_dataset_versions,
     list_resources_for_version,
     list_sources_for_version,
+    list_sources_with_resources_for_version,
     preview_dataset_version_payload,
 )
 from app.services.datasets import (
@@ -141,6 +143,17 @@ async def get_dataset_version_resources_endpoint(
     version_uuid: UUID,
 ) -> list[ResourcePublic]:
     return await list_resources_for_version(version_uuid)
+
+
+@router.get(
+    "/dataset-versions/{version_uuid}/sources-with-resources",
+    response_model=list[SourceWithResourcesPublic],
+    tags=["dataset-versions"],
+)
+async def get_dataset_version_sources_with_resources_endpoint(
+    version_uuid: UUID,
+) -> list[SourceWithResourcesPublic]:
+    return await list_sources_with_resources_for_version(version_uuid)
 
 
 @router.get(

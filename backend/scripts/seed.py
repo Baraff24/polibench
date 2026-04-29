@@ -4,9 +4,10 @@ scripts/seed.py
 
 Seed registry-aware allineato al modello DataRec:
 - Dataset catalografico
-- DatasetVersion con YAML raw (dataset/version/characteristics/pipeline)
+- DatasetVersion con YAML raw (dataset/version/characteristics)
 - Source/Resource derivate dal version YAML (via service reale)
-- Experiment agganciati a DatasetVersion
+- Pipeline separate da DatasetVersion
+- Experiment agganciati a Pipeline
 - ExperimentMetric importate via CSV + MetricImportJob async
 
 Uso:
@@ -25,6 +26,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 from beanie import init_beanie
@@ -93,6 +95,7 @@ class MetricCsvRow:
 
 @dataclass(frozen=True)
 class DatasetFixture:
+    key: str
     name: str
     task: TaskType
     description: str
@@ -117,7 +120,7 @@ class ModelFixture:
 
 @dataclass(frozen=True)
 class PipelineFixture:
-    dataset_name: str
+    dataset_key: str
     dataset_version: str
     code: str
     pipeline_yaml_raw: str
@@ -126,7 +129,7 @@ class PipelineFixture:
 
 @dataclass(frozen=True)
 class ExperimentFixture:
-    dataset_name: str
+    dataset_key: str
     dataset_version: str
     model_name: str
     run_name: str
@@ -134,6 +137,7 @@ class ExperimentFixture:
     status: Status
     pipeline_code: str = "P001"
     submitted_by: str = "admin"
+    training_config: dict[str, Any] | None = None
     metrics: list[MetricCsvRow] = field(default_factory=list)
 
 
@@ -145,108 +149,112 @@ class SeedScenario:
     experiments: list[ExperimentFixture]
 
 
-def _dump_yaml(data: dict[str, Any]) -> str:
+SCRIPT_DIR = Path(__file__).resolve().parent
+FIXTURE_ROOT = SCRIPT_DIR / "fixtures" / "datarec_registry"
+DATASET_FIXTURES_DIR = FIXTURE_ROOT / "datasets"
+VERSION_FIXTURES_DIR = FIXTURE_ROOT / "versions"
+METRICS_FIXTURES_DIR = FIXTURE_ROOT / "metrics"
+
+
+def _require_yaml() -> Any:
     if yaml is None:
-        raise RuntimeError("PyYAML non disponibile: impossibile generare fixture YAML")
-    return yaml.safe_dump(data, sort_keys=False, allow_unicode=True).strip()
+        raise RuntimeError("PyYAML non disponibile")
+    return yaml
 
 
-def _dataset_yaml(
-    name: str,
-    versions: list[str],
-    latest_version: str,
-    description: str,
-    citation: str,
-) -> str:
-    return _dump_yaml(
-        {
-            "name": name,
-            "versions": versions,
-            "latest_version": latest_version,
-            "source": "DataRecHub",
-            "description": description,
-            "citation": citation,
-        }
-    )
+def _read_fixture(path: Path) -> str:
+    if not path.exists():
+        raise RuntimeError(f"Fixture non trovata: {path}")
+    return path.read_text(encoding="utf-8").strip()
 
 
-def _version_yaml(
-    dataset_name: str,
-    version: str,
-    sources: list[dict[str, Any]],
-    resources: list[dict[str, Any]],
-) -> str:
-    return _dump_yaml(
-        {
-            "dataset_name": dataset_name,
-            "version": version,
-            "sources": sources,
-            "resources": resources,
-        }
-    )
-
-
-def _characteristics_yaml(
-    dataset_name: str,
-    version: str,
-    n_users: int,
-    n_items: int,
-    n_interactions: int,
-    density: float,
-    gini_user: float,
-    gini_item: float,
-) -> str:
-    return _dump_yaml(
-        {
-            "dataset_name": dataset_name,
-            "version": version,
-            "characteristics": {
-                "n_users": n_users,
-                "n_items": n_items,
-                "n_interactions": n_interactions,
-                "density": density,
-                "gini_user": gini_user,
-                "gini_item": gini_item,
-            },
-        }
-    )
+def _dump_yaml(data: dict[str, Any]) -> str:
+    parser = _require_yaml()
+    return parser.safe_dump(data, sort_keys=False, allow_unicode=True).strip()
 
 
 def _pipeline_yaml(steps: list[dict[str, Any]]) -> str:
     return _dump_yaml({"pipeline": steps})
 
 
+def _registry_dataset_name(payload: dict[str, Any], fallback: str) -> str:
+    value = payload.get("dataset_name") or payload.get("name")
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return fallback
+
+
+def _registry_dataset_description(payload: dict[str, Any], fallback: str) -> str:
+    value = payload.get("description")
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return fallback
+
+
+def _make_dataset_fixture(
+    *,
+    key: str,
+    version: str,
+    task: TaskType,
+    visibility: Visibility,
+    owner: str,
+    pipeline_steps: list[dict[str, Any]],
+) -> DatasetFixture:
+    parser = _require_yaml()
+
+    dataset_yaml_raw = _read_fixture(DATASET_FIXTURES_DIR / f"{key}.yml")
+    version_yaml_raw = _read_fixture(VERSION_FIXTURES_DIR / f"{key}_{version}.yml")
+    characteristics_yaml_raw = _read_fixture(
+        METRICS_FIXTURES_DIR / f"{key}_{version}.yml"
+    )
+
+    dataset_payload = parser.safe_load(dataset_yaml_raw)
+    if not isinstance(dataset_payload, dict):
+        raise RuntimeError(f"Dataset YAML non valido per fixture '{key}'")
+
+    return DatasetFixture(
+        key=key,
+        name=_registry_dataset_name(dataset_payload, key),
+        task=task,
+        description=_registry_dataset_description(dataset_payload, f"{key} dataset"),
+        visibility=visibility,
+        version=version,
+        owner=owner,
+        dataset_yaml_raw=dataset_yaml_raw,
+        version_yaml_raw=version_yaml_raw,
+        characteristics_yaml_raw=characteristics_yaml_raw,
+        pipeline_yaml_raw=_pipeline_yaml(pipeline_steps),
+    )
+
+
 def _ranking_metrics(quality: str) -> list[MetricCsvRow]:
     levels = {
         "baseline": {
-            "recall@10": 0.080,
-            "ndcg@10": 0.050,
-            "map@10": 0.039,
-            "hitrate@10": 0.120,
+            "ndcg@10": (0.052, 10),
+            "recall@20": (0.107, 20),
+            "hit@10": (0.131, 10),
         },
         "good": {
-            "recall@10": 0.160,
-            "ndcg@10": 0.110,
-            "map@10": 0.091,
-            "hitrate@10": 0.220,
+            "ndcg@10": (0.118, 10),
+            "recall@20": (0.183, 20),
+            "hit@10": (0.249, 10),
         },
         "best": {
-            "recall@10": 0.210,
-            "ndcg@10": 0.151,
-            "map@10": 0.131,
-            "hitrate@10": 0.291,
+            "ndcg@10": (0.157, 10),
+            "recall@20": (0.236, 20),
+            "hit@10": (0.311, 10),
         },
     }
     selected = levels[quality]
     rows: list[MetricCsvRow] = []
     for split in (Split.TEST, Split.VALIDATION):
-        factor = 1.0 if split == Split.TEST else 0.93
-        for metric_name, base in selected.items():
+        factor = 1.0 if split == Split.TEST else 0.94
+        for metric_name, (base, k) in selected.items():
             rows.append(
                 MetricCsvRow(
                     split=split,
                     metric=metric_name,
-                    k=10,
+                    k=k,
                     value=round(base * factor, 6),
                     direction=Direction.MAX,
                 )
@@ -256,14 +264,14 @@ def _ranking_metrics(quality: str) -> list[MetricCsvRow]:
 
 def _rating_metrics(quality: str) -> list[MetricCsvRow]:
     levels = {
-        "baseline": {"rmse": 1.020, "mae": 0.810},
-        "good": {"rmse": 0.940, "mae": 0.745},
-        "best": {"rmse": 0.902, "mae": 0.705},
+        "baseline": {"rmse": 1.038, "mae": 0.824},
+        "good": {"rmse": 0.962, "mae": 0.758},
+        "best": {"rmse": 0.913, "mae": 0.717},
     }
     selected = levels[quality]
     rows: list[MetricCsvRow] = []
     for split in (Split.TEST, Split.VALIDATION):
-        penalty = 0.0 if split == Split.TEST else 0.018
+        penalty = 0.0 if split == Split.TEST else 0.02
         rows.append(
             MetricCsvRow(
                 split=split,
@@ -276,11 +284,47 @@ def _rating_metrics(quality: str) -> list[MetricCsvRow]:
             MetricCsvRow(
                 split=split,
                 metric="mae",
-                value=round(selected["mae"] + penalty * 0.7, 6),
+                value=round(selected["mae"] + penalty * 0.65, 6),
                 direction=Direction.MIN,
             )
         )
     return rows
+
+
+def _ranking_training_config(
+    *,
+    embedding_dim: int,
+    learning_rate: float,
+    batch_size: int,
+    epochs: int,
+    reg: float,
+    seed: int,
+) -> dict[str, Any]:
+    return {
+        "embedding_dim": embedding_dim,
+        "learning_rate": learning_rate,
+        "batch_size": batch_size,
+        "epochs": epochs,
+        "reg": reg,
+        "seed": seed,
+    }
+
+
+def _rating_training_config(
+    *,
+    n_factors: int,
+    learning_rate: float,
+    reg: float,
+    epochs: int,
+    seed: int,
+) -> dict[str, Any]:
+    return {
+        "n_factors": n_factors,
+        "learning_rate": learning_rate,
+        "reg": reg,
+        "epochs": epochs,
+        "seed": seed,
+    }
 
 
 USER_FIXTURES = [
@@ -300,6 +344,13 @@ USER_FIXTURES = [
         is_verified=True,
     ),
     UserFixture(
+        key="researcher2",
+        email="researcher2@polibench.dev",
+        password="researcher2123",
+        role=UserRole.RESEARCHER,
+        is_verified=True,
+    ),
+    UserFixture(
         key="viewer",
         email="viewer@polibench.dev",
         password="viewer123",
@@ -308,974 +359,199 @@ USER_FIXTURES = [
     ),
 ]
 
-MOVIELENS_VERSIONS = ["v1", "v2", "v3"]
-ALIBABA_VERSIONS = ["v1", "v2"]
-EPINIONS_VERSIONS = ["v1", "v2"]
-AMAZON_BOOKS_VERSIONS = ["2023", "2024"]
-LASTFM_VERSIONS = ["2011", "2014"]
 
-ALIBABA_V1 = DatasetFixture(
-    name="Alibaba-iFashion",
-    task=TaskType.RANKING,
-    description="Fashion recommendation benchmark with implicit feedback.",
-    visibility=Visibility.PUBLIC,
+ALIBABA_V1 = _make_dataset_fixture(
+    key="alibaba_ifashion",
     version="v1",
+    task=TaskType.RANKING,
+    visibility=Visibility.PUBLIC,
     owner="admin",
-    dataset_yaml_raw=_dataset_yaml(
-        name="Alibaba-iFashion",
-        versions=ALIBABA_VERSIONS,
-        latest_version="v2",
-        description="Fashion recommendation benchmark.",
-        citation="DataRecHub examples",
-    ),
-    version_yaml_raw=_version_yaml(
-        dataset_name="Alibaba-iFashion",
-        version="v1",
-        sources=[
-            {
-                "name": "raw-archive",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/alibaba_ifashion_v1.zip",
-                "filename": "alibaba_ifashion_v1.zip",
-                "checksum": "sha256:abc123",
-                "checksum_algorithm": "sha256",
-            }
-        ],
-        resources=[
-            {
-                "name": "interactions",
-                "source_name": "raw-archive",
-                "type": "interactions",
-                "format": "csv",
-                "required": True,
-            },
-            {
-                "name": "items",
-                "source_name": "raw-archive",
-                "type": "item_features",
-                "format": "csv",
-                "required": False,
-            },
-        ],
-    ),
-    characteristics_yaml_raw=_characteristics_yaml(
-        dataset_name="Alibaba-iFashion",
-        version="v1",
-        n_users=62010,
-        n_items=35402,
-        n_interactions=781453,
-        density=0.000356,
-        gini_user=0.612,
-        gini_item=0.701,
-    ),
-    pipeline_yaml_raw=_pipeline_yaml(
-        [
-            {
-                "name": "ingest",
-                "operation": "load_csv",
-                "params": {"file": "interactions.csv"},
-            },
-            {
-                "name": "normalize",
-                "operation": "normalize_ids",
-                "params": {"user_col": "user_id", "item_col": "item_id"},
-            },
-            {
-                "name": "split",
-                "operation": "leave_one_out",
-                "params": {"min_interactions": 5},
-            },
-        ]
-    ),
+    pipeline_steps=[
+        {
+            "name": "ingest",
+            "operation": "load_sequence",
+            "params": {"resource": "interactions"},
+        },
+        {
+            "name": "normalize",
+            "operation": "normalize_ids",
+            "params": {"encode_ids": True},
+        },
+        {
+            "name": "split",
+            "operation": "leave_one_out",
+            "params": {"min_interactions": 5},
+        },
+    ],
 )
 
-ALIBABA_V2 = DatasetFixture(
-    name="Alibaba-iFashion",
-    task=TaskType.RANKING,
-    description="Fashion recommendation benchmark with implicit feedback.",
-    visibility=Visibility.PUBLIC,
-    version="v2",
-    owner="admin",
-    dataset_yaml_raw=_dataset_yaml(
-        name="Alibaba-iFashion",
-        versions=ALIBABA_VERSIONS,
-        latest_version="v2",
-        description="Fashion recommendation benchmark.",
-        citation="DataRecHub examples",
-    ),
-    version_yaml_raw=_version_yaml(
-        dataset_name="Alibaba-iFashion",
-        version="v2",
-        sources=[
-            {
-                "name": "raw-archive-v2",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/alibaba_ifashion_v2.zip",
-                "filename": "alibaba_ifashion_v2.zip",
-                "checksum": "sha256:abc124",
-                "checksum_algorithm": "sha256",
-            },
-            {
-                "name": "metadata-sidecar-v2",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/alibaba_ifashion_v2_sidecar.zip",
-                "filename": "alibaba_ifashion_v2_sidecar.zip",
-            },
-        ],
-        resources=[
-            {
-                "name": "interactions",
-                "source_name": "raw-archive-v2",
-                "type": "interactions",
-                "format": "csv",
-                "required": True,
-            },
-            {
-                "name": "items",
-                "source_name": "metadata-sidecar-v2",
-                "type": "item_features",
-                "format": "csv",
-                "required": False,
-            },
-            {
-                "name": "category_graph",
-                "source_name": "metadata-sidecar-v2",
-                "type": "graph",
-                "format": "csv",
-                "required": False,
-            },
-        ],
-    ),
-    characteristics_yaml_raw=_characteristics_yaml(
-        dataset_name="Alibaba-iFashion",
-        version="v2",
-        n_users=70245,
-        n_items=41510,
-        n_interactions=912340,
-        density=0.000312,
-        gini_user=0.598,
-        gini_item=0.688,
-    ),
-    pipeline_yaml_raw=_pipeline_yaml(
-        [
-            {
-                "name": "ingest",
-                "operation": "load_csv",
-                "params": {"file": "interactions.csv"},
-            },
-            {
-                "name": "deduplicate",
-                "operation": "drop_duplicates",
-                "params": {"subset": ["user_id", "item_id", "timestamp"]},
-            },
-            {
-                "name": "kcore",
-                "operation": "filter_min_interactions",
-                "params": {"min_user_interactions": 5, "min_item_interactions": 5},
-            },
-            {
-                "name": "feature-join",
-                "operation": "join_item_features",
-                "params": {"resource": "items"},
-            },
-            {
-                "name": "split",
-                "operation": "leave_one_out",
-                "params": {"min_interactions": 5},
-            },
-        ]
-    ),
-)
-
-EPINIONS_V1_PRIVATE = DatasetFixture(
-    name="Epinions",
-    task=TaskType.RANKING,
-    description="Trust-aware recommendation benchmark from Epinions.",
-    visibility=Visibility.PRIVATE,
+EPINIONS_V1 = _make_dataset_fixture(
+    key="epinions",
     version="v1",
-    owner="researcher",
-    dataset_yaml_raw=_dataset_yaml(
-        name="Epinions",
-        versions=EPINIONS_VERSIONS,
-        latest_version="v2",
-        description="Epinions trust/review benchmark.",
-        citation="DataRecHub examples",
-    ),
-    version_yaml_raw=_version_yaml(
-        dataset_name="Epinions",
-        version="v1",
-        sources=[
-            {
-                "name": "epinions-main",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/epinions_v1.tar.gz",
-                "filename": "epinions_v1.tar.gz",
-            }
-        ],
-        resources=[
-            {
-                "name": "interactions",
-                "source_name": "epinions-main",
-                "type": "interactions",
-                "format": "tsv",
-                "required": True,
-            },
-            {
-                "name": "trust_network",
-                "source_name": "epinions-main",
-                "type": "graph",
-                "format": "tsv",
-                "required": False,
-            },
-        ],
-    ),
-    characteristics_yaml_raw=_characteristics_yaml(
-        dataset_name="Epinions",
-        version="v1",
-        n_users=40163,
-        n_items=139738,
-        n_interactions=664824,
-        density=0.000118,
-        gini_user=0.674,
-        gini_item=0.752,
-    ),
-    pipeline_yaml_raw=_pipeline_yaml(
-        [
-            {"name": "parse", "operation": "parse_tsv", "params": {"delimiter": "\\t"}},
-            {"name": "clean", "operation": "drop_duplicates", "params": {}},
-            {
-                "name": "split",
-                "operation": "temporal_split",
-                "params": {"train_ratio": 0.8},
-            },
-        ]
-    ),
-)
-
-EPINIONS_V2_PRIVATE = DatasetFixture(
-    name="Epinions",
     task=TaskType.RANKING,
-    description="Trust-aware recommendation benchmark from Epinions.",
     visibility=Visibility.PRIVATE,
-    version="v2",
     owner="researcher",
-    dataset_yaml_raw=_dataset_yaml(
-        name="Epinions",
-        versions=EPINIONS_VERSIONS,
-        latest_version="v2",
-        description="Epinions trust/review benchmark.",
-        citation="DataRecHub examples",
-    ),
-    version_yaml_raw=_version_yaml(
-        dataset_name="Epinions",
-        version="v2",
-        sources=[
-            {
-                "name": "epinions-main-v2",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/epinions_v2.tar.gz",
-                "filename": "epinions_v2.tar.gz",
-                "checksum": "sha256:epinions-v2",
-                "checksum_algorithm": "sha256",
-            },
-            {
-                "name": "epinions-trust-v2",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/epinions_trust_v2.tsv.gz",
-                "filename": "epinions_trust_v2.tsv.gz",
-            },
-        ],
-        resources=[
-            {
-                "name": "interactions",
-                "source_name": "epinions-main-v2",
-                "type": "interactions",
-                "format": "tsv",
-                "required": True,
-            },
-            {
-                "name": "trust_network",
-                "source_name": "epinions-trust-v2",
-                "type": "graph",
-                "format": "tsv",
-                "required": False,
-            },
-            {
-                "name": "review_metadata",
-                "source_name": "epinions-main-v2",
-                "type": "item_features",
-                "format": "tsv",
-                "required": False,
-            },
-        ],
-    ),
-    characteristics_yaml_raw=_characteristics_yaml(
-        dataset_name="Epinions",
-        version="v2",
-        n_users=42890,
-        n_items=150342,
-        n_interactions=744512,
-        density=0.000115,
-        gini_user=0.661,
-        gini_item=0.739,
-    ),
-    pipeline_yaml_raw=_pipeline_yaml(
-        [
-            {"name": "parse", "operation": "parse_tsv", "params": {"delimiter": "\\t"}},
-            {
-                "name": "kcore",
-                "operation": "filter_min_interactions",
-                "params": {"min_user_interactions": 3},
-            },
-            {
-                "name": "trust-link",
-                "operation": "join_graph_features",
-                "params": {"resource": "trust_network"},
-            },
-            {
-                "name": "split",
-                "operation": "temporal_split",
-                "params": {"train_ratio": 0.82},
-            },
-        ]
-    ),
+    pipeline_steps=[
+        {"name": "ingest", "operation": "parse_tsv", "params": {"resource": "trust"}},
+        {"name": "deduplicate", "operation": "drop_duplicates", "params": {}},
+        {"name": "split", "operation": "temporal_split", "params": {"train_ratio": 0.8}},
+    ],
 )
 
-MOVIELENS_100K_V1 = DatasetFixture(
-    name="MovieLens-100K",
-    task=TaskType.RATING_PREDICTION,
-    description="Classic explicit-feedback benchmark for rating prediction.",
-    visibility=Visibility.PUBLIC,
-    version="v1",
-    owner="researcher",
-    dataset_yaml_raw=_dataset_yaml(
-        name="MovieLens-100K",
-        versions=MOVIELENS_VERSIONS,
-        latest_version="v3",
-        description="MovieLens 100K multi-version benchmark.",
-        citation="GroupLens Research",
-    ),
-    version_yaml_raw=_version_yaml(
-        dataset_name="MovieLens-100K",
-        version="v1",
-        sources=[
-            {
-                "name": "ml100k-main-v1",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/movielens_100k_v1.zip",
-                "filename": "movielens_100k_v1.zip",
-            }
-        ],
-        resources=[
-            {
-                "name": "ratings",
-                "source_name": "ml100k-main-v1",
-                "type": "interactions",
-                "format": "csv",
-                "required": True,
-            }
-        ],
-    ),
-    characteristics_yaml_raw=_characteristics_yaml(
-        dataset_name="MovieLens-100K",
-        version="v1",
-        n_users=943,
-        n_items=1682,
-        n_interactions=100000,
-        density=0.063046,
-        gini_user=0.321,
-        gini_item=0.417,
-    ),
-    pipeline_yaml_raw=_pipeline_yaml(
-        [
-            {"name": "load", "operation": "load_csv", "params": {"file": "ratings.csv"}},
-            {
-                "name": "split",
-                "operation": "random_split",
-                "params": {"train_ratio": 0.8, "validation_ratio": 0.1},
-            },
-        ]
-    ),
-)
-
-MOVIELENS_100K_V2 = DatasetFixture(
-    name="MovieLens-100K",
-    task=TaskType.RATING_PREDICTION,
-    description="Classic explicit-feedback benchmark for rating prediction.",
-    visibility=Visibility.PUBLIC,
-    version="v2",
-    owner="researcher",
-    dataset_yaml_raw=_dataset_yaml(
-        name="MovieLens-100K",
-        versions=MOVIELENS_VERSIONS,
-        latest_version="v3",
-        description="MovieLens 100K multi-version benchmark.",
-        citation="GroupLens Research",
-    ),
-    version_yaml_raw=_version_yaml(
-        dataset_name="MovieLens-100K",
-        version="v2",
-        sources=[
-            {
-                "name": "ml100k-main-v2",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/movielens_100k_v2.zip",
-                "filename": "movielens_100k_v2.zip",
-                "checksum": "sha256:ml100k-v2",
-                "checksum_algorithm": "sha256",
-            },
-            {
-                "name": "ml100k-docs-v2",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/movielens_100k_v2_readme.txt",
-                "filename": "movielens_100k_v2_readme.txt",
-            },
-        ],
-        resources=[
-            {
-                "name": "ratings",
-                "source_name": "ml100k-main-v2",
-                "type": "interactions",
-                "format": "csv",
-                "required": True,
-            },
-            {
-                "name": "item_metadata",
-                "source_name": "ml100k-main-v2",
-                "type": "item_features",
-                "format": "csv",
-                "required": False,
-            },
-        ],
-    ),
-    characteristics_yaml_raw=_characteristics_yaml(
-        dataset_name="MovieLens-100K",
-        version="v2",
-        n_users=980,
-        n_items=1720,
-        n_interactions=108500,
-        density=0.06437,
-        gini_user=0.338,
-        gini_item=0.431,
-    ),
-    pipeline_yaml_raw=_pipeline_yaml(
-        [
-            {"name": "load", "operation": "load_csv", "params": {"file": "ratings.csv"}},
-            {
-                "name": "filter",
-                "operation": "filter_min_interactions",
-                "params": {"min_user_interactions": 5},
-            },
-            {
-                "name": "split",
-                "operation": "temporal_split",
-                "params": {"train_ratio": 0.8, "validation_ratio": 0.1},
-            },
-        ]
-    ),
-)
-
-MOVIELENS_100K_V3 = DatasetFixture(
-    name="MovieLens-100K",
-    task=TaskType.RATING_PREDICTION,
-    description="Classic explicit-feedback benchmark for rating prediction.",
-    visibility=Visibility.PUBLIC,
-    version="v3",
-    owner="researcher",
-    dataset_yaml_raw=_dataset_yaml(
-        name="MovieLens-100K",
-        versions=MOVIELENS_VERSIONS,
-        latest_version="v3",
-        description="MovieLens 100K multi-version benchmark.",
-        citation="GroupLens Research",
-    ),
-    version_yaml_raw=_version_yaml(
-        dataset_name="MovieLens-100K",
-        version="v3",
-        sources=[
-            {
-                "name": "ml100k-main-v3",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/movielens_100k_v3.zip",
-                "filename": "movielens_100k_v3.zip",
-            },
-            {
-                "name": "ml100k-sidecar-v3",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/movielens_100k_v3_sidecar.zip",
-                "filename": "movielens_100k_v3_sidecar.zip",
-            },
-        ],
-        resources=[
-            {
-                "name": "ratings",
-                "source_name": "ml100k-main-v3",
-                "type": "interactions",
-                "format": "csv",
-                "required": True,
-            },
-            {
-                "name": "item_metadata",
-                "source_name": "ml100k-main-v3",
-                "type": "item_features",
-                "format": "csv",
-                "required": False,
-            },
-            {
-                "name": "genre_graph",
-                "source_name": "ml100k-sidecar-v3",
-                "type": "graph",
-                "format": "csv",
-                "required": False,
-            },
-        ],
-    ),
-    characteristics_yaml_raw=_characteristics_yaml(
-        dataset_name="MovieLens-100K",
-        version="v3",
-        n_users=1015,
-        n_items=1764,
-        n_interactions=113200,
-        density=0.06318,
-        gini_user=0.341,
-        gini_item=0.439,
-    ),
-    pipeline_yaml_raw=_pipeline_yaml(
-        [
-            {"name": "load", "operation": "load_csv", "params": {"file": "ratings.csv"}},
-            {
-                "name": "filter",
-                "operation": "filter_min_interactions",
-                "params": {"min_user_interactions": 5, "min_item_interactions": 10},
-            },
-            {"name": "normalize", "operation": "normalize_ids", "params": {}},
-            {
-                "name": "feature-join",
-                "operation": "join_item_features",
-                "params": {"resource": "item_metadata"},
-            },
-            {
-                "name": "split",
-                "operation": "temporal_split",
-                "params": {"train_ratio": 0.82, "validation_ratio": 0.08},
-            },
-        ]
-    ),
-)
-
-AMAZON_BOOKS_V2023 = DatasetFixture(
-    name="Amazon-Books",
-    task=TaskType.RATING_PREDICTION,
-    description="Amazon Books benchmark for explicit-feedback recommendation.",
-    visibility=Visibility.PUBLIC,
-    version="2023",
-    owner="researcher",
-    dataset_yaml_raw=_dataset_yaml(
-        name="Amazon-Books",
-        versions=AMAZON_BOOKS_VERSIONS,
-        latest_version="2024",
-        description="Amazon Books benchmark with yearly snapshots.",
-        citation="DataRecHub examples",
-    ),
-    version_yaml_raw=_version_yaml(
-        dataset_name="Amazon-Books",
-        version="2023",
-        sources=[
-            {
-                "name": "amazon-books-2023",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/amazon_books_2023.parquet",
-                "filename": "amazon_books_2023.parquet",
-                "checksum": "sha256:amazon-books-2023",
-                "checksum_algorithm": "sha256",
-            }
-        ],
-        resources=[
-            {
-                "name": "ratings",
-                "source_name": "amazon-books-2023",
-                "type": "interactions",
-                "format": "parquet",
-                "required": True,
-            },
-            {
-                "name": "item_metadata",
-                "source_name": "amazon-books-2023",
-                "type": "item_features",
-                "format": "jsonl",
-                "required": False,
-            },
-        ],
-    ),
-    characteristics_yaml_raw=_characteristics_yaml(
-        dataset_name="Amazon-Books",
-        version="2023",
-        n_users=892345,
-        n_items=515210,
-        n_interactions=2987450,
-        density=0.000006,
-        gini_user=0.743,
-        gini_item=0.812,
-    ),
-    pipeline_yaml_raw=_pipeline_yaml(
-        [
-            {
-                "name": "load",
-                "operation": "load_parquet",
-                "params": {"file": "ratings.parquet"},
-            },
-            {
-                "name": "clean",
-                "operation": "drop_missing_values",
-                "params": {"columns": ["user_id", "item_id", "rating"]},
-            },
-            {
-                "name": "split",
-                "operation": "random_split",
-                "params": {"train_ratio": 0.8, "validation_ratio": 0.1},
-            },
-        ]
-    ),
-)
-
-AMAZON_BOOKS_V2024 = DatasetFixture(
-    name="Amazon-Books",
-    task=TaskType.RATING_PREDICTION,
-    description="Amazon Books benchmark for explicit-feedback recommendation.",
-    visibility=Visibility.PUBLIC,
-    version="2024",
-    owner="researcher",
-    dataset_yaml_raw=_dataset_yaml(
-        name="Amazon-Books",
-        versions=AMAZON_BOOKS_VERSIONS,
-        latest_version="2024",
-        description="Amazon Books benchmark with yearly snapshots.",
-        citation="DataRecHub examples",
-    ),
-    version_yaml_raw=_version_yaml(
-        dataset_name="Amazon-Books",
-        version="2024",
-        sources=[
-            {
-                "name": "amazon-books-2024",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/amazon_books_2024.parquet",
-                "filename": "amazon_books_2024.parquet",
-                "checksum": "sha256:amazon-books-2024",
-                "checksum_algorithm": "sha256",
-            },
-            {
-                "name": "amazon-books-sidecar-2024",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/amazon_books_2024_sidecar.zip",
-                "filename": "amazon_books_2024_sidecar.zip",
-            },
-        ],
-        resources=[
-            {
-                "name": "ratings",
-                "source_name": "amazon-books-2024",
-                "type": "interactions",
-                "format": "parquet",
-                "required": True,
-            },
-            {
-                "name": "item_metadata",
-                "source_name": "amazon-books-sidecar-2024",
-                "type": "item_features",
-                "format": "jsonl",
-                "required": False,
-            },
-            {
-                "name": "category_tree",
-                "source_name": "amazon-books-sidecar-2024",
-                "type": "graph",
-                "format": "json",
-                "required": False,
-            },
-        ],
-    ),
-    characteristics_yaml_raw=_characteristics_yaml(
-        dataset_name="Amazon-Books",
-        version="2024",
-        n_users=941120,
-        n_items=548990,
-        n_interactions=3278900,
-        density=0.000006,
-        gini_user=0.731,
-        gini_item=0.798,
-    ),
-    pipeline_yaml_raw=_pipeline_yaml(
-        [
-            {
-                "name": "load",
-                "operation": "load_parquet",
-                "params": {"file": "ratings.parquet"},
-            },
-            {
-                "name": "kcore",
-                "operation": "filter_min_interactions",
-                "params": {"min_user_interactions": 5, "min_item_interactions": 5},
-            },
-            {
-                "name": "normalize",
-                "operation": "normalize_ids",
-                "params": {"user_col": "user_id", "item_col": "item_id"},
-            },
-            {
-                "name": "split",
-                "operation": "temporal_split",
-                "params": {"train_ratio": 0.82, "validation_ratio": 0.08},
-            },
-        ]
-    ),
-)
-
-LASTFM_2011 = DatasetFixture(
-    name="LastFM",
-    task=TaskType.RANKING,
-    description="Music recommendation benchmark with implicit feedback.",
-    visibility=Visibility.PUBLIC,
+LASTFM_2011 = _make_dataset_fixture(
+    key="lastfm",
     version="2011",
-    owner="researcher",
-    dataset_yaml_raw=_dataset_yaml(
-        name="LastFM",
-        versions=LASTFM_VERSIONS,
-        latest_version="2014",
-        description="LastFM benchmark with multiple curated snapshots.",
-        citation="DataRecHub examples",
-    ),
-    version_yaml_raw=_version_yaml(
-        dataset_name="LastFM",
-        version="2011",
-        sources=[
-            {
-                "name": "lastfm-2011-main",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/lastfm_2011.tar.gz",
-                "filename": "lastfm_2011.tar.gz",
-            }
-        ],
-        resources=[
-            {
-                "name": "interactions",
-                "source_name": "lastfm-2011-main",
-                "type": "interactions",
-                "format": "tsv",
-                "required": True,
-            },
-            {
-                "name": "social_graph",
-                "source_name": "lastfm-2011-main",
-                "type": "graph",
-                "format": "tsv",
-                "required": False,
-            },
-        ],
-    ),
-    characteristics_yaml_raw=_characteristics_yaml(
-        dataset_name="LastFM",
-        version="2011",
-        n_users=1892,
-        n_items=17632,
-        n_interactions=92834,
-        density=0.002781,
-        gini_user=0.584,
-        gini_item=0.643,
-    ),
-    pipeline_yaml_raw=_pipeline_yaml(
-        [
-            {"name": "load", "operation": "parse_tsv", "params": {"delimiter": "\\t"}},
-            {
-                "name": "filter",
-                "operation": "filter_min_interactions",
-                "params": {"min_user_interactions": 20},
-            },
-            {"name": "split", "operation": "leave_one_out", "params": {}},
-        ]
-    ),
-)
-
-LASTFM_2014 = DatasetFixture(
-    name="LastFM",
     task=TaskType.RANKING,
-    description="Music recommendation benchmark with implicit feedback.",
     visibility=Visibility.PUBLIC,
-    version="2014",
     owner="researcher",
-    dataset_yaml_raw=_dataset_yaml(
-        name="LastFM",
-        versions=LASTFM_VERSIONS,
-        latest_version="2014",
-        description="LastFM benchmark with multiple curated snapshots.",
-        citation="DataRecHub examples",
-    ),
-    version_yaml_raw=_version_yaml(
-        dataset_name="LastFM",
-        version="2014",
-        sources=[
-            {
-                "name": "lastfm-2014-main",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/lastfm_2014.tar.gz",
-                "filename": "lastfm_2014.tar.gz",
-                "checksum": "sha256:lastfm-2014-main",
-                "checksum_algorithm": "sha256",
-            },
-            {
-                "name": "lastfm-2014-tags",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/lastfm_2014_tags.tsv.gz",
-                "filename": "lastfm_2014_tags.tsv.gz",
-            },
-        ],
-        resources=[
-            {
-                "name": "interactions",
-                "source_name": "lastfm-2014-main",
-                "type": "interactions",
-                "format": "tsv",
-                "required": True,
-            },
-            {
-                "name": "social_graph",
-                "source_name": "lastfm-2014-main",
-                "type": "graph",
-                "format": "tsv",
-                "required": False,
-            },
-            {
-                "name": "tags",
-                "source_name": "lastfm-2014-tags",
-                "type": "item_features",
-                "format": "tsv",
-                "required": False,
-            },
-        ],
-    ),
-    characteristics_yaml_raw=_characteristics_yaml(
-        dataset_name="LastFM",
-        version="2014",
-        n_users=2485,
-        n_items=20944,
-        n_interactions=131806,
-        density=0.00253,
-        gini_user=0.567,
-        gini_item=0.618,
-    ),
-    pipeline_yaml_raw=_pipeline_yaml(
-        [
-            {"name": "load", "operation": "parse_tsv", "params": {"delimiter": "\\t"}},
-            {
-                "name": "kcore",
-                "operation": "filter_min_interactions",
-                "params": {"min_user_interactions": 15, "min_item_interactions": 20},
-            },
-            {
-                "name": "feature-join",
-                "operation": "join_item_features",
-                "params": {"resource": "tags"},
-            },
-            {
-                "name": "split",
-                "operation": "temporal_split",
-                "params": {"train_ratio": 0.8, "validation_ratio": 0.1},
-            },
-        ]
-    ),
+    pipeline_steps=[
+        {
+            "name": "ingest",
+            "operation": "parse_tabular",
+            "params": {"resource": "ratings"},
+        },
+        {
+            "name": "kcore",
+            "operation": "filter_min_interactions",
+            "params": {"min_user_interactions": 20},
+        },
+        {"name": "split", "operation": "leave_one_out", "params": {}},
+    ],
 )
 
-EDGE_TINY_RANKING_V1 = DatasetFixture(
-    name="Tiny-Edge-Ranking",
+MOVIELENS_100K = _make_dataset_fixture(
+    key="movielens",
+    version="100k",
+    task=TaskType.RATING_PREDICTION,
+    visibility=Visibility.PUBLIC,
+    owner="researcher",
+    pipeline_steps=[
+        {"name": "ingest", "operation": "parse_tsv", "params": {"resource": "ratings"}},
+        {"name": "normalize", "operation": "normalize_ids", "params": {}},
+        {
+            "name": "split",
+            "operation": "random_split",
+            "params": {"train_ratio": 0.8, "validation_ratio": 0.1},
+        },
+    ],
+)
+
+MOVIELENS_1M = _make_dataset_fixture(
+    key="movielens",
+    version="1m",
+    task=TaskType.RATING_PREDICTION,
+    visibility=Visibility.PUBLIC,
+    owner="researcher",
+    pipeline_steps=[
+        {"name": "ingest", "operation": "parse_dat", "params": {"resource": "ratings"}},
+        {
+            "name": "kcore",
+            "operation": "filter_min_interactions",
+            "params": {"min_user_interactions": 5, "min_item_interactions": 5},
+        },
+        {
+            "name": "split",
+            "operation": "temporal_split",
+            "params": {"train_ratio": 0.82, "validation_ratio": 0.08},
+        },
+    ],
+)
+
+MOVIELENS_20M = _make_dataset_fixture(
+    key="movielens",
+    version="20m",
+    task=TaskType.RATING_PREDICTION,
+    visibility=Visibility.PUBLIC,
+    owner="researcher",
+    pipeline_steps=[
+        {"name": "ingest", "operation": "parse_csv", "params": {"resource": "ratings"}},
+        {
+            "name": "kcore",
+            "operation": "filter_min_interactions",
+            "params": {"min_user_interactions": 10, "min_item_interactions": 10},
+        },
+        {
+            "name": "split",
+            "operation": "temporal_split",
+            "params": {"train_ratio": 0.85, "validation_ratio": 0.05},
+        },
+    ],
+)
+
+AMAZON_BOOKS_2023 = _make_dataset_fixture(
+    key="amazon_books",
+    version="2023",
+    task=TaskType.RATING_PREDICTION,
+    visibility=Visibility.PUBLIC,
+    owner="researcher2",
+    pipeline_steps=[
+        {"name": "ingest", "operation": "parse_csv", "params": {"resource": "ratings"}},
+        {
+            "name": "sanitize",
+            "operation": "drop_missing_values",
+            "params": {"columns": ["user_id", "parent_asin", "rating"]},
+        },
+        {
+            "name": "split",
+            "operation": "temporal_split",
+            "params": {"train_ratio": 0.82, "validation_ratio": 0.08},
+        },
+    ],
+)
+
+GOWALLA_CHECKINS = _make_dataset_fixture(
+    key="gowalla",
+    version="checkins",
     task=TaskType.RANKING,
-    description="Dataset ridotto per edge cases validi.",
-    visibility=Visibility.PRIVATE,
-    version="v1",
-    owner="admin",
-    dataset_yaml_raw=_dataset_yaml(
-        name="Tiny-Edge-Ranking",
-        versions=["v1"],
-        latest_version="v1",
-        description="Edge dataset with small valid registry.",
-        citation="Internal demo fixture",
-    ),
-    version_yaml_raw=_version_yaml(
-        dataset_name="Tiny-Edge-Ranking",
-        version="v1",
-        sources=[
-            {
-                "name": "tiny-source",
-                "source_type": "url",
-                "downloadable": True,
-                "url": "https://example.org/datasets/tiny_edge_ranking_v1.csv",
-                "filename": "tiny_edge_ranking_v1.csv",
-            }
-        ],
-        resources=[
-            {
-                "name": "interactions",
-                "source_name": "tiny-source",
-                "type": "interactions",
-                "format": "csv",
-                "required": True,
-            }
-        ],
-    ),
-    characteristics_yaml_raw=_characteristics_yaml(
-        dataset_name="Tiny-Edge-Ranking",
-        version="v1",
-        n_users=120,
-        n_items=64,
-        n_interactions=850,
-        density=0.110677,
-        gini_user=0.411,
-        gini_item=0.454,
-    ),
-    pipeline_yaml_raw=_pipeline_yaml(
-        [
-            {
-                "name": "load",
-                "operation": "load_csv",
-                "params": {"file": "interactions.csv"},
-            },
-            {"name": "split", "operation": "leave_one_out", "params": {}},
-            {"name": "post-check", "operation": "validate_schema", "params": {}},
-        ]
-    ),
+    visibility=Visibility.PUBLIC,
+    owner="researcher2",
+    pipeline_steps=[
+        {"name": "ingest", "operation": "parse_tsv", "params": {"resource": "checkins"}},
+        {
+            "name": "sessionize",
+            "operation": "sessionize",
+            "params": {"max_gap_minutes": 60},
+        },
+        {"name": "split", "operation": "leave_one_out", "params": {}},
+    ],
+)
+
+GOWALLA_FRIENDSHIPS = _make_dataset_fixture(
+    key="gowalla",
+    version="friendships",
+    task=TaskType.RANKING,
+    visibility=Visibility.PUBLIC,
+    owner="researcher2",
+    pipeline_steps=[
+        {
+            "name": "ingest",
+            "operation": "parse_tsv",
+            "params": {"resource": "ratings"},
+        },
+        {"name": "normalize", "operation": "normalize_ids", "params": {}},
+        {
+            "name": "split",
+            "operation": "random_split",
+            "params": {"train_ratio": 0.8, "validation_ratio": 0.1},
+        },
+    ],
 )
 
 DATASET_FIXTURES_MINIMAL = [ALIBABA_V1]
+
 DATASET_FIXTURES_DEMO = [
     ALIBABA_V1,
-    ALIBABA_V2,
-    EPINIONS_V1_PRIVATE,
-    EPINIONS_V2_PRIVATE,
-    MOVIELENS_100K_V1,
-    MOVIELENS_100K_V2,
-    MOVIELENS_100K_V3,
-    AMAZON_BOOKS_V2023,
-    AMAZON_BOOKS_V2024,
+    EPINIONS_V1,
     LASTFM_2011,
-    LASTFM_2014,
+    MOVIELENS_100K,
+    MOVIELENS_1M,
+    MOVIELENS_20M,
+    AMAZON_BOOKS_2023,
+    GOWALLA_CHECKINS,
+    GOWALLA_FRIENDSHIPS,
 ]
-DATASET_FIXTURES_EDGE = [EDGE_TINY_RANKING_V1, MOVIELENS_100K_V3]
+
+DATASET_FIXTURES_EDGE = [MOVIELENS_20M, GOWALLA_FRIENDSHIPS]
 
 MODEL_FIXTURES_MINIMAL = [
     ModelFixture(
@@ -1284,7 +560,7 @@ MODEL_FIXTURES_MINIMAL = [
         owner="admin",
         paper_url="https://arxiv.org/abs/2002.02126",
         implementation="https://github.com/gusye1234/LightGCN-PyTorch",
-        hyperparams={"n_layers": 3, "embedding_dim": 64, "lr": 0.001},
+        hyperparams={"embedding_dim": 64, "n_layers": 3, "learning_rate": 0.001},
     )
 ]
 
@@ -1296,7 +572,7 @@ MODEL_FIXTURES_DEMO = [
         owner="researcher",
         paper_url="https://arxiv.org/abs/1205.2618",
         implementation="https://github.com/guoyang9/BPR-pytorch",
-        hyperparams={"embedding_dim": 64, "lr": 0.001, "reg": 0.0001},
+        hyperparams={"embedding_dim": 64, "learning_rate": 0.001, "reg": 0.0001},
     ),
     ModelFixture(
         name="SVD",
@@ -1304,31 +580,15 @@ MODEL_FIXTURES_DEMO = [
         owner="researcher",
         paper_url="https://dl.acm.org/doi/10.1145/1401890.1401944",
         implementation="https://surpriselib.com",
-        hyperparams={"n_factors": 100, "n_epochs": 20, "lr_all": 0.005},
+        hyperparams={"n_factors": 128, "learning_rate": 0.005, "reg": 0.01},
     ),
     ModelFixture(
         name="UserKNN",
         family="neighborhood",
-        owner="researcher",
+        owner="researcher2",
         paper_url="https://dl.acm.org/doi/10.1145/371920.372071",
         implementation="https://surpriselib.com",
-        hyperparams={"k": 40, "sim_options": {"name": "cosine", "user_based": True}},
-    ),
-    ModelFixture(
-        name="ItemKNN",
-        family="neighborhood",
-        owner="researcher",
-        paper_url="https://dl.acm.org/doi/10.1145/371920.372071",
-        implementation="https://surpriselib.com",
-        hyperparams={"k": 50, "sim_options": {"name": "pearson", "user_based": False}},
-    ),
-    ModelFixture(
-        name="NeuMF",
-        family="neural-cf",
-        owner="researcher",
-        paper_url="https://arxiv.org/abs/1708.05031",
-        implementation="https://github.com/hexiangnan/neural_collaborative_filtering",
-        hyperparams={"embedding_dim": 64, "mlp_layers": [128, 64, 32], "lr": 0.0005},
+        hyperparams={"k": 80, "sim": "cosine", "shrinkage": 100},
     ),
     ModelFixture(
         name="PopRank",
@@ -1338,6 +598,7 @@ MODEL_FIXTURES_DEMO = [
         hyperparams={"strategy": "global_popularity"},
     ),
 ]
+
 MODEL_FIXTURES_EDGE = [
     *MODEL_FIXTURES_MINIMAL,
     ModelFixture(
@@ -1345,7 +606,7 @@ MODEL_FIXTURES_EDGE = [
         family="baseline",
         owner="admin",
         implementation="https://example.org/models/random-baseline",
-        hyperparams={"seed": 123, "sampling": "uniform"},
+        hyperparams={"sampling": "uniform", "seed": 123},
     ),
 ]
 
@@ -1353,20 +614,20 @@ PIPELINE_FIXTURES_MINIMAL: list[PipelineFixture] = []
 
 PIPELINE_FIXTURES_DEMO = [
     PipelineFixture(
-        dataset_name="Alibaba-iFashion",
-        dataset_version="v2",
+        dataset_key="movielens",
+        dataset_version="100k",
         code="P002",
         pipeline_yaml_raw=_pipeline_yaml(
             [
                 {
-                    "name": "load",
-                    "operation": "load_csv",
-                    "params": {"file": "events.csv"},
+                    "name": "ingest",
+                    "operation": "parse_tsv",
+                    "params": {"resource": "ratings"},
                 },
                 {
-                    "name": "sessionize",
-                    "operation": "build_sessions",
-                    "params": {"max_gap_minutes": 30},
+                    "name": "kcore",
+                    "operation": "filter_min_interactions",
+                    "params": {"min_user_interactions": 10},
                 },
                 {
                     "name": "split",
@@ -1377,20 +638,20 @@ PIPELINE_FIXTURES_DEMO = [
         ),
     ),
     PipelineFixture(
-        dataset_name="MovieLens-100K",
-        dataset_version="v2",
+        dataset_key="movielens",
+        dataset_version="1m",
         code="P002",
         pipeline_yaml_raw=_pipeline_yaml(
             [
                 {
-                    "name": "load",
-                    "operation": "load_csv",
-                    "params": {"file": "ratings.csv"},
+                    "name": "ingest",
+                    "operation": "parse_dat",
+                    "params": {"resource": "ratings"},
                 },
                 {
-                    "name": "filter",
-                    "operation": "filter_min_interactions",
-                    "params": {"min_user_interactions": 10},
+                    "name": "feature-join",
+                    "operation": "join_content",
+                    "params": {"resource": "movies"},
                 },
                 {
                     "name": "split",
@@ -1401,46 +662,50 @@ PIPELINE_FIXTURES_DEMO = [
         ),
     ),
     PipelineFixture(
-        dataset_name="Amazon-Books",
-        dataset_version="2024",
+        dataset_key="amazon_books",
+        dataset_version="2023",
         code="P002",
         pipeline_yaml_raw=_pipeline_yaml(
             [
                 {
-                    "name": "load",
-                    "operation": "load_parquet",
-                    "params": {"file": "ratings.parquet"},
+                    "name": "ingest",
+                    "operation": "parse_csv",
+                    "params": {"resource": "ratings"},
                 },
                 {
                     "name": "deduplicate",
                     "operation": "drop_duplicates",
-                    "params": {"subset": ["user_id", "item_id", "timestamp"]},
+                    "params": {"subset": ["user_id", "parent_asin", "timestamp"]},
                 },
                 {
                     "name": "split",
-                    "operation": "temporal_split",
-                    "params": {"train_ratio": 0.84, "validation_ratio": 0.06},
+                    "operation": "leave_one_out",
+                    "params": {"min_interactions": 5},
                 },
             ]
         ),
     ),
     PipelineFixture(
-        dataset_name="LastFM",
-        dataset_version="2014",
+        dataset_key="lastfm",
+        dataset_version="2011",
         code="P002",
         pipeline_yaml_raw=_pipeline_yaml(
             [
                 {
-                    "name": "load",
-                    "operation": "parse_tsv",
-                    "params": {"delimiter": "\\t"},
+                    "name": "ingest",
+                    "operation": "parse_tabular",
+                    "params": {"resource": "ratings"},
                 },
                 {
-                    "name": "graph-features",
-                    "operation": "join_graph_features",
-                    "params": {"resource": "social_graph"},
+                    "name": "tag-join",
+                    "operation": "join_content",
+                    "params": {"resource": "tags"},
                 },
-                {"name": "split", "operation": "leave_one_out", "params": {}},
+                {
+                    "name": "split",
+                    "operation": "temporal_split",
+                    "params": {"train_ratio": 0.8, "validation_ratio": 0.1},
+                },
             ]
         ),
     ),
@@ -1448,20 +713,20 @@ PIPELINE_FIXTURES_DEMO = [
 
 PIPELINE_FIXTURES_EDGE = [
     PipelineFixture(
-        dataset_name="Tiny-Edge-Ranking",
-        dataset_version="v1",
+        dataset_key="gowalla",
+        dataset_version="friendships",
         code="P002",
         pipeline_yaml_raw=_pipeline_yaml(
             [
                 {
-                    "name": "load",
-                    "operation": "load_csv",
-                    "params": {"file": "small.csv"},
+                    "name": "ingest",
+                    "operation": "parse_tsv",
+                    "params": {"resource": "ratings"},
                 },
                 {
                     "name": "split",
-                    "operation": "random_split",
-                    "params": {"train_ratio": 0.7},
+                    "operation": "temporal_split",
+                    "params": {"train_ratio": 0.85, "validation_ratio": 0.05},
                 },
             ]
         ),
@@ -1470,13 +735,21 @@ PIPELINE_FIXTURES_EDGE = [
 
 EXPERIMENT_FIXTURES_MINIMAL = [
     ExperimentFixture(
-        dataset_name="Alibaba-iFashion",
+        dataset_key="alibaba_ifashion",
         dataset_version="v1",
         model_name="LightGCN",
         run_name="seed-minimal-lightgcn-alibaba-v1-finished",
         seed=42,
         status=Status.FINISHED,
         submitted_by="admin",
+        training_config=_ranking_training_config(
+            embedding_dim=64,
+            learning_rate=0.001,
+            batch_size=2048,
+            epochs=200,
+            reg=0.0001,
+            seed=42,
+        ),
         metrics=_ranking_metrics("good"),
     ),
 ]
@@ -1484,352 +757,320 @@ EXPERIMENT_FIXTURES_MINIMAL = [
 EXPERIMENT_FIXTURES_DEMO = [
     *EXPERIMENT_FIXTURES_MINIMAL,
     ExperimentFixture(
-        dataset_name="Alibaba-iFashion",
+        dataset_key="alibaba_ifashion",
         dataset_version="v1",
         model_name="BPR-MF",
         run_name="seed-demo-bpr-alibaba-v1-finished",
-        seed=9,
+        seed=17,
         status=Status.FINISHED,
         submitted_by="researcher",
+        training_config=_ranking_training_config(
+            embedding_dim=64,
+            learning_rate=0.001,
+            batch_size=1024,
+            epochs=150,
+            reg=0.0005,
+            seed=17,
+        ),
         metrics=_ranking_metrics("baseline"),
     ),
     ExperimentFixture(
-        dataset_name="Alibaba-iFashion",
+        dataset_key="alibaba_ifashion",
         dataset_version="v1",
         model_name="PopRank",
-        run_name="seed-demo-poprank-alibaba-v1-queued",
-        seed=21,
-        status=Status.QUEUED,
+        run_name="seed-demo-poprank-alibaba-v1-failed",
+        seed=18,
+        status=Status.FAILED,
         submitted_by="viewer",
+        training_config={"strategy": "global_popularity", "seed": 18},
     ),
     ExperimentFixture(
-        dataset_name="Alibaba-iFashion",
-        dataset_version="v2",
-        model_name="LightGCN",
-        run_name="seed-demo-lightgcn-alibaba-v2-finished",
-        seed=22,
-        status=Status.FINISHED,
-        submitted_by="researcher",
-        metrics=_ranking_metrics("best"),
-    ),
-    ExperimentFixture(
-        dataset_name="Alibaba-iFashion",
-        dataset_version="v2",
-        model_name="BPR-MF",
-        run_name="seed-demo-bpr-alibaba-v2-finished",
-        seed=23,
-        status=Status.FINISHED,
-        submitted_by="researcher",
-        metrics=_ranking_metrics("good"),
-    ),
-    ExperimentFixture(
-        dataset_name="Alibaba-iFashion",
-        dataset_version="v2",
-        model_name="NeuMF",
-        run_name="seed-demo-neumf-alibaba-v2-running",
-        seed=24,
-        status=Status.RUNNING,
-        pipeline_code="P002",
-        submitted_by="researcher",
-    ),
-    ExperimentFixture(
-        dataset_name="Epinions",
+        dataset_key="epinions",
         dataset_version="v1",
-        model_name="BPR-MF",
-        run_name="seed-demo-bpr-epinions-v1-finished",
+        model_name="LightGCN",
+        run_name="seed-demo-lightgcn-epinions-v1-finished",
         seed=31,
         status=Status.FINISHED,
         submitted_by="researcher",
-        metrics=_ranking_metrics("good"),
-    ),
-    ExperimentFixture(
-        dataset_name="Epinions",
-        dataset_version="v1",
-        model_name="LightGCN",
-        run_name="seed-demo-lightgcn-epinions-v1-running",
-        seed=32,
-        status=Status.RUNNING,
-        submitted_by="researcher",
-    ),
-    ExperimentFixture(
-        dataset_name="Epinions",
-        dataset_version="v1",
-        model_name="PopRank",
-        run_name="seed-demo-poprank-epinions-v1-failed",
-        seed=33,
-        status=Status.FAILED,
-        submitted_by="viewer",
-    ),
-    ExperimentFixture(
-        dataset_name="Epinions",
-        dataset_version="v2",
-        model_name="LightGCN",
-        run_name="seed-demo-lightgcn-epinions-v2-finished",
-        seed=34,
-        status=Status.FINISHED,
-        submitted_by="researcher",
+        training_config=_ranking_training_config(
+            embedding_dim=128,
+            learning_rate=0.0007,
+            batch_size=4096,
+            epochs=260,
+            reg=0.00005,
+            seed=31,
+        ),
         metrics=_ranking_metrics("best"),
     ),
     ExperimentFixture(
-        dataset_name="Epinions",
-        dataset_version="v2",
+        dataset_key="epinions",
+        dataset_version="v1",
         model_name="BPR-MF",
-        run_name="seed-demo-bpr-epinions-v2-finished",
-        seed=35,
+        run_name="seed-demo-bpr-epinions-v1-running",
+        seed=32,
+        status=Status.RUNNING,
+        submitted_by="researcher2",
+        training_config=_ranking_training_config(
+            embedding_dim=96,
+            learning_rate=0.0012,
+            batch_size=2048,
+            epochs=220,
+            reg=0.0002,
+            seed=32,
+        ),
+    ),
+    ExperimentFixture(
+        dataset_key="lastfm",
+        dataset_version="2011",
+        model_name="BPR-MF",
+        run_name="seed-demo-bpr-lastfm-2011-finished",
+        seed=41,
         status=Status.FINISHED,
-        submitted_by="researcher",
+        submitted_by="researcher2",
+        training_config=_ranking_training_config(
+            embedding_dim=64,
+            learning_rate=0.001,
+            batch_size=512,
+            epochs=180,
+            reg=0.0003,
+            seed=41,
+        ),
         metrics=_ranking_metrics("good"),
     ),
     ExperimentFixture(
-        dataset_name="Epinions",
-        dataset_version="v2",
-        model_name="PopRank",
-        run_name="seed-demo-poprank-epinions-v2-queued",
-        seed=36,
-        status=Status.QUEUED,
-        submitted_by="viewer",
+        dataset_key="lastfm",
+        dataset_version="2011",
+        model_name="LightGCN",
+        run_name="seed-demo-lightgcn-lastfm-2011-finished-p2",
+        seed=42,
+        status=Status.FINISHED,
+        pipeline_code="P002",
+        submitted_by="researcher",
+        training_config=_ranking_training_config(
+            embedding_dim=128,
+            learning_rate=0.0008,
+            batch_size=1024,
+            epochs=240,
+            reg=0.0001,
+            seed=42,
+        ),
+        metrics=_ranking_metrics("best"),
     ),
     ExperimentFixture(
-        dataset_name="MovieLens-100K",
-        dataset_version="v1",
-        model_name="UserKNN",
-        run_name="seed-demo-userknn-ml100k-v1-finished",
+        dataset_key="movielens",
+        dataset_version="100k",
+        model_name="SVD",
+        run_name="seed-demo-svd-ml100k-finished",
         seed=101,
         status=Status.FINISHED,
         submitted_by="researcher",
+        training_config=_rating_training_config(
+            n_factors=80,
+            learning_rate=0.005,
+            reg=0.02,
+            epochs=50,
+            seed=101,
+        ),
+        metrics=_rating_metrics("good"),
+    ),
+    ExperimentFixture(
+        dataset_key="movielens",
+        dataset_version="100k",
+        model_name="UserKNN",
+        run_name="seed-demo-userknn-ml100k-finished-p2",
+        seed=102,
+        status=Status.FINISHED,
+        pipeline_code="P002",
+        submitted_by="researcher2",
+        training_config={"k": 80, "sim": "cosine", "shrinkage": 50, "seed": 102},
         metrics=_rating_metrics("baseline"),
     ),
     ExperimentFixture(
-        dataset_name="MovieLens-100K",
-        dataset_version="v1",
-        model_name="SVD",
-        run_name="seed-demo-svd-ml100k-v1-finished",
-        seed=102,
-        status=Status.FINISHED,
-        submitted_by="researcher",
-        metrics=_rating_metrics("good"),
-    ),
-    ExperimentFixture(
-        dataset_name="MovieLens-100K",
-        dataset_version="v1",
-        model_name="ItemKNN",
-        run_name="seed-demo-itemknn-ml100k-v1-failed",
+        dataset_key="movielens",
+        dataset_version="100k",
+        model_name="PopRank",
+        run_name="seed-demo-poprank-ml100k-queued",
         seed=103,
-        status=Status.FAILED,
+        status=Status.QUEUED,
         submitted_by="viewer",
+        training_config={"strategy": "item_popularity", "seed": 103},
     ),
     ExperimentFixture(
-        dataset_name="MovieLens-100K",
-        dataset_version="v2",
+        dataset_key="movielens",
+        dataset_version="1m",
         model_name="SVD",
-        run_name="seed-demo-svd-ml100k-v2-finished",
-        seed=104,
+        run_name="seed-demo-svd-ml1m-finished-p2",
+        seed=111,
         status=Status.FINISHED,
         pipeline_code="P002",
         submitted_by="researcher",
+        training_config=_rating_training_config(
+            n_factors=128,
+            learning_rate=0.004,
+            reg=0.015,
+            epochs=60,
+            seed=111,
+        ),
         metrics=_rating_metrics("best"),
     ),
     ExperimentFixture(
-        dataset_name="MovieLens-100K",
-        dataset_version="v2",
+        dataset_key="movielens",
+        dataset_version="1m",
         model_name="UserKNN",
-        run_name="seed-demo-userknn-ml100k-v2-finished",
-        seed=105,
-        status=Status.FINISHED,
-        submitted_by="researcher",
-        metrics=_rating_metrics("good"),
-    ),
-    ExperimentFixture(
-        dataset_name="MovieLens-100K",
-        dataset_version="v2",
-        model_name="ItemKNN",
-        run_name="seed-demo-itemknn-ml100k-v2-running",
-        seed=106,
+        run_name="seed-demo-userknn-ml1m-running",
+        seed=112,
         status=Status.RUNNING,
-        pipeline_code="P002",
-        submitted_by="researcher",
+        submitted_by="researcher2",
+        training_config={"k": 120, "sim": "pearson", "shrinkage": 80, "seed": 112},
     ),
     ExperimentFixture(
-        dataset_name="MovieLens-100K",
-        dataset_version="v3",
-        model_name="ItemKNN",
-        run_name="seed-demo-itemknn-ml100k-v3-finished",
-        seed=107,
-        status=Status.FINISHED,
-        submitted_by="researcher",
-        metrics=_rating_metrics("good"),
-    ),
-    ExperimentFixture(
-        dataset_name="MovieLens-100K",
-        dataset_version="v3",
+        dataset_key="movielens",
+        dataset_version="20m",
         model_name="SVD",
-        run_name="seed-demo-svd-ml100k-v3-running",
-        seed=108,
-        status=Status.RUNNING,
+        run_name="seed-demo-svd-ml20m-finished",
+        seed=121,
+        status=Status.FINISHED,
         submitted_by="researcher",
+        training_config=_rating_training_config(
+            n_factors=256,
+            learning_rate=0.003,
+            reg=0.02,
+            epochs=80,
+            seed=121,
+        ),
+        metrics=_rating_metrics("good"),
     ),
     ExperimentFixture(
-        dataset_name="MovieLens-100K",
-        dataset_version="v3",
+        dataset_key="movielens",
+        dataset_version="20m",
         model_name="UserKNN",
-        run_name="seed-demo-userknn-ml100k-v3-failed",
-        seed=109,
+        run_name="seed-demo-userknn-ml20m-failed",
+        seed=122,
         status=Status.FAILED,
         submitted_by="viewer",
+        training_config={"k": 160, "sim": "cosine", "shrinkage": 120, "seed": 122},
     ),
     ExperimentFixture(
-        dataset_name="Amazon-Books",
+        dataset_key="amazon_books",
         dataset_version="2023",
         model_name="SVD",
         run_name="seed-demo-svd-amazon-books-2023-finished",
         seed=201,
         status=Status.FINISHED,
-        submitted_by="researcher",
+        submitted_by="researcher2",
+        training_config=_rating_training_config(
+            n_factors=64,
+            learning_rate=0.005,
+            reg=0.03,
+            epochs=40,
+            seed=201,
+        ),
         metrics=_rating_metrics("baseline"),
     ),
     ExperimentFixture(
-        dataset_name="Amazon-Books",
+        dataset_key="amazon_books",
         dataset_version="2023",
         model_name="UserKNN",
-        run_name="seed-demo-userknn-amazon-books-2023-finished",
+        run_name="seed-demo-userknn-amazon-books-2023-finished-p2",
         seed=202,
         status=Status.FINISHED,
+        pipeline_code="P002",
         submitted_by="researcher",
+        training_config={"k": 140, "sim": "cosine", "shrinkage": 90, "seed": 202},
         metrics=_rating_metrics("good"),
     ),
     ExperimentFixture(
-        dataset_name="Amazon-Books",
+        dataset_key="amazon_books",
         dataset_version="2023",
-        model_name="ItemKNN",
-        run_name="seed-demo-itemknn-amazon-books-2023-queued",
+        model_name="PopRank",
+        run_name="seed-demo-poprank-amazon-books-2023-running",
         seed=203,
-        status=Status.QUEUED,
-        submitted_by="viewer",
-    ),
-    ExperimentFixture(
-        dataset_name="Amazon-Books",
-        dataset_version="2024",
-        model_name="SVD",
-        run_name="seed-demo-svd-amazon-books-2024-finished",
-        seed=204,
-        status=Status.FINISHED,
-        pipeline_code="P002",
-        submitted_by="researcher",
-        metrics=_rating_metrics("best"),
-    ),
-    ExperimentFixture(
-        dataset_name="Amazon-Books",
-        dataset_version="2024",
-        model_name="ItemKNN",
-        run_name="seed-demo-itemknn-amazon-books-2024-finished",
-        seed=205,
-        status=Status.FINISHED,
-        submitted_by="researcher",
-        metrics=_rating_metrics("good"),
-    ),
-    ExperimentFixture(
-        dataset_name="Amazon-Books",
-        dataset_version="2024",
-        model_name="UserKNN",
-        run_name="seed-demo-userknn-amazon-books-2024-running",
-        seed=206,
         status=Status.RUNNING,
-        pipeline_code="P002",
-        submitted_by="researcher",
+        submitted_by="viewer",
+        training_config={"strategy": "global_popularity", "seed": 203},
     ),
     ExperimentFixture(
-        dataset_name="LastFM",
-        dataset_version="2011",
-        model_name="BPR-MF",
-        run_name="seed-demo-bpr-lastfm-2011-finished",
+        dataset_key="gowalla",
+        dataset_version="checkins",
+        model_name="LightGCN",
+        run_name="seed-demo-lightgcn-gowalla-checkins-finished",
         seed=301,
         status=Status.FINISHED,
-        submitted_by="researcher",
-        metrics=_ranking_metrics("baseline"),
-    ),
-    ExperimentFixture(
-        dataset_name="LastFM",
-        dataset_version="2011",
-        model_name="LightGCN",
-        run_name="seed-demo-lightgcn-lastfm-2011-finished",
-        seed=302,
-        status=Status.FINISHED,
-        submitted_by="researcher",
-        metrics=_ranking_metrics("good"),
-    ),
-    ExperimentFixture(
-        dataset_name="LastFM",
-        dataset_version="2011",
-        model_name="PopRank",
-        run_name="seed-demo-poprank-lastfm-2011-failed",
-        seed=303,
-        status=Status.FAILED,
-        submitted_by="viewer",
-    ),
-    ExperimentFixture(
-        dataset_name="LastFM",
-        dataset_version="2014",
-        model_name="LightGCN",
-        run_name="seed-demo-lightgcn-lastfm-2014-finished",
-        seed=304,
-        status=Status.FINISHED,
-        pipeline_code="P002",
-        submitted_by="researcher",
+        submitted_by="researcher2",
+        training_config=_ranking_training_config(
+            embedding_dim=128,
+            learning_rate=0.0009,
+            batch_size=8192,
+            epochs=260,
+            reg=0.0001,
+            seed=301,
+        ),
         metrics=_ranking_metrics("best"),
     ),
     ExperimentFixture(
-        dataset_name="LastFM",
-        dataset_version="2014",
-        model_name="NeuMF",
-        run_name="seed-demo-neumf-lastfm-2014-finished",
-        seed=305,
+        dataset_key="gowalla",
+        dataset_version="checkins",
+        model_name="BPR-MF",
+        run_name="seed-demo-bpr-gowalla-checkins-finished-p2",
+        seed=302,
         status=Status.FINISHED,
+        pipeline_code="P002",
         submitted_by="researcher",
+        training_config=_ranking_training_config(
+            embedding_dim=96,
+            learning_rate=0.001,
+            batch_size=4096,
+            epochs=220,
+            reg=0.0002,
+            seed=302,
+        ),
         metrics=_ranking_metrics("good"),
     ),
     ExperimentFixture(
-        dataset_name="LastFM",
-        dataset_version="2014",
+        dataset_key="gowalla",
+        dataset_version="friendships",
         model_name="PopRank",
-        run_name="seed-demo-poprank-lastfm-2014-running",
-        seed=306,
-        status=Status.RUNNING,
-        pipeline_code="P002",
+        run_name="seed-demo-poprank-gowalla-friendships-finished",
+        seed=311,
+        status=Status.FINISHED,
         submitted_by="viewer",
+        training_config={"strategy": "global_popularity", "seed": 311},
+        metrics=_ranking_metrics("baseline"),
     ),
 ]
 
 EXPERIMENT_FIXTURES_EDGE = [
     ExperimentFixture(
-        dataset_name="Tiny-Edge-Ranking",
-        dataset_version="v1",
+        dataset_key="gowalla",
+        dataset_version="friendships",
         model_name="RandomBaseline",
-        run_name="seed-edge-random-tiny-v1-finished",
-        seed=131,
+        run_name="seed-edge-random-gowalla-friendships-finished",
+        seed=401,
         status=Status.FINISHED,
         submitted_by="admin",
+        training_config={"sampling": "uniform", "temperature": 1.0, "seed": 401},
         metrics=[
-            MetricCsvRow(Split.TEST, "ndcg@10", 0.033, Direction.MAX, k=10),
-            MetricCsvRow(Split.TEST, "recall@10", 0.055, Direction.MAX, k=10),
+            MetricCsvRow(Split.TEST, "ndcg@10", 0.031, Direction.MAX, k=10),
+            MetricCsvRow(Split.TEST, "recall@20", 0.059, Direction.MAX, k=20),
+            MetricCsvRow(Split.TEST, "hit@10", 0.081, Direction.MAX, k=10),
         ],
     ),
     ExperimentFixture(
-        dataset_name="Tiny-Edge-Ranking",
-        dataset_version="v1",
+        dataset_key="movielens",
+        dataset_version="20m",
         model_name="LightGCN",
-        run_name="seed-edge-lightgcn-tiny-v1-failed",
-        seed=132,
+        run_name="seed-edge-lightgcn-ml20m-failed",
+        seed=402,
         status=Status.FAILED,
         submitted_by="researcher",
-    ),
-    ExperimentFixture(
-        dataset_name="MovieLens-100K",
-        dataset_version="v3",
-        model_name="RandomBaseline",
-        run_name="seed-edge-random-ml100k-v3-queued",
-        seed=133,
-        status=Status.QUEUED,
-        submitted_by="viewer",
+        training_config=_ranking_training_config(
+            embedding_dim=256,
+            learning_rate=0.0005,
+            batch_size=16384,
+            epochs=300,
+            reg=0.00005,
+            seed=402,
+        ),
     ),
 ]
 
@@ -1968,7 +1209,7 @@ async def _upsert_dataset_version(
     created = await DatasetVersion.find_one(DatasetVersion.uuid == public.uuid)
     if created is None:
         raise RuntimeError(
-            f"DatasetVersion appena creata non trovata: {fixture.name} {fixture.version}"
+            f"DatasetVersion appena creata non trovata: {fixture.key} {fixture.version}"
         )
     return created, True
 
@@ -2034,6 +1275,9 @@ async def _upsert_experiment(
         if existing.dataset_id is None:
             existing.dataset_id = dataset_version.dataset_id
             changed = True
+        if existing.training_config is None and fixture.training_config is not None:
+            existing.training_config = fixture.training_config
+            changed = True
         if changed:
             await existing.save()
         return existing, False
@@ -2044,8 +1288,8 @@ async def _upsert_experiment(
             model_uuid=model.uuid,
             run_name=fixture.run_name,
             seed=fixture.seed,
-            training_config=model.hyperparams,
-            notes="Seeded via scripts/seed.py",
+            training_config=fixture.training_config or model.hyperparams,
+            notes="Seeded via scripts/seed.py (demo metrics are synthetic CSV rows)",
         ),
         submitter,
     )
@@ -2100,13 +1344,12 @@ async def _consistency_checks(
 ) -> list[str]:
     issues: list[str] = []
 
-    for (dataset_name, version_name), version in dataset_versions.items():
+    for (dataset_key, version_name), version in dataset_versions.items():
         if version.status != VersionStatus.READY:
             continue
         if await Dataset.get(version.dataset_id) is None:
             issues.append(
-                "dataset mancante per DatasetVersion "
-                f"{dataset_name}:{version_name}"
+                f"dataset mancante per DatasetVersion {dataset_key}:{version_name}"
             )
 
         sources_count = await Source.find(Source.dataset_version_id == version.id).count()
@@ -2116,7 +1359,7 @@ async def _consistency_checks(
         if sources_count == 0 and resources_count == 0:
             issues.append(
                 "ready DatasetVersion senza sources/resources: "
-                f"{dataset_name}:{version_name}"
+                f"{dataset_key}:{version_name}"
             )
 
     for exp in experiments:
@@ -2135,11 +1378,11 @@ async def _consistency_checks(
                 f"{exp.run_name}"
             )
 
-    for (dataset_name, version_name, pipeline_code), pipeline in pipelines.items():
+    for (dataset_key, version_name, pipeline_code), pipeline in pipelines.items():
         if await DatasetVersion.get(pipeline.dataset_version_id) is None:
             issues.append(
                 "pipeline senza dataset_version valida: "
-                f"{dataset_name}:{version_name}:{pipeline_code}"
+                f"{dataset_key}:{version_name}:{pipeline_code}"
             )
 
     bad_metrics = await Metric.find(
@@ -2202,7 +1445,7 @@ async def seed(mode: str = SeedMode.MINIMAL.value, reset: bool = False) -> None:
     for fixture in scenario.datasets:
         owner = _require_user(user_map, fixture.owner)
         dataset, was_created = await _upsert_dataset(fixture, owner)
-        datasets[fixture.name] = dataset
+        datasets[fixture.key] = dataset
         created_datasets += 1 if was_created else 0
         print(
             f"  - {fixture.name} ({fixture.version}) "
@@ -2211,7 +1454,7 @@ async def seed(mode: str = SeedMode.MINIMAL.value, reset: bool = False) -> None:
         )
 
         dataset_version, version_created = await _upsert_dataset_version(dataset, fixture)
-        dataset_versions[(fixture.name, fixture.version)] = dataset_version
+        dataset_versions[(fixture.key, fixture.version)] = dataset_version
         created_versions += 1 if version_created else 0
         if version_created:
             created_sources += await Source.find(
@@ -2229,16 +1472,16 @@ async def seed(mode: str = SeedMode.MINIMAL.value, reset: bool = False) -> None:
             Pipeline.dataset_version_id == dataset_version.id
         ).to_list()
         for existing_pipeline in existing_pipelines:
-            pipelines[(fixture.name, fixture.version, existing_pipeline.code)] = (
+            pipelines[(fixture.key, fixture.version, existing_pipeline.code)] = (
                 existing_pipeline
             )
 
         has_pipeline_for_version = any(
-            key[0] == fixture.name and key[1] == fixture.version for key in pipelines
+            key[0] == fixture.key and key[1] == fixture.version for key in pipelines
         )
         if not has_pipeline_for_version and fixture.pipeline_yaml_raw.strip():
             base_pipeline_fixture = PipelineFixture(
-                dataset_name=fixture.name,
+                dataset_key=fixture.key,
                 dataset_version=fixture.version,
                 code="P001",
                 pipeline_yaml_raw=fixture.pipeline_yaml_raw,
@@ -2248,28 +1491,26 @@ async def seed(mode: str = SeedMode.MINIMAL.value, reset: bool = False) -> None:
                 base_pipeline_fixture,
                 dataset_version,
             )
-            pipelines[(fixture.name, fixture.version, base_pipeline.code)] = base_pipeline
+            pipelines[(fixture.key, fixture.version, base_pipeline.code)] = base_pipeline
             created_pipelines += 1 if base_pipeline_created else 0
 
     print("pipelines:")
     for fixture in scenario.pipelines:
         dataset_version = dataset_versions.get(
-            (fixture.dataset_name, fixture.dataset_version)
+            (fixture.dataset_key, fixture.dataset_version)
         )
         if dataset_version is None:
             print(
-                f"  - {fixture.code} ({fixture.dataset_name}:{fixture.dataset_version}) "
+                f"  - {fixture.code} ({fixture.dataset_key}:{fixture.dataset_version}) "
                 "(skipped: missing dataset version)"
             )
             continue
 
         pipeline, was_created = await _upsert_pipeline(fixture, dataset_version)
-        pipelines[(fixture.dataset_name, fixture.dataset_version, fixture.code)] = (
-            pipeline
-        )
+        pipelines[(fixture.dataset_key, fixture.dataset_version, fixture.code)] = pipeline
         created_pipelines += 1 if was_created else 0
         print(
-            f"  - {fixture.code} ({fixture.dataset_name}:{fixture.dataset_version}) "
+            f"  - {fixture.code} ({fixture.dataset_key}:{fixture.dataset_version}) "
             f"({'created' if was_created else 'existing'})"
         )
 
@@ -2287,10 +1528,10 @@ async def seed(mode: str = SeedMode.MINIMAL.value, reset: bool = False) -> None:
     print("experiments:")
     for fixture in scenario.experiments:
         dataset_version = dataset_versions.get(
-            (fixture.dataset_name, fixture.dataset_version)
+            (fixture.dataset_key, fixture.dataset_version)
         )
         pipeline = pipelines.get(
-            (fixture.dataset_name, fixture.dataset_version, fixture.pipeline_code)
+            (fixture.dataset_key, fixture.dataset_version, fixture.pipeline_code)
         )
         model = models.get(fixture.model_name)
         if dataset_version is None or pipeline is None or model is None:
@@ -2324,8 +1565,7 @@ async def seed(mode: str = SeedMode.MINIMAL.value, reset: bool = False) -> None:
         experiments.append(exp)
         print(
             f"  - {fixture.run_name} status={fixture.status.value} "
-            f"pipeline={fixture.pipeline_code} "
-            f"submitter={fixture.submitted_by} "
+            f"pipeline={fixture.pipeline_code} submitter={fixture.submitted_by} "
             f"({'created' if exp_created else 'existing'}, "
             f"metrics_csv={'imported' if metrics_imported else 'skipped'})"
         )

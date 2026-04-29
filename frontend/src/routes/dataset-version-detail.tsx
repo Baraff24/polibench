@@ -1,6 +1,6 @@
 import { useLoaderData, useNavigate } from 'react-router'
 import { useState } from 'react'
-import { Badge, DataTable, EmptyState, PageHeader, StatCard } from '../components'
+import { Badge, DataTable, PageHeader, StatCard } from '../components'
 import type { Column } from '../components'
 import { datasetService } from '../services'
 import type {
@@ -8,22 +8,11 @@ import type {
   DatasetVersionYamlPublic,
   PipelineSummary,
   ResourcePublic,
-  SourcePublic,
+  SourceWithResourcesPublic,
 } from '../models'
 import type { Params } from 'react-router'
 
 type YamlKind = 'dataset' | 'version' | 'characteristics'
-
-const sourceColumns: Column<SourcePublic>[] = [
-  { key: 'name', header: 'Name', render: (row) => row.name },
-  { key: 'source_type', header: 'Type', render: (row) => row.source_type },
-  {
-    key: 'downloadable',
-    header: 'Downloadable',
-    render: (row) => (row.downloadable ? 'yes' : 'no'),
-  },
-  { key: 'url', header: 'URL', render: (row) => row.url || '—' },
-]
 
 const resourceColumns: Column<ResourcePublic>[] = [
   { key: 'name', header: 'Name', render: (row) => row.name },
@@ -58,11 +47,10 @@ export async function loader({ params }: { params: Params }) {
     }
   }
 
-  const [version, sources, resources, pipelines, datasetYaml, versionYaml, characteristicsYaml] =
+  const [version, sourcesWithResources, pipelines, datasetYaml, versionYaml, characteristicsYaml] =
     await Promise.all([
       datasetService.getVersionByUuid(versionUuid),
-      datasetService.getVersionSources(versionUuid),
-      datasetService.getVersionResources(versionUuid),
+      datasetService.getVersionSourcesWithResources(versionUuid),
       datasetService.getVersionPipelines(versionUuid),
       safeGetYaml('dataset'),
       safeGetYaml('version'),
@@ -71,8 +59,7 @@ export async function loader({ params }: { params: Params }) {
 
   return {
     version,
-    sources,
-    resources,
+    sourcesWithResources,
     pipelines,
     yamls: {
       dataset: datasetYaml,
@@ -86,10 +73,9 @@ export default function DatasetVersionDetail() {
   const navigate = useNavigate()
   const [visibleYaml, setVisibleYaml] = useState<YamlKind | null>(null)
 
-  const { version, sources, resources, pipelines, yamls } = useLoaderData() as {
+  const { version, sourcesWithResources, pipelines, yamls } = useLoaderData() as {
     version: DatasetVersionPublic
-    sources: SourcePublic[]
-    resources: ResourcePublic[]
+    sourcesWithResources: SourceWithResourcesPublic[]
     pipelines: PipelineSummary[]
     yamls: Record<YamlKind, DatasetVersionYamlPublic>
   }
@@ -121,6 +107,8 @@ export default function DatasetVersionDetail() {
     URL.revokeObjectURL(url)
   }
 
+  const hasYamlContent = yamlKinds.some(({ kind }) => Boolean(yamls[kind].content?.trim()))
+
   return (
     <div className='page container'>
       <PageHeader title={`Dataset Version v${version.version}`}>
@@ -137,74 +125,91 @@ export default function DatasetVersionDetail() {
         <StatCard label='Density' value={version.density?.toFixed(6) || '—'} />
       </div>
 
-      <section className='detail-section'>
-        <h2 className='detail-section__title'>Pipelines</h2>
-        {pipelines.length === 0 ? (
-          <EmptyState
-            title='No pipelines yet'
-            description='Create a pipeline for this dataset version to run experiments.'
-          />
-        ) : (
+      {pipelines.length > 0 && (
+        <section className='detail-section'>
+          <h2 className='detail-section__title'>Pipelines</h2>
           <DataTable
             columns={pipelineColumns}
             rows={pipelines}
             rowKey={(row) => row.uuid}
             onRowClick={(row) => navigate(`/pipelines/${row.uuid}`)}
           />
-        )}
-      </section>
+        </section>
+      )}
 
-      <section className='detail-section'>
-        <h2 className='detail-section__title'>YAML</h2>
-        <div className='form__actions'>
-          {yamlKinds.map(({ kind, label }) => (
-            <div key={kind} style={{ display: 'flex', gap: '0.5rem' }}>
-              <button type='button' className='btn btn--outline' onClick={() => toggleYaml(kind)}>
-                {visibleYaml === kind ? `Hide ${label}` : `View ${label}`}
-              </button>
-              <button type='button' className='btn btn--outline' onClick={() => downloadYaml(kind)}>
-                Download
-              </button>
-            </div>
-          ))}
-        </div>
-        {visibleYaml && (
-          <pre
-            className='detail-field__value'
-            style={{
-              whiteSpace: 'pre-wrap',
-              marginTop: '1rem',
-              padding: '1rem',
-              border: '1px solid #d0d7de',
-              borderRadius: '8px',
-              background: '#ffffff',
-              color: '#111111',
-              fontWeight: 500,
-              lineHeight: 1.45,
-            }}
-          >
-            {yamls[visibleYaml].content || '# empty'}
-          </pre>
-        )}
-      </section>
+      {hasYamlContent && (
+        <section className='detail-section'>
+          <h2 className='detail-section__title'>YAML</h2>
+          <div className='form__actions'>
+            {yamlKinds.map(({ kind, label }) => (
+              <div key={kind} style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type='button' className='btn btn--outline' onClick={() => toggleYaml(kind)}>
+                  {visibleYaml === kind ? `Hide ${label}` : `View ${label}`}
+                </button>
+                <button type='button' className='btn btn--outline' onClick={() => downloadYaml(kind)}>
+                  Download
+                </button>
+              </div>
+            ))}
+          </div>
+          {visibleYaml && (
+            <pre
+              className='detail-field__value'
+              style={{
+                whiteSpace: 'pre-wrap',
+                marginTop: '1rem',
+                padding: '1rem',
+                border: '1px solid #d0d7de',
+                borderRadius: '8px',
+                background: '#ffffff',
+                color: '#111111',
+                fontWeight: 500,
+                lineHeight: 1.45,
+              }}
+            >
+              {yamls[visibleYaml].content || '# empty'}
+            </pre>
+          )}
+        </section>
+      )}
 
-      <section className='detail-section'>
-        <h2 className='detail-section__title'>Sources</h2>
-        {sources.length === 0 ? (
-          <EmptyState title='No sources' description='No sources found in version YAML.' />
-        ) : (
-          <DataTable columns={sourceColumns} rows={sources} rowKey={(row) => row.uuid} />
-        )}
-      </section>
-
-      <section className='detail-section'>
-        <h2 className='detail-section__title'>Resources</h2>
-        {resources.length === 0 ? (
-          <EmptyState title='No resources' description='No resources found in version YAML.' />
-        ) : (
-          <DataTable columns={resourceColumns} rows={resources} rowKey={(row) => row.uuid} />
-        )}
-      </section>
+      {sourcesWithResources.length > 0 && (
+        <section className='detail-section'>
+          <h2 className='detail-section__title'>Sources & Resources</h2>
+          <div className='detail-grid' style={{ gridTemplateColumns: '1fr' }}>
+            {sourcesWithResources.map((source) => (
+              <details key={source.uuid} className='pipeline-chain__details' open>
+                <summary>
+                  {source.name} ({source.source_type}) - {source.resources.length} resources
+                </summary>
+                <div className='detail-grid' style={{ marginTop: '0.75rem' }}>
+                  <div className='detail-field'>
+                    <div className='detail-field__label'>Downloadable</div>
+                    <div className='detail-field__value'>{source.downloadable ? 'yes' : 'no'}</div>
+                  </div>
+                  <div className='detail-field'>
+                    <div className='detail-field__label'>URL</div>
+                    <div className='detail-field__value'>{source.url || '—'}</div>
+                  </div>
+                  <div className='detail-field'>
+                    <div className='detail-field__label'>Filename</div>
+                    <div className='detail-field__value'>{source.filename || '—'}</div>
+                  </div>
+                </div>
+                {source.resources.length > 0 && (
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <DataTable
+                      columns={resourceColumns}
+                      rows={source.resources}
+                      rowKey={(row) => row.uuid}
+                    />
+                  </div>
+                )}
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

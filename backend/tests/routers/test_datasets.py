@@ -127,6 +127,16 @@ characteristics:
     assert get_resources.status_code == 200
     assert len(get_resources.json()) == 1
 
+    get_nested = await client.get(
+        f"{API}/dataset-versions/{version_uuid}/sources-with-resources"
+    )
+    assert get_nested.status_code == 200
+    nested = get_nested.json()
+    assert len(nested) == 1
+    assert nested[0]["name"] == "source-main"
+    assert len(nested[0]["resources"]) == 1
+    assert nested[0]["resources"][0]["name"] == "interactions"
+
     list_pipelines = await client.get(f"{API}/dataset-versions/{version_uuid}/pipelines")
     assert list_pipelines.status_code == 200
     pipelines = list_pipelines.json()
@@ -280,6 +290,85 @@ characteristics:
     assert preview["resource_count"] == 1
     assert preview["pipeline_steps_count"] == 2
     assert preview["characteristics"]["n_users"] == 150
+
+
+@pytest.mark.anyio
+async def test_create_dataset_version_accepts_datarec_dict_yaml_shape(
+    client: AsyncClient,
+    superuser_token_headers: dict[str, str],
+) -> None:
+    ds_resp = await client.post(
+        f"{API}/datasets",
+        json={"name": "AmazonBooks", "task": "rating_prediction"},
+        headers=superuser_token_headers,
+    )
+    assert ds_resp.status_code == 200
+    dataset_uuid = ds_resp.json()["uuid"]
+
+    version_payload = {
+        "version": "2023",
+        "status": "ready",
+        "dataset_yaml_raw": """
+dataset_name: Amazon Books
+versions: ["2023"]
+latest_version: "2023"
+""".strip(),
+        "version_yaml_raw": """
+dataset_name: AmazonBooks
+version: "2023"
+sources:
+  ratings:
+    source_type: HttpSource
+    args:
+      downloadable: true
+      url: https://example.org/books.csv.gz
+      filename: books.csv.gz
+resources:
+  ratings:
+    source_name: ratings
+    filename: books.csv
+    type: interactions
+    format: transactions_tabular
+    required: true
+""".strip(),
+        "characteristics_yaml_raw": """
+dataset: amazon_books
+version: "2023"
+characteristics:
+  n_users: 100
+  n_items: 50
+  n_interactions: 500
+  density: 0.1
+  gini_user: 0.5
+  gini_item: 0.6
+""".strip(),
+        "pipeline_yaml_raw": """
+pipeline:
+  - name: parse
+    operation: parse_csv
+""".strip(),
+    }
+    resp = await client.post(
+        f"{API}/datasets/{dataset_uuid}/versions",
+        json=version_payload,
+        headers=superuser_token_headers,
+    )
+    assert resp.status_code == 200
+    version_uuid = resp.json()["uuid"]
+    assert resp.json()["n_users"] == 100
+
+    nested = await client.get(
+        f"{API}/dataset-versions/{version_uuid}/sources-with-resources"
+    )
+    assert nested.status_code == 200
+    payload = nested.json()
+    assert len(payload) == 1
+    assert payload[0]["name"] == "ratings"
+    assert payload[0]["downloadable"] is True
+    assert payload[0]["url"] == "https://example.org/books.csv.gz"
+    assert len(payload[0]["resources"]) == 1
+    assert payload[0]["resources"][0]["name"] == "ratings"
+    assert payload[0]["resources"][0]["type"] == "interactions"
 
 
 @pytest.mark.anyio

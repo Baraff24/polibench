@@ -111,6 +111,10 @@ export interface ResourcePublic {
   created_at: string
 }
 
+export interface SourceWithResourcesPublic extends SourcePublic {
+  resources: ResourcePublic[]
+}
+
 export interface DatasetVersionYamlPublic {
   dataset_version_uuid: string
   kind: string

@@ -1,0 +1,42 @@
+dataset_name: "MovieLens"
+version: "1m"
+
+sources:
+  ml1m_zip:
+    source_type: HttpSource
+    args:
+      archive: zip
+      downloadable: True
+      url: https://files.grouplens.org/datasets/movielens/ml-1m.zip
+      checksum: c4d9eecfca2ab87c1945afe126590906
+      checksum_algorithm: md5
+      filename: ml-1m.zip
+      inner_paths:
+        movies: ml-1m/movies.dat
+        ratings: ml-1m/ratings.dat
+        users: ml-1m/users.dat
+
+resources:
+  ratings:
+    source_name: ml1m_zip
+    filename: ratings.dat
+    type: interactions
+    format: transactions_tabular
+    required: True
+    schema:
+      sep: "::"
+      user_col: 0
+      item_col: 1
+      rating_col: 2
+      timestamp_col: 3
+      engine: python
+  movies:
+    source_name: ml1m_zip
+    filename: movies.dat
+    type: content
+    about: items
+  users:
+    source_name: ml1m_zip
+    filename: users.dat
+    type: content
+    about: users

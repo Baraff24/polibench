@@ -12,6 +12,7 @@ export type {
   DatasetVersionSummary,
   DatasetVersionPublic,
   SourcePublic,
+  SourceWithResourcesPublic,
   ResourcePublic,
   DatasetVersionYamlPublic,
   DatasetVersionPreviewPublic,
@@ -41,4 +42,11 @@ export type {
   ImportStatus,
   MetricImportPublic,
 } from './metric'
-export type { LeaderboardEntry, MultiMetricLeaderboardEntry } from './leaderboard'
+export type {
+  LeaderboardEntry,
+  MultiMetricLeaderboardEntry,
+  LeaderboardQueryPayload,
+  BestConfigurationQueryPayload,
+  BestConfigurationGroup,
+  BestConfigurationResponse,
+} from './leaderboard'

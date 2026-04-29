@@ -218,6 +218,11 @@ Modalità disponibili:
 - `demo`: seed esteso multi-dataset/multi-versione con stati esperimenti misti e metric import realistici.
 - `edge`: casi limite validi per test UI/consistenza (senza dati volutamente invalidi).
 
+Note seed:
+
+- fixture YAML registry reali in `backend/scripts/fixtures/datarec_registry/`
+- metriche esperimenti demo importate da CSV separati (non confuse con dataset characteristics YAML)
+
 ---
 
 ## Sviluppo locale (senza Docker)
@@ -385,6 +390,7 @@ Nel file `.env` aggiorna almeno:
 | `GET`   | `/api/v1/dataset-versions/{uuid}`    | Dettaglio DatasetVersion                          |
 | `GET`   | `/api/v1/dataset-versions/{uuid}/sources` | Sources della DatasetVersion                 |
 | `GET`   | `/api/v1/dataset-versions/{uuid}/resources` | Resources della DatasetVersion              |
+| `GET`   | `/api/v1/dataset-versions/{uuid}/sources-with-resources` | Sources annidate con Resources figlie |
 | `GET`   | `/api/v1/dataset-versions/{uuid}/pipelines` | Lista pipeline della DatasetVersion          |
 | `POST`  | `/api/v1/dataset-versions/{uuid}/pipelines` | Crea pipeline per DatasetVersion             |
 | `POST`  | `/api/v1/dataset-versions/{uuid}/pipelines/preview` | Preview parse pipeline YAML            |
@@ -401,6 +407,9 @@ Nel file `.env` aggiorna almeno:
 | `GET`   | `/api/v1/experiments/{uuid}/metrics` | Metriche dell'esperimento                         |
 | `POST`  | `/api/v1/experiments/{uuid}/metric-import` | Import metriche da CSV (async)              |
 | `GET`   | `/api/v1/leaderboard`                | Leaderboard filtrata per dataset/version/pipeline |
+| `GET`   | `/api/v1/leaderboard/multi`          | Leaderboard multi-metrica (dataset/version/pipeline) |
+| `POST`  | `/api/v1/leaderboard/query`          | Query avanzata (author/model/hyperparams)         |
+| `POST`  | `/api/v1/leaderboard/best-configuration` | Best configuration server-side                 |
 
 La documentazione interattiva completa è disponibile su `/docs` (Swagger UI) e `/redoc`.
 

@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -18,6 +19,7 @@ from app.schemas.dataset_versions import (
     DatasetVersionYamlPublic,
     ResourcePublic,
     SourcePublic,
+    SourceWithResourcesPublic,
 )
 from app.schemas.pipelines import PipelineCreate
 from app.services.datasets import get_dataset_by_uuid
@@ -76,7 +78,8 @@ def _parse_yaml(raw: str | None, field_name: str) -> dict[str, Any] | list[Any] 
 
 
 def _normalize_dataset_name(value: str) -> str:
-    return value.strip().lower()
+    normalized = value.strip().lower()
+    return re.sub(r"[^a-z0-9]+", "", normalized)
 
 
 def _same_dataset_name(lhs: str, rhs: str) -> bool:
@@ -134,17 +137,33 @@ def _extract_list_from_payload(
     payload: dict[str, Any],
     key: str,
 ) -> list[Any]:
+    def _as_list(value: Any) -> list[Any]:
+        if isinstance(value, list):
+            return value
+        if isinstance(value, dict):
+            out: list[Any] = []
+            for item_key, item_value in value.items():
+                if isinstance(item_value, dict):
+                    normalized = dict(item_value)
+                    normalized.setdefault("name", str(item_key))
+                    out.append(normalized)
+                else:
+                    out.append(item_value)
+            return out
+        return []
+
     direct = payload.get(key)
-    if isinstance(direct, list):
-        return direct
+    direct_list = _as_list(direct)
+    if direct_list:
+        return direct_list
 
     for nested_key in ("version", "dataset_version", "registry", "spec"):
         nested = payload.get(nested_key)
         if not isinstance(nested, dict):
             continue
-        candidate = nested.get(key)
-        if isinstance(candidate, list):
-            return candidate
+        candidate_list = _as_list(nested.get(key))
+        if candidate_list:
+            return candidate_list
     return []
 
 
@@ -386,8 +405,14 @@ def _parse_sources(
             )
         seen_names.add(source_name)
 
-        downloadable = _as_bool(source.get("downloadable", False))
-        url = source.get("url")
+        args = source.get("args")
+        if not isinstance(args, dict):
+            args = {}
+
+        downloadable = _as_bool(
+            source.get("downloadable", args.get("downloadable", False))
+        )
+        url = source.get("url", args.get("url"))
         if downloadable and (not isinstance(url, str) or not url.strip()):
             raise HTTPException(
                 status_code=422,
@@ -396,8 +421,11 @@ def _parse_sources(
                 ),
             )
 
-        checksum = source.get("checksum")
-        checksum_algorithm = source.get("checksum_algorithm")
+        checksum = source.get("checksum", args.get("checksum"))
+        checksum_algorithm = source.get(
+            "checksum_algorithm",
+            args.get("checksum_algorithm"),
+        )
         if checksum is not None and checksum_algorithm in (None, ""):
             raise HTTPException(
                 status_code=422,
@@ -407,19 +435,19 @@ def _parse_sources(
                 ),
             )
 
-        inner_paths = source.get("inner_paths")
+        inner_paths = source.get("inner_paths", args.get("inner_paths"))
         if not isinstance(inner_paths, dict):
             inner_paths = None
         out.append(
             {
                 "name": source_name,
                 "source_type": str(source.get("source_type") or "unknown"),
-                "archive": source.get("archive"),
+                "archive": source.get("archive", args.get("archive")),
                 "downloadable": downloadable,
                 "url": url.strip() if isinstance(url, str) else None,
                 "checksum": checksum,
                 "checksum_algorithm": checksum_algorithm,
-                "filename": source.get("filename"),
+                "filename": source.get("filename", args.get("filename")),
                 "inner_paths": inner_paths,
             }
         )
@@ -724,6 +752,34 @@ async def list_sources_for_version(version_uuid: UUID) -> list[SourcePublic]:
     version = await get_dataset_version_by_uuid(version_uuid)
     sources = await Source.find(Source.dataset_version_id == version.id).to_list()
     return [_to_source_public(s, version.uuid) for s in sources]
+
+
+async def list_sources_with_resources_for_version(
+    version_uuid: UUID,
+) -> list[SourceWithResourcesPublic]:
+    version = await get_dataset_version_by_uuid(version_uuid)
+    sources = await Source.find(Source.dataset_version_id == version.id).to_list()
+    resources = await Resource.find(Resource.dataset_version_id == version.id).to_list()
+    resources_by_source_id: dict[Any, list[ResourcePublic]] = {}
+
+    for resource in resources:
+        if resource.source_id is None:
+            continue
+        resources_by_source_id.setdefault(resource.source_id, []).append(
+            _to_resource_public(resource, version.uuid)
+        )
+
+    out: list[SourceWithResourcesPublic] = []
+    for source in sources:
+        source_public = _to_source_public(source, version.uuid)
+        out.append(
+            SourceWithResourcesPublic(
+                **source_public.model_dump(),
+                resources=resources_by_source_id.get(source.id, []),
+            )
+        )
+
+    return out
 
 
 async def list_resources_for_version(version_uuid: UUID) -> list[ResourcePublic]:

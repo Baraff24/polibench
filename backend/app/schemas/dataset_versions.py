@@ -102,3 +102,7 @@ class DatasetVersionPreviewPublic(BaseModel):
     resource_count: int
     pipeline_steps_count: int
     characteristics: DatasetVersionCharacteristicsPreview
+
+
+class SourceWithResourcesPublic(SourcePublic):
+    resources: list[ResourcePublic]

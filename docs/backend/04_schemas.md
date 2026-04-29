@@ -77,6 +77,7 @@ Nota: `Dataset` e catalografico; non contiene pipeline o metriche esperimento.
 | `DatasetVersionSummary` | output lista | versione ridotta per listing |
 | `SourcePublic` | output | source parse da `version_yaml_raw` |
 | `ResourcePublic` | output | risorse parse da `version_yaml_raw` |
+| `SourceWithResourcesPublic` | output | source con `resources[]` annidate per UI accordion |
 | `DatasetVersionYamlPublic` | output | payload YAML (`kind`, `content`) |
 | `DatasetVersionPreviewPublic` | output preview | contatori parse e caratteristiche riconosciute |
 
@@ -166,6 +167,14 @@ class LeaderboardEntry(BaseModel):
     dataset_version_uuid: UUID
     pipeline_uuid: UUID | None = None
     pipeline_code: str | None = None
+    submitted_by_user_uuid: UUID | None = None
+    submitted_by_display_name: str | None = None
+    submitted_by_email: str | None = None
+    training_config: dict[str, Any] | None = None
+    status: str | None = None
+    run_name: str | None = None
+    seed: int | None = None
+    created_at: datetime | None = None
     split: Split
     metric: str
     k: int | None = None
@@ -183,6 +192,14 @@ class MultiMetricLeaderboardEntry(BaseModel):
     dataset_version_uuid: UUID
     pipeline_uuid: UUID | None = None
     pipeline_code: str | None = None
+    submitted_by_user_uuid: UUID | None = None
+    submitted_by_display_name: str | None = None
+    submitted_by_email: str | None = None
+    training_config: dict[str, Any] | None = None
+    status: str | None = None
+    run_name: str | None = None
+    seed: int | None = None
+    created_at: datetime | None = None
     split: Split
     metrics: dict[str, float]
     directions: dict[str, Direction]
@@ -192,6 +209,10 @@ class MultiMetricLeaderboardEntry(BaseModel):
 
 Nota: `Metric` contiene solo performance metric degli esperimenti.
 Le dataset characteristics restano in `DatasetVersion`.
+Le query avanzate usano anche:
+
+- `LeaderboardQuery` (POST `/leaderboard/query`)
+- `BestConfigurationQuery` + `BestConfigurationResponse` (POST `/leaderboard/best-configuration`)
 
 ---
 
@@ -213,16 +234,22 @@ from .dataset_versions import (
     DatasetVersionYamlPublic,
     ResourcePublic,
     SourcePublic,
+    SourceWithResourcesPublic,
 )
 from .datasets import DatasetCreate, DatasetPublic, DatasetSummary
 from .experiments import ExperimentCreate, ExperimentPublic, ExperimentSummary
 from .metric_imports import MetricImportPublic
 from .metrics import (
+    BestConfigurationGroup,
+    BestConfigurationQuery,
+    BestConfigurationResponse,
     ExperimentMetrics,
+    LeaderboardQuery,
     LeaderboardEntry,
     MetricCreate,
     MetricPublic,
     MetricsBatchCreate,
+    MultiMetricLeaderboardEntry,
 )
 from .ml_models import MLModelCreate, MLModelPublic, MLModelSummary
 from .pipelines import (
