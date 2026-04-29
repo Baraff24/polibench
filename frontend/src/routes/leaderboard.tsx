@@ -4,7 +4,6 @@ import { DataTable, EmptyState, PageHeader } from '../components'
 import type { Column } from '../components'
 import { datasetService, leaderboardService, mlModelService } from '../services'
 import type {
-  BestConfigurationGroup,
   BestConfigurationResponse,
   DatasetSummary,
   DatasetVersionSummary,
@@ -59,6 +58,7 @@ const METRIC_PRESETS: Record<string, { metrics: string[]; sortBy: string }> = {
 }
 
 type SortOrder = 'asc' | 'desc'
+type LeaderboardViewMode = 'raw' | 'best_configuration'
 
 type ColumnDef = {
   id: string
@@ -68,6 +68,15 @@ type ColumnDef = {
 
 const STORAGE_VISIBLE_COLUMNS_KEY = 'leaderboard.visibleColumns.v2'
 const QUERY_TOP_N = 5000
+
+function formatHyperparamsLabel(hyperparams: Record<string, unknown>): string {
+  const keys = Object.keys(hyperparams)
+  if (keys.length === 0) return 'model only'
+  return keys
+    .sort((a, b) => a.localeCompare(b))
+    .map((key) => `${key}=${String(hyperparams[key])}`)
+    .join(', ')
+}
 
 export default function Leaderboard() {
   const navigate = useNavigate()
@@ -85,6 +94,7 @@ export default function Leaderboard() {
   const [split, setSplit] = useState<Split>('test')
   const [entries, setEntries] = useState<MultiMetricLeaderboardEntry[]>([])
   const [loading, setLoading] = useState(false)
+  const [viewMode, setViewMode] = useState<LeaderboardViewMode>('raw')
 
   const [metricNames, setMetricNames] = useState<string[]>([])
   const [sortBy, setSortBy] = useState('')
@@ -186,6 +196,21 @@ export default function Leaderboard() {
   }, [hyperparamFilters])
 
   useEffect(() => {
+    setViewMode('raw')
+    setBestResponse(null)
+  }, [
+    datasetUuid,
+    datasetVersionUuid,
+    pipelineUuid,
+    split,
+    metricNames,
+    sortBy,
+    selectedModelUuids,
+    selectedAuthorUuids,
+    queryHyperparamFilters,
+  ])
+
+  useEffect(() => {
     if (!datasetUuid || metricNames.length === 0 || !sortBy) return
     if (datasetVersionUuid && !pipelineUuid) {
       setEntries([])
@@ -251,18 +276,6 @@ export default function Leaderboard() {
     return Array.from(keys).sort((a, b) => a.localeCompare(b))
   }, [entries])
 
-  const firstEntry = entries.length > 0 ? entries[0] : null
-
-  useEffect(() => {
-    if (entries.length === 0) return
-    const validKeys = new Set(['rank', 'model', 'pipeline', 'author', 'run_name', 'status', 'seed', 'created_at'])
-    metricNames.forEach((metric) => validKeys.add(`metric:${metric}`))
-    selectedHyperparamColumns.forEach((hp) => validKeys.add(`hp:${hp}`))
-
-    if (tableSort && validKeys.has(tableSort.key)) return
-    setTableSort({ key: 'rank', order: 'asc' })
-  }, [entries, metricNames, selectedHyperparamColumns, tableSort])
-
   function sortIndicator(key: string): string {
     if (!tableSort || tableSort.key !== key) return '↕'
     return tableSort.order === 'asc' ? '↑' : '↓'
@@ -293,9 +306,56 @@ export default function Leaderboard() {
     )
   }
 
+  const bestConfigurationEntries = useMemo<MultiMetricLeaderboardEntry[]>(() => {
+    if (!bestResponse) return []
+    const targetMetric = bestResponse.target_metric
+    const pipelineCode = pipelines.find((pipeline) => pipeline.uuid === bestResponse.pipeline_uuid)?.code || null
+
+    return bestResponse.groups.map((group, index) => ({
+      experiment_uuid: group.best_experiment_uuid || `agg-${group.model_uuid}-${index}`,
+      model_uuid: group.model_uuid,
+      model_name: group.model_name,
+      dataset_uuid: bestResponse.dataset_uuid,
+      dataset_version_uuid: bestResponse.dataset_version_uuid,
+      pipeline_uuid: bestResponse.pipeline_uuid,
+      pipeline_code: pipelineCode,
+      submitted_by_user_uuid: group.submitted_by_user_uuid,
+      submitted_by_display_name: group.submitted_by_display_name,
+      submitted_by_email: group.submitted_by_email,
+      training_config: group.hyperparams,
+      status: 'aggregated',
+      run_name: group.best_run_name || formatHyperparamsLabel(group.hyperparams),
+      seed: null,
+      created_at: null,
+      split: bestResponse.split,
+      metrics: {
+        [targetMetric]: group.best_value,
+      },
+      directions: {
+        [targetMetric]: bestResponse.direction,
+      },
+      repo_url: null,
+      rank: index + 1,
+    }))
+  }, [bestResponse, pipelines])
+
+  const activeMetricNames = useMemo(() => {
+    if (viewMode === 'best_configuration' && bestResponse) {
+      return [bestResponse.target_metric]
+    }
+    return metricNames
+  }, [viewMode, bestResponse, metricNames])
+
+  const activeEntries = useMemo(() => {
+    if (viewMode === 'best_configuration') {
+      return bestConfigurationEntries
+    }
+    return entries
+  }, [viewMode, bestConfigurationEntries, entries])
+
   const sortedEntries = useMemo(() => {
-    if (!tableSort) return entries
-    const rows = [...entries]
+    if (!tableSort) return activeEntries
+    const rows = [...activeEntries]
     const directionFactor = tableSort.order === 'asc' ? 1 : -1
 
     rows.sort((a, b) => {
@@ -351,7 +411,19 @@ export default function Leaderboard() {
     })
 
     return rows
-  }, [entries, tableSort])
+  }, [activeEntries, tableSort])
+
+  const firstEntry = activeEntries.length > 0 ? activeEntries[0] : null
+
+  useEffect(() => {
+    if (activeEntries.length === 0) return
+    const validKeys = new Set(['rank', 'model', 'pipeline', 'author', 'run_name', 'status', 'seed', 'created_at'])
+    activeMetricNames.forEach((metric) => validKeys.add(`metric:${metric}`))
+    selectedHyperparamColumns.forEach((hp) => validKeys.add(`hp:${hp}`))
+
+    if (tableSort && validKeys.has(tableSort.key)) return
+    setTableSort({ key: 'rank', order: 'asc' })
+  }, [activeEntries, activeMetricNames, selectedHyperparamColumns, tableSort])
 
   const columnDefs = useMemo<ColumnDef[]>(() => {
     const defs: ColumnDef[] = [
@@ -394,7 +466,7 @@ export default function Leaderboard() {
       },
     ]
 
-    for (const metric of metricNames) {
+    for (const metric of activeMetricNames) {
       defs.push({
         id: `metric:${metric}`,
         label: metric.toUpperCase() + directionArrow(firstEntry?.directions[metric]),
@@ -415,7 +487,7 @@ export default function Leaderboard() {
     }
 
     return defs
-  }, [metricNames, firstEntry, selectedHyperparamColumns])
+  }, [activeMetricNames, firstEntry, selectedHyperparamColumns])
 
   const activeColumnDefs = useMemo(() => {
     return columnDefs.filter((def) => visibleColumns.includes(def.id))
@@ -437,47 +509,6 @@ export default function Leaderboard() {
       },
     }))
   }, [activeColumnDefs, tableSort])
-
-  const bestGroupColumns = useMemo<Column<BestConfigurationGroup>[]>(() => {
-    return [
-      {
-        key: 'rank',
-        header: '#',
-        render: (_row, rowIndex) => String(rowIndex + 1),
-      },
-      {
-        key: 'model',
-        header: 'Model',
-        render: (row) => row.model_name || row.model_uuid,
-      },
-      {
-        key: 'author',
-        header: 'Author',
-        render: (row) =>
-          row.submitted_by_display_name || row.submitted_by_email || '—',
-      },
-      {
-        key: 'best',
-        header: 'Best value',
-        render: (row) => row.best_value.toFixed(6),
-      },
-      {
-        key: 'mean',
-        header: 'Mean value',
-        render: (row) => row.mean_value.toFixed(6),
-      },
-      {
-        key: 'count',
-        header: 'Count',
-        render: (row) => String(row.count),
-      },
-      {
-        key: 'hyperparams',
-        header: 'Grouped hyperparams',
-        render: (row) => JSON.stringify(row.hyperparams),
-      },
-    ]
-  }, [])
 
   function toggleVisibleColumn(columnId: string) {
     setVisibleColumns((prev) => {
@@ -610,6 +641,12 @@ export default function Leaderboard() {
           Object.keys(queryHyperparamFilters).length > 0 ? queryHyperparamFilters : undefined,
       })
       setBestResponse(response)
+      setViewMode('best_configuration')
+      if (response.group_by_hyperparams.length > 0) {
+        setSelectedHyperparamColumns((previous) =>
+          Array.from(new Set([...previous, ...response.group_by_hyperparams])),
+        )
+      }
       setBestModalOpen(false)
     } catch {
       showSnackBar('Unable to compute best configuration.', 'error')
@@ -887,91 +924,113 @@ export default function Leaderboard() {
           >
             Show best configuration
           </button>
+          {viewMode === 'best_configuration' && (
+            <button
+              type='button'
+              className='btn btn--outline'
+              onClick={() => setViewMode('raw')}
+            >
+              Show all configurations
+            </button>
+          )}
           <button type='button' className='btn btn--outline' onClick={exportLatex}>
             Export LaTeX
           </button>
         </div>
       </section>
 
-      {bestResponse && (
+      {loading && <p className='text-muted'>Loading...</p>}
+
+      {!loading && (
         <section className='detail-section'>
-          <h2 className='detail-section__title'>Best Configuration Results</h2>
-          <div className='detail-grid'>
-            <div className='detail-field'>
-              <div className='detail-field__label'>Target metric</div>
-              <div className='detail-field__value'>{bestResponse.target_metric}</div>
-            </div>
-            <div className='detail-field'>
-              <div className='detail-field__label'>Split</div>
-              <div className='detail-field__value'>{bestResponse.split}</div>
-            </div>
-            <div className='detail-field'>
-              <div className='detail-field__label'>Direction</div>
-              <div className='detail-field__value'>{bestResponse.direction}</div>
-            </div>
-            <div className='detail-field'>
-              <div className='detail-field__label'>Grouped by</div>
-              <div className='detail-field__value'>
-                {bestResponse.group_by_hyperparams.join(', ') || 'model only'}
+          <h2 className='detail-section__title'>
+            Current Results {viewMode === 'raw' ? '(Raw experiments)' : '(Best configuration / aggregated)'}
+          </h2>
+
+          {viewMode === 'best_configuration' && bestResponse && (
+            <>
+              <div className='detail-grid'>
+                <div className='detail-field'>
+                  <div className='detail-field__label'>Target metric</div>
+                  <div className='detail-field__value'>{bestResponse.target_metric}</div>
+                </div>
+                <div className='detail-field'>
+                  <div className='detail-field__label'>Direction</div>
+                  <div className='detail-field__value'>{bestResponse.direction}</div>
+                </div>
+                <div className='detail-field'>
+                  <div className='detail-field__label'>Grouped by</div>
+                  <div className='detail-field__value'>
+                    {bestResponse.group_by_hyperparams.join(', ') || 'model only'}
+                  </div>
+                </div>
+                <div className='detail-field'>
+                  <div className='detail-field__label'>Split</div>
+                  <div className='detail-field__value'>{bestResponse.split}</div>
+                </div>
               </div>
-            </div>
-          </div>
-          {bestResponse.best_group ? (
+
+              {bestResponse.best_group && (
+                <div className='detail-grid' style={{ marginTop: '0.75rem' }}>
+                  <div className='detail-field'>
+                    <div className='detail-field__label'>Best overall</div>
+                    <div className='detail-field__value'>
+                      {bestResponse.best_group.model_name || '—'} (BEST)
+                    </div>
+                  </div>
+                  <div className='detail-field'>
+                    <div className='detail-field__label'>Best value</div>
+                    <div className='detail-field__value'>
+                      {bestResponse.best_group.best_value.toFixed(6)}
+                    </div>
+                  </div>
+                  <div className='detail-field'>
+                    <div className='detail-field__label'>Best author</div>
+                    <div className='detail-field__value'>
+                      {bestResponse.best_group.submitted_by_display_name ||
+                        bestResponse.best_group.submitted_by_email ||
+                        '—'}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeEntries.length === 0 ? (
+            <EmptyState
+              title='No results'
+              description={
+                viewMode === 'best_configuration'
+                  ? 'No groups matched the selected filters.'
+                  : 'Try different filters.'
+              }
+            />
+          ) : (
             <>
               <div className='detail-grid' style={{ marginTop: '0.75rem' }}>
                 <div className='detail-field'>
-                  <div className='detail-field__label'>Best model</div>
+                  <div className='detail-field__label'>Rows</div>
                   <div className='detail-field__value'>
-                    {bestResponse.best_group.model_name || '—'}
-                  </div>
-                </div>
-                <div className='detail-field'>
-                  <div className='detail-field__label'>Best value</div>
-                  <div className='detail-field__value'>
-                    {bestResponse.best_group.best_value.toFixed(6)}
-                  </div>
-                </div>
-                <div className='detail-field'>
-                  <div className='detail-field__label'>Best author</div>
-                  <div className='detail-field__value'>
-                    {bestResponse.best_group.submitted_by_display_name ||
-                      bestResponse.best_group.submitted_by_email ||
-                      '—'}
+                    {activeEntries.length}
                   </div>
                 </div>
               </div>
               <div style={{ marginTop: '1rem' }}>
                 <DataTable
-                  columns={bestGroupColumns}
-                  rows={bestResponse.groups}
-                  rowKey={(row) => `${row.model_uuid}-${JSON.stringify(row.hyperparams)}`}
+                  columns={tableColumns}
+                  rows={sortedEntries}
+                  rowKey={(entry) => entry.experiment_uuid}
+                  onRowClick={(entry) => {
+                    if (entry.experiment_uuid.startsWith('agg-')) return
+                    navigate(`/experiments/${entry.experiment_uuid}`)
+                  }}
                 />
               </div>
+              <LeaderboardChart entries={sortedEntries} metrics={activeMetricNames} mode={chartMode} />
             </>
-          ) : (
-            <EmptyState
-              title='No best configuration'
-              description='No groups matched the selected filters.'
-            />
           )}
         </section>
-      )}
-
-      {loading && <p className='text-muted'>Loading...</p>}
-      {!loading && entries.length === 0 && (
-        <EmptyState title='No results' description='Try different filters.' />
-      )}
-      {!loading && entries.length > 0 && (
-        <DataTable
-          columns={tableColumns}
-          rows={sortedEntries}
-          rowKey={(entry) => entry.experiment_uuid}
-          onRowClick={(entry) => navigate(`/experiments/${entry.experiment_uuid}`)}
-        />
-      )}
-
-      {!loading && entries.length > 0 && (
-        <LeaderboardChart entries={sortedEntries} metrics={metricNames} mode={chartMode} />
       )}
 
       {bestModalOpen && (
