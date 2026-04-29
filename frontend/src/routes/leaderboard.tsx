@@ -4,6 +4,7 @@ import { DataTable, EmptyState, PageHeader } from '../components'
 import type { Column } from '../components'
 import { datasetService, leaderboardService, mlModelService } from '../services'
 import type {
+  BestConfigurationGroup,
   BestConfigurationResponse,
   DatasetSummary,
   DatasetVersionSummary,
@@ -66,6 +67,7 @@ type ColumnDef = {
 }
 
 const STORAGE_VISIBLE_COLUMNS_KEY = 'leaderboard.visibleColumns.v2'
+const QUERY_TOP_N = 5000
 
 export default function Leaderboard() {
   const navigate = useNavigate()
@@ -81,7 +83,6 @@ export default function Leaderboard() {
   const [pipelineUuid, setPipelineUuid] = useState('')
 
   const [split, setSplit] = useState<Split>('test')
-  const [topN, setTopN] = useState(20)
   const [entries, setEntries] = useState<MultiMetricLeaderboardEntry[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -94,9 +95,6 @@ export default function Leaderboard() {
   const [selectedAuthorUuids, setSelectedAuthorUuids] = useState<string[]>([])
 
   const [hyperparamFilters, setHyperparamFilters] = useState<Record<string, string>>({})
-  const [hyperparamFilterKey, setHyperparamFilterKey] = useState('')
-  const [hyperparamFilterValue, setHyperparamFilterValue] = useState('')
-
   const [selectedHyperparamColumns, setSelectedHyperparamColumns] = useState<string[]>([])
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
@@ -117,7 +115,7 @@ export default function Leaderboard() {
 
   const [bestModalOpen, setBestModalOpen] = useState(false)
   const [bestDirection, setBestDirection] = useState<Direction>('max')
-  const [bestGroupByInput, setBestGroupByInput] = useState('embedding_dim,learning_rate,batch_size')
+  const [bestGroupByHyperparams, setBestGroupByHyperparams] = useState<string[]>([])
   const [bestLoading, setBestLoading] = useState(false)
   const [bestResponse, setBestResponse] = useState<BestConfigurationResponse | null>(null)
 
@@ -203,7 +201,7 @@ export default function Leaderboard() {
         split,
         metrics: metricNames,
         sort_by: sortBy,
-        top_n: topN,
+        top_n: QUERY_TOP_N,
         model_uuids: selectedModelUuids.length > 0 ? selectedModelUuids : undefined,
         author_uuids: selectedAuthorUuids.length > 0 ? selectedAuthorUuids : undefined,
         hyperparam_filters:
@@ -219,7 +217,6 @@ export default function Leaderboard() {
     split,
     metricNames,
     sortBy,
-    topN,
     selectedModelUuids,
     selectedAuthorUuids,
     queryHyperparamFilters,
@@ -441,6 +438,47 @@ export default function Leaderboard() {
     }))
   }, [activeColumnDefs, tableSort])
 
+  const bestGroupColumns = useMemo<Column<BestConfigurationGroup>[]>(() => {
+    return [
+      {
+        key: 'rank',
+        header: '#',
+        render: (_row, rowIndex) => String(rowIndex + 1),
+      },
+      {
+        key: 'model',
+        header: 'Model',
+        render: (row) => row.model_name || row.model_uuid,
+      },
+      {
+        key: 'author',
+        header: 'Author',
+        render: (row) =>
+          row.submitted_by_display_name || row.submitted_by_email || '—',
+      },
+      {
+        key: 'best',
+        header: 'Best value',
+        render: (row) => row.best_value.toFixed(6),
+      },
+      {
+        key: 'mean',
+        header: 'Mean value',
+        render: (row) => row.mean_value.toFixed(6),
+      },
+      {
+        key: 'count',
+        header: 'Count',
+        render: (row) => String(row.count),
+      },
+      {
+        key: 'hyperparams',
+        header: 'Grouped hyperparams',
+        render: (row) => JSON.stringify(row.hyperparams),
+      },
+    ]
+  }, [])
+
   function toggleVisibleColumn(columnId: string) {
     setVisibleColumns((prev) => {
       if (prev.includes(columnId)) {
@@ -462,24 +500,46 @@ export default function Leaderboard() {
     })
   }
 
-  function addHyperparamFilter() {
-    const key = hyperparamFilterKey.trim()
-    const value = hyperparamFilterValue.trim()
-    if (!key || !value) {
-      showSnackBar('Hyperparam key and value are required.', 'error')
-      return
-    }
-    setHyperparamFilters((prev) => ({ ...prev, [key]: value }))
-    setHyperparamFilterKey('')
-    setHyperparamFilterValue('')
+  function toggleModelSelection(modelUuid: string) {
+    setSelectedModelUuids((prev) => {
+      if (prev.includes(modelUuid)) {
+        return prev.filter((item) => item !== modelUuid)
+      }
+      return [...prev, modelUuid]
+    })
   }
 
-  function removeHyperparamFilter(key: string) {
+  function toggleAuthorSelection(authorUuid: string) {
+    setSelectedAuthorUuids((prev) => {
+      if (prev.includes(authorUuid)) {
+        return prev.filter((item) => item !== authorUuid)
+      }
+      return [...prev, authorUuid]
+    })
+  }
+
+  function toggleHyperparamColumnSelection(hyperparam: string) {
+    setSelectedHyperparamColumns((prev) => {
+      if (prev.includes(hyperparam)) {
+        return prev.filter((item) => item !== hyperparam)
+      }
+      return [...prev, hyperparam]
+    })
+  }
+
+  function toggleHyperparamFilterKey(key: string) {
     setHyperparamFilters((prev) => {
+      if (!(key in prev)) {
+        return { ...prev, [key]: '' }
+      }
       const next = { ...prev }
       delete next[key]
       return next
     })
+  }
+
+  function updateHyperparamFilterValue(key: string, value: string) {
+    setHyperparamFilters((prev) => ({ ...prev, [key]: value }))
   }
 
   async function exportLatex() {
@@ -534,11 +594,6 @@ export default function Leaderboard() {
       return
     }
 
-    const groupBy = bestGroupByInput
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean)
-
     setBestLoading(true)
     try {
       const response = await leaderboardService.getBestConfiguration({
@@ -548,14 +603,14 @@ export default function Leaderboard() {
         split,
         target_metric: sortBy,
         direction: bestDirection,
-        group_by_hyperparams: groupBy,
+        group_by_hyperparams: bestGroupByHyperparams,
         model_uuids: selectedModelUuids.length > 0 ? selectedModelUuids : undefined,
         author_uuids: selectedAuthorUuids.length > 0 ? selectedAuthorUuids : undefined,
         hyperparam_filters:
           Object.keys(queryHyperparamFilters).length > 0 ? queryHyperparamFilters : undefined,
       })
       setBestResponse(response)
-      setBestModalOpen(true)
+      setBestModalOpen(false)
     } catch {
       showSnackBar('Unable to compute best configuration.', 'error')
     } finally {
@@ -649,18 +704,6 @@ export default function Leaderboard() {
         </div>
 
         <div className='leaderboard-filters__field'>
-          <label className='leaderboard-filters__label'>Top N</label>
-          <input
-            className='leaderboard-filters__input'
-            type='number'
-            min={1}
-            max={200}
-            value={topN}
-            onChange={(e) => setTopN(Number(e.target.value))}
-          />
-        </div>
-
-        <div className='leaderboard-filters__field'>
           <label className='leaderboard-filters__label'>Chart mode</label>
           <select
             className='leaderboard-filters__select'
@@ -698,99 +741,123 @@ export default function Leaderboard() {
 
           <div className='leaderboard-filters__field'>
             <label className='leaderboard-filters__label'>Models</label>
-            <select
-              multiple
-              className='leaderboard-filters__select'
-              value={selectedModelUuids}
-              onChange={(e) => {
-                const values = Array.from(e.target.selectedOptions).map((opt) => opt.value)
-                setSelectedModelUuids(values)
-              }}
-              style={{ minHeight: '7rem' }}
-            >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                <input
+                  type='checkbox'
+                  checked={selectedModelUuids.length === 0}
+                  onChange={() => setSelectedModelUuids([])}
+                />
+                <span>All models</span>
+              </label>
               {models.map((model) => (
-                <option key={model.uuid} value={model.uuid}>
-                  {model.name}
-                </option>
+                <label
+                  key={model.uuid}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <input
+                    type='checkbox'
+                    checked={selectedModelUuids.includes(model.uuid)}
+                    onChange={() => toggleModelSelection(model.uuid)}
+                  />
+                  <span>{model.name}</span>
+                </label>
               ))}
-            </select>
+            </div>
           </div>
 
           <div className='leaderboard-filters__field'>
             <label className='leaderboard-filters__label'>Authors</label>
-            <select
-              multiple
-              className='leaderboard-filters__select'
-              value={selectedAuthorUuids}
-              onChange={(e) => {
-                const values = Array.from(e.target.selectedOptions).map((opt) => opt.value)
-                setSelectedAuthorUuids(values)
-              }}
-              style={{ minHeight: '7rem' }}
-            >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                <input
+                  type='checkbox'
+                  checked={selectedAuthorUuids.length === 0}
+                  onChange={() => setSelectedAuthorUuids([])}
+                />
+                <span>All authors</span>
+              </label>
               {availableAuthors.map((author) => (
-                <option key={author.uuid} value={author.uuid}>
-                  {author.label}
-                </option>
+                <label
+                  key={author.uuid}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <input
+                    type='checkbox'
+                    checked={selectedAuthorUuids.includes(author.uuid)}
+                    onChange={() => toggleAuthorSelection(author.uuid)}
+                  />
+                  <span>{author.label}</span>
+                </label>
               ))}
-            </select>
+            </div>
           </div>
 
           <div className='leaderboard-filters__field'>
             <label className='leaderboard-filters__label'>Hyperparam columns</label>
-            <select
-              multiple
-              className='leaderboard-filters__select'
-              value={selectedHyperparamColumns}
-              onChange={(e) => {
-                const values = Array.from(e.target.selectedOptions).map((opt) => opt.value)
-                setSelectedHyperparamColumns(values)
-              }}
-              style={{ minHeight: '7rem' }}
-            >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                <input
+                  type='checkbox'
+                  checked={selectedHyperparamColumns.length === 0}
+                  onChange={() => setSelectedHyperparamColumns([])}
+                />
+                <span>No extra hyperparams columns</span>
+              </label>
               {availableHyperparamKeys.map((key) => (
-                <option key={key} value={key}>
-                  {key}
-                </option>
+                <label
+                  key={key}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <input
+                    type='checkbox'
+                    checked={selectedHyperparamColumns.includes(key)}
+                    onChange={() => toggleHyperparamColumnSelection(key)}
+                  />
+                  <span>{key}</span>
+                </label>
               ))}
-            </select>
+            </div>
           </div>
         </div>
 
         <div className='leaderboard-filters'>
           <div className='leaderboard-filters__field'>
-            <label className='leaderboard-filters__label'>Add hyperparam filter</label>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <input
-                className='leaderboard-filters__input'
-                placeholder='key (e.g. embedding_dim)'
-                value={hyperparamFilterKey}
-                onChange={(e) => setHyperparamFilterKey(e.target.value)}
-              />
-              <input
-                className='leaderboard-filters__input'
-                placeholder='value (e.g. 64)'
-                value={hyperparamFilterValue}
-                onChange={(e) => setHyperparamFilterValue(e.target.value)}
-              />
-              <button type='button' className='btn btn--outline' onClick={addHyperparamFilter}>
-                Add filter
-              </button>
+            <label className='leaderboard-filters__label'>Hyperparam filters</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                <input
+                  type='checkbox'
+                  checked={Object.keys(hyperparamFilters).length === 0}
+                  onChange={() => setHyperparamFilters({})}
+                />
+                <span>All hyperparams values</span>
+              </label>
+              {availableHyperparamKeys.map((key) => (
+                <label
+                  key={key}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  <input
+                    type='checkbox'
+                    checked={key in hyperparamFilters}
+                    onChange={() => toggleHyperparamFilterKey(key)}
+                  />
+                  <span style={{ minWidth: '9rem' }}>{key}</span>
+                  {key in hyperparamFilters && (
+                    <input
+                      className='leaderboard-filters__input'
+                      placeholder='value'
+                      value={hyperparamFilters[key]}
+                      onChange={(event) =>
+                        updateHyperparamFilterValue(key, event.target.value)
+                      }
+                      style={{ maxWidth: '14rem' }}
+                    />
+                  )}
+                </label>
+              ))}
             </div>
-            {Object.keys(hyperparamFilters).length > 0 && (
-              <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {Object.entries(hyperparamFilters).map(([key, value]) => (
-                  <button
-                    key={key}
-                    type='button'
-                    className='btn btn--outline btn--sm'
-                    onClick={() => removeHyperparamFilter(key)}
-                  >
-                    {key}={value} ×
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         </div>
 
@@ -813,14 +880,82 @@ export default function Leaderboard() {
         </div>
 
         <div className='form__actions'>
-          <button type='button' className='btn btn--outline' onClick={showBestConfiguration} disabled={bestLoading}>
-            {bestLoading ? 'Computing...' : 'Show best configuration'}
+          <button
+            type='button'
+            className='btn btn--outline'
+            onClick={() => setBestModalOpen(true)}
+          >
+            Show best configuration
           </button>
           <button type='button' className='btn btn--outline' onClick={exportLatex}>
             Export LaTeX
           </button>
         </div>
       </section>
+
+      {bestResponse && (
+        <section className='detail-section'>
+          <h2 className='detail-section__title'>Best Configuration Results</h2>
+          <div className='detail-grid'>
+            <div className='detail-field'>
+              <div className='detail-field__label'>Target metric</div>
+              <div className='detail-field__value'>{bestResponse.target_metric}</div>
+            </div>
+            <div className='detail-field'>
+              <div className='detail-field__label'>Split</div>
+              <div className='detail-field__value'>{bestResponse.split}</div>
+            </div>
+            <div className='detail-field'>
+              <div className='detail-field__label'>Direction</div>
+              <div className='detail-field__value'>{bestResponse.direction}</div>
+            </div>
+            <div className='detail-field'>
+              <div className='detail-field__label'>Grouped by</div>
+              <div className='detail-field__value'>
+                {bestResponse.group_by_hyperparams.join(', ') || 'model only'}
+              </div>
+            </div>
+          </div>
+          {bestResponse.best_group ? (
+            <>
+              <div className='detail-grid' style={{ marginTop: '0.75rem' }}>
+                <div className='detail-field'>
+                  <div className='detail-field__label'>Best model</div>
+                  <div className='detail-field__value'>
+                    {bestResponse.best_group.model_name || '—'}
+                  </div>
+                </div>
+                <div className='detail-field'>
+                  <div className='detail-field__label'>Best value</div>
+                  <div className='detail-field__value'>
+                    {bestResponse.best_group.best_value.toFixed(6)}
+                  </div>
+                </div>
+                <div className='detail-field'>
+                  <div className='detail-field__label'>Best author</div>
+                  <div className='detail-field__value'>
+                    {bestResponse.best_group.submitted_by_display_name ||
+                      bestResponse.best_group.submitted_by_email ||
+                      '—'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: '1rem' }}>
+                <DataTable
+                  columns={bestGroupColumns}
+                  rows={bestResponse.groups}
+                  rowKey={(row) => `${row.model_uuid}-${JSON.stringify(row.hyperparams)}`}
+                />
+              </div>
+            </>
+          ) : (
+            <EmptyState
+              title='No best configuration'
+              description='No groups matched the selected filters.'
+            />
+          )}
+        </section>
+      )}
 
       {loading && <p className='text-muted'>Loading...</p>}
       {!loading && entries.length === 0 && (
@@ -839,7 +974,7 @@ export default function Leaderboard() {
         <LeaderboardChart entries={sortedEntries} metrics={metricNames} mode={chartMode} />
       )}
 
-      {bestModalOpen && bestResponse && (
+      {bestModalOpen && (
         <div
           style={{
             position: 'fixed',
@@ -859,98 +994,86 @@ export default function Leaderboard() {
             onClick={(event) => event.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 className='detail-section__title'>Best Configuration</h2>
+              <h2 className='detail-section__title'>Best Configuration Settings</h2>
               <button type='button' className='btn btn--outline btn--sm' onClick={() => setBestModalOpen(false)}>
                 Close
               </button>
             </div>
 
-            <div className='detail-grid'>
-              <div className='detail-field'>
-                <div className='detail-field__label'>Target metric</div>
-                <div className='detail-field__value'>{bestResponse.target_metric}</div>
+            <p className='text-muted'>
+              Choose direction and group-by hyperparameters, then apply to compute best
+              configuration in the current dataset/version/pipeline/split context.
+            </p>
+
+            <div className='leaderboard-filters'>
+              <div className='leaderboard-filters__field'>
+                <label className='leaderboard-filters__label'>Direction</label>
+                <select
+                  className='leaderboard-filters__select'
+                  value={bestDirection}
+                  onChange={(e) => setBestDirection(e.target.value as Direction)}
+                >
+                  <option value='max'>higher is better</option>
+                  <option value='min'>lower is better</option>
+                </select>
               </div>
-              <div className='detail-field'>
-                <div className='detail-field__label'>Split</div>
-                <div className='detail-field__value'>{bestResponse.split}</div>
-              </div>
-              <div className='detail-field'>
-                <div className='detail-field__label'>Direction</div>
-                <div className='detail-field__value'>{bestResponse.direction}</div>
-              </div>
-              <div className='detail-field'>
-                <div className='detail-field__label'>Grouped by</div>
-                <div className='detail-field__value'>
-                  {bestResponse.group_by_hyperparams.join(', ') || 'model only'}
+              <div className='leaderboard-filters__field'>
+                <label className='leaderboard-filters__label'>Group by hyperparams</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <label
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <input
+                      type='checkbox'
+                      checked={bestGroupByHyperparams.length === 0}
+                      onChange={() => setBestGroupByHyperparams([])}
+                    />
+                    <span>Model only (no hyperparams grouping)</span>
+                  </label>
+                  {availableHyperparamKeys.map((key) => (
+                    <label
+                      key={key}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <input
+                        type='checkbox'
+                        checked={bestGroupByHyperparams.includes(key)}
+                        onChange={() => {
+                          setBestGroupByHyperparams((prev) => {
+                            if (prev.includes(key)) {
+                              return prev.filter((item) => item !== key)
+                            }
+                            return [...prev, key]
+                          })
+                        }}
+                      />
+                      <span>{key}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
             </div>
 
-            {bestResponse.best_group ? (
-              <section className='detail-section'>
-                <h3 className='detail-section__title'>Best Group</h3>
-                <div className='detail-grid'>
-                  <div className='detail-field'>
-                    <div className='detail-field__label'>Model</div>
-                    <div className='detail-field__value'>{bestResponse.best_group.model_name || '—'}</div>
-                  </div>
-                  <div className='detail-field'>
-                    <div className='detail-field__label'>Author</div>
-                    <div className='detail-field__value'>
-                      {bestResponse.best_group.submitted_by_display_name ||
-                        bestResponse.best_group.submitted_by_email ||
-                        '—'}
-                    </div>
-                  </div>
-                  <div className='detail-field'>
-                    <div className='detail-field__label'>Best value</div>
-                    <div className='detail-field__value'>{bestResponse.best_group.best_value.toFixed(6)}</div>
-                  </div>
-                  <div className='detail-field'>
-                    <div className='detail-field__label'>Mean value</div>
-                    <div className='detail-field__value'>{bestResponse.best_group.mean_value.toFixed(6)}</div>
-                  </div>
-                  <div className='detail-field'>
-                    <div className='detail-field__label'>Count</div>
-                    <div className='detail-field__value'>{bestResponse.best_group.count}</div>
-                  </div>
-                </div>
-                <pre className='detail-field__value' style={{ whiteSpace: 'pre-wrap', marginTop: '0.75rem' }}>
-                  {JSON.stringify(bestResponse.best_group.hyperparams, null, 2)}
-                </pre>
-              </section>
-            ) : (
-              <EmptyState title='No best configuration' description='No groups matched the selected filters.' />
-            )}
+            <div className='form__actions'>
+              <button
+                type='button'
+                className='btn btn--outline'
+                onClick={() => setBestModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type='button'
+                className='btn btn--primary'
+                disabled={bestLoading}
+                onClick={showBestConfiguration}
+              >
+                {bestLoading ? 'Computing...' : 'Apply'}
+              </button>
+            </div>
           </div>
         </div>
       )}
-
-      <section className='detail-section'>
-        <h2 className='detail-section__title'>Best Configuration Settings</h2>
-        <div className='leaderboard-filters'>
-          <div className='leaderboard-filters__field'>
-            <label className='leaderboard-filters__label'>Direction</label>
-            <select
-              className='leaderboard-filters__select'
-              value={bestDirection}
-              onChange={(e) => setBestDirection(e.target.value as Direction)}
-            >
-              <option value='max'>higher is better</option>
-              <option value='min'>lower is better</option>
-            </select>
-          </div>
-          <div className='leaderboard-filters__field'>
-            <label className='leaderboard-filters__label'>Group by hyperparams</label>
-            <input
-              className='leaderboard-filters__input'
-              value={bestGroupByInput}
-              onChange={(e) => setBestGroupByInput(e.target.value)}
-              placeholder='embedding_dim,learning_rate,batch_size'
-            />
-          </div>
-        </div>
-      </section>
     </div>
   )
 }

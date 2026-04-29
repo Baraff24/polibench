@@ -291,6 +291,58 @@ def _rating_metrics(quality: str) -> list[MetricCsvRow]:
     return rows
 
 
+def _amazon_books_tuning_metrics(ndcg_test: float) -> list[MetricCsvRow]:
+    ndcg_validation = round(ndcg_test * 0.95, 6)
+    recall_test = round(ndcg_test * 1.75, 6)
+    recall_validation = round(ndcg_validation * 1.75, 6)
+    hit_test = round(ndcg_test * 2.2, 6)
+    hit_validation = round(ndcg_validation * 2.2, 6)
+    return [
+        MetricCsvRow(
+            split=Split.TEST,
+            metric="ndcg@10",
+            value=round(ndcg_test, 6),
+            direction=Direction.MAX,
+            k=10,
+        ),
+        MetricCsvRow(
+            split=Split.VALIDATION,
+            metric="ndcg@10",
+            value=ndcg_validation,
+            direction=Direction.MAX,
+            k=10,
+        ),
+        MetricCsvRow(
+            split=Split.TEST,
+            metric="recall@20",
+            value=recall_test,
+            direction=Direction.MAX,
+            k=20,
+        ),
+        MetricCsvRow(
+            split=Split.VALIDATION,
+            metric="recall@20",
+            value=recall_validation,
+            direction=Direction.MAX,
+            k=20,
+        ),
+        MetricCsvRow(
+            split=Split.TEST,
+            metric="hit@10",
+            value=hit_test,
+            direction=Direction.MAX,
+            k=10,
+        ),
+        MetricCsvRow(
+            split=Split.VALIDATION,
+            metric="hit@10",
+            value=hit_validation,
+            direction=Direction.MAX,
+            k=10,
+        ),
+    ]
+
+
 def _ranking_training_config(
     *,
     embedding_dim: int,
@@ -481,7 +533,7 @@ MOVIELENS_20M = _make_dataset_fixture(
 AMAZON_BOOKS_2023 = _make_dataset_fixture(
     key="amazon_books",
     version="2023",
-    task=TaskType.RATING_PREDICTION,
+    task=TaskType.RANKING,
     visibility=Visibility.PUBLIC,
     owner="researcher2",
     pipeline_steps=[
@@ -953,41 +1005,84 @@ EXPERIMENT_FIXTURES_DEMO = [
     ExperimentFixture(
         dataset_key="amazon_books",
         dataset_version="2023",
-        model_name="SVD",
-        run_name="seed-demo-svd-amazon-books-2023-finished",
+        model_name="LightGCN",
+        run_name="seed-demo-lightgcn-amazon-books-2023-lr1e3-ed64-bs1024",
         seed=201,
         status=Status.FINISHED,
         submitted_by="researcher2",
-        training_config=_rating_training_config(
-            n_factors=64,
-            learning_rate=0.005,
-            reg=0.03,
-            epochs=40,
+        training_config=_ranking_training_config(
+            embedding_dim=64,
+            learning_rate=0.001,
+            batch_size=1024,
+            epochs=180,
+            reg=0.0001,
             seed=201,
         ),
-        metrics=_rating_metrics("baseline"),
+        metrics=_amazon_books_tuning_metrics(0.110),
     ),
     ExperimentFixture(
         dataset_key="amazon_books",
         dataset_version="2023",
-        model_name="UserKNN",
-        run_name="seed-demo-userknn-amazon-books-2023-finished-p2",
+        model_name="LightGCN",
+        run_name="seed-demo-lightgcn-amazon-books-2023-lr5e4-ed64-bs1024",
         seed=202,
         status=Status.FINISHED,
-        pipeline_code="P002",
         submitted_by="researcher",
-        training_config={"k": 140, "sim": "cosine", "shrinkage": 90, "seed": 202},
-        metrics=_rating_metrics("good"),
+        training_config=_ranking_training_config(
+            embedding_dim=64,
+            learning_rate=0.0005,
+            batch_size=1024,
+            epochs=180,
+            reg=0.0001,
+            seed=202,
+        ),
+        metrics=_amazon_books_tuning_metrics(0.104),
+    ),
+    ExperimentFixture(
+        dataset_key="amazon_books",
+        dataset_version="2023",
+        model_name="LightGCN",
+        run_name="seed-demo-lightgcn-amazon-books-2023-lr1e3-ed128-bs1024",
+        seed=203,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        training_config=_ranking_training_config(
+            embedding_dim=128,
+            learning_rate=0.001,
+            batch_size=1024,
+            epochs=180,
+            reg=0.0001,
+            seed=203,
+        ),
+        metrics=_amazon_books_tuning_metrics(0.118),
+    ),
+    ExperimentFixture(
+        dataset_key="amazon_books",
+        dataset_version="2023",
+        model_name="LightGCN",
+        run_name="seed-demo-lightgcn-amazon-books-2023-lr1e3-ed128-bs2048",
+        seed=204,
+        status=Status.FINISHED,
+        submitted_by="researcher2",
+        training_config=_ranking_training_config(
+            embedding_dim=128,
+            learning_rate=0.001,
+            batch_size=2048,
+            epochs=180,
+            reg=0.0001,
+            seed=204,
+        ),
+        metrics=_amazon_books_tuning_metrics(0.115),
     ),
     ExperimentFixture(
         dataset_key="amazon_books",
         dataset_version="2023",
         model_name="PopRank",
         run_name="seed-demo-poprank-amazon-books-2023-running",
-        seed=203,
+        seed=205,
         status=Status.RUNNING,
         submitted_by="viewer",
-        training_config={"strategy": "global_popularity", "seed": 203},
+        training_config={"strategy": "global_popularity", "seed": 205},
     ),
     ExperimentFixture(
         dataset_key="gowalla",
