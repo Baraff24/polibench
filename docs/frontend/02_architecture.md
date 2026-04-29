@@ -347,7 +347,7 @@ Tutti i service sono accessibili tramite il barrel `services/index.ts`.
 - tabella mostrata prima del grafico (tabella come vista primaria)
 - modal `Show best configuration` usato solo per impostazioni (direction + grouping)
 - vista unica `Current Results`: tabella e grafico leggono sempre dallo stesso dataset della modalita' attiva (`raw` oppure `best_configuration`)
-- in modalita' aggregata la tabella generale viene sostituita dalla tabella aggregata (nessuna seconda tabella separata)
+- in modalita' `best_configuration` la UI mostra solo `best_group` (una riga), non l'elenco completo `groups`
 - filtri `Models` e `Authors` con checkbox (`All ...` + selezioni puntuali), non con select multiple
 - column picker persistito in `localStorage` (colonne base + metriche + hyperparams)
 - bottone `Show best configuration` (modal con grouping per hyperparams)

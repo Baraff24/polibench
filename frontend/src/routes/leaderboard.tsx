@@ -307,36 +307,39 @@ export default function Leaderboard() {
   }
 
   const bestConfigurationEntries = useMemo<MultiMetricLeaderboardEntry[]>(() => {
-    if (!bestResponse) return []
+    if (!bestResponse || !bestResponse.best_group) return []
     const targetMetric = bestResponse.target_metric
     const pipelineCode = pipelines.find((pipeline) => pipeline.uuid === bestResponse.pipeline_uuid)?.code || null
+    const group = bestResponse.best_group
 
-    return bestResponse.groups.map((group, index) => ({
-      experiment_uuid: group.best_experiment_uuid || `agg-${group.model_uuid}-${index}`,
-      model_uuid: group.model_uuid,
-      model_name: group.model_name,
-      dataset_uuid: bestResponse.dataset_uuid,
-      dataset_version_uuid: bestResponse.dataset_version_uuid,
-      pipeline_uuid: bestResponse.pipeline_uuid,
-      pipeline_code: pipelineCode,
-      submitted_by_user_uuid: group.submitted_by_user_uuid,
-      submitted_by_display_name: group.submitted_by_display_name,
-      submitted_by_email: group.submitted_by_email,
-      training_config: group.hyperparams,
-      status: 'aggregated',
-      run_name: group.best_run_name || formatHyperparamsLabel(group.hyperparams),
-      seed: null,
-      created_at: null,
-      split: bestResponse.split,
-      metrics: {
-        [targetMetric]: group.best_value,
+    return [
+      {
+        experiment_uuid: group.best_experiment_uuid || `agg-best-${group.model_uuid}`,
+        model_uuid: group.model_uuid,
+        model_name: group.model_name,
+        dataset_uuid: bestResponse.dataset_uuid,
+        dataset_version_uuid: bestResponse.dataset_version_uuid,
+        pipeline_uuid: bestResponse.pipeline_uuid,
+        pipeline_code: pipelineCode,
+        submitted_by_user_uuid: group.submitted_by_user_uuid,
+        submitted_by_display_name: group.submitted_by_display_name,
+        submitted_by_email: group.submitted_by_email,
+        training_config: group.hyperparams,
+        status: 'aggregated',
+        run_name: group.best_run_name || formatHyperparamsLabel(group.hyperparams),
+        seed: null,
+        created_at: null,
+        split: bestResponse.split,
+        metrics: {
+          [targetMetric]: group.best_value,
+        },
+        directions: {
+          [targetMetric]: bestResponse.direction,
+        },
+        repo_url: null,
+        rank: 1,
       },
-      directions: {
-        [targetMetric]: bestResponse.direction,
-      },
-      repo_url: null,
-      rank: index + 1,
-    }))
+    ]
   }, [bestResponse, pipelines])
 
   const activeMetricNames = useMemo(() => {
@@ -860,7 +863,7 @@ export default function Leaderboard() {
 
         <div className='leaderboard-filters'>
           <div className='leaderboard-filters__field'>
-            <label className='leaderboard-filters__label'>Hyperparam filters</label>
+            <label className='leaderboard-filters__label'>Filter by hyperparameters</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                 <input
