@@ -412,7 +412,7 @@ Nel file `.env` aggiorna almeno:
 | `GET`   | `/api/v1/leaderboard`                | Leaderboard filtrata per dataset/version/pipeline |
 | `GET`   | `/api/v1/leaderboard/multi`          | Leaderboard multi-metrica (dataset/version/pipeline) |
 | `POST`  | `/api/v1/leaderboard/query`          | Query avanzata (author/model/hyperparams)         |
-| `POST`  | `/api/v1/leaderboard/best-configuration` | Best configuration server-side                 |
+| `POST`  | `/api/v1/leaderboard/best-configuration` | Best per modello su stessa dataset version/pipeline, metrica target e direction |
 
 La documentazione interattiva completa è disponibile su `/docs` (Swagger UI) e `/redoc`.
 

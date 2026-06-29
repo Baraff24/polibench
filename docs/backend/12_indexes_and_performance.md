@@ -46,7 +46,24 @@ L'indice composto sopra riduce il working set anche in modalita multi.
 
 ---
 
-### 3) Metriche per experiment
+### 3) Best configuration
+
+Dove: `services/leaderboard.py` (`POST /api/v1/leaderboard/best-configuration`)
+
+Strategia:
+
+1. fetch metriche per `dataset/version/pipeline + split + target_metric`
+2. risoluzione degli `Experiment` candidati e applicazione di eventuali `hyperparam_filters`
+3. gruppo per `model_id` + eventuali chiavi `group_by_hyperparams`
+4. scelta della migliore run per gruppo usando la `direction` richiesta (`max`/`min`)
+5. fetch delle metriche richieste per le run migliori e ordinamento dei gruppi con la stessa `direction`
+
+La UI corrente invia `group_by_hyperparams: []`, quindi il caso principale e' "migliore run per ogni modello" nella stessa dataset version e pipeline.
+L'indice composto leaderboard filtra il working set iniziale; il recupero delle metriche delle run migliori usa l'indice per `experiment_id`.
+
+---
+
+### 4) Metriche per experiment
 
 Dove: `services/metrics.py` (`GET /api/v1/experiments/{uuid}/metrics`)
 
@@ -62,7 +79,7 @@ Indice utile:
 
 ---
 
-### 4) Pipelines per versione
+### 5) Pipelines per versione
 
 Dove: `services/pipelines.py` (`GET /api/v1/dataset-versions/{uuid}/pipelines`)
 

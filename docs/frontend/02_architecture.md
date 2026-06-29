@@ -338,19 +338,22 @@ Tutti i service sono accessibili tramite il barrel `services/index.ts`.
 |--------|----------|-------------|
 | `get(datasetUuid, metric, split, n, datasetVersionUuid?, pipelineUuid?, modelUuids?, authorUuids?)` | `GET /leaderboard?...` | Top-N con filtri dataset/version/pipeline/model/author |
 | `getMultiMetric(datasetUuid, metrics, split, sortBy, n, datasetVersionUuid?, pipelineUuid?, modelUuids?, authorUuids?)` | `GET /leaderboard/multi?...` | Leaderboard multi-metrica con filtri estesi |
-| `query(payload)` | `POST /leaderboard/query` | Query avanzata con hyperparam filters |
-| `getBestConfiguration(payload)` | `POST /leaderboard/best-configuration` | Best configuration server-side |
+| `query(payload)` | `POST /leaderboard/query` | Query avanzata con filtri model/author/hyperparams |
+| `getBestConfiguration(payload)` | `POST /leaderboard/best-configuration` | Best configuration per dataset version, pipeline, metrica target e direction |
 
 ### Comportamento `routes/leaderboard.tsx`
 
-- filtri server-side: `dataset`, `dataset_version`, `pipeline`, `split`, `sort_by`, `top_n`, `model_uuids`, `author_uuids`, `hyperparam_filters`
+- filtri server-side della vista raw: `dataset`, `dataset_version`, `pipeline`, `split`, `sort_by`, `top_n`, `model_uuids`, `author_uuids`
+- la sezione `Filter by hyperparameters` e' disabilitata/commentata in UI (`SHOW_HYPERPARAM_FILTERS = false`); il servizio `query` supporta ancora `hyperparam_filters` per uso API avanzato
 - tabella mostrata prima del grafico (tabella come vista primaria)
-- modal `Show best configuration` usato solo per impostazioni (direction + grouping)
+- modal `Show best configuration` disponibile solo dopo selezione di `dataset_version` e `pipeline`; permette di scegliere `target_metric` e `direction` (`max`/`min`)
 - vista unica `Current Results`: tabella e grafico leggono sempre dallo stesso dataset della modalita' attiva (`raw` oppure `best_configuration`)
-- in modalita' `best_configuration` la UI mostra solo `best_group` (una riga), non l'elenco completo `groups`
+- in modalita' `best_configuration` la UI mostra `groups`: una riga migliore per ogni modello, calcolata dentro la stessa `dataset_version` e la stessa `pipeline`, ordinata per `target_metric` secondo la `direction` scelta
+- `best_group` e' usato come riepilogo del migliore assoluto tra i gruppi visualizzati; non sostituisce la tabella completa
+- la UI invia `group_by_hyperparams: []`, quindi l'aggregazione effettiva e' per modello; l'API puo' ancora raggruppare per modello + hyperparams se chiamata direttamente con `group_by_hyperparams`
 - filtri `Models` e `Authors` con checkbox (`All ...` + selezioni puntuali), non con select multiple
 - column picker persistito in `localStorage` (colonne base + metriche + hyperparams)
-- bottone `Show best configuration` (modal con grouping per hyperparams)
+- bottone `Show best configuration` (modal con metric selector e direction selector)
 - bottone `Export LaTeX` sulla tabella visibile/filtrata
 - filtro client-side sempre visibile: `chart_mode` (`auto` | `line` | `bar`)
 - tabella con sort client-side su header cliccabili
@@ -485,8 +488,20 @@ interface LeaderboardEntry {
     model_uuid;
     model_name?;
     dataset_uuid;
+    dataset_version_uuid;
+    pipeline_uuid?;
+    pipeline_code?;
+    submitted_by_user_uuid?;
+    submitted_by_display_name?;
+    submitted_by_email?;
+    training_config?;
+    status?;
+    run_name?;
+    seed?;
+    created_at?;
     split;
     metric;
+    k?;
     value;
     direction;
     rank?
@@ -497,11 +512,69 @@ interface MultiMetricLeaderboardEntry {
     model_uuid;
     model_name?;
     dataset_uuid;
+    dataset_version_uuid;
+    pipeline_uuid?;
+    pipeline_code?;
+    submitted_by_user_uuid?;
+    submitted_by_display_name?;
+    submitted_by_email?;
+    training_config?;
+    status?;
+    run_name?;
+    seed?;
+    created_at?;
     split;
     metrics: Record<string, number>;
     directions: Record<string, Direction>;
     repo_url?;
     rank?
+}
+
+interface BestConfigurationQueryPayload {
+    dataset_uuid;
+    dataset_version_uuid;
+    pipeline_uuid;
+    split;
+    metrics: string[];
+    target_metric;
+    direction;
+    group_by_hyperparams: string[];
+    model_uuids?;
+    author_uuids?;
+    hyperparam_filters?
+}
+
+interface BestConfigurationGroup {
+    model_uuid;
+    model_name?;
+    submitted_by_user_uuid?;
+    submitted_by_display_name?;
+    submitted_by_email?;
+    hyperparams: Record<string, unknown>;
+    best_value;
+    mean_value;
+    count;
+    std?;
+    best_metrics: Record<string, number>;
+    directions: Record<string, Direction>;
+    best_pipeline_uuid?;
+    best_pipeline_code?;
+    best_experiment_uuid?;
+    best_run_name?;
+    best_training_config?
+}
+
+interface BestConfigurationResponse {
+    dataset_uuid;
+    dataset_version_uuid;
+    pipeline_uuid;
+    split;
+    metrics: string[];
+    target_metric;
+    direction;
+    group_by_hyperparams: string[];
+    best_group?;
+    groups: BestConfigurationGroup[]
 }
 ```
 

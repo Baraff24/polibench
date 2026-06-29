@@ -143,11 +143,13 @@ Flusso preferito per `POST /experiments`:
 | `/api/v1/leaderboard` | GET | pubblico | `dataset_uuid`, `metric`, `split`, `top_n=10`, `dataset_version_uuid?`, `pipeline_uuid?`, `model_uuids?`, `author_uuids?` | `list[LeaderboardEntry]` |
 | `/api/v1/leaderboard/multi` | GET | pubblico | `dataset_uuid`, `metrics`, `split`, `sort_by`, `top_n=20`, `dataset_version_uuid?`, `pipeline_uuid?`, `model_uuids?`, `author_uuids?` | `list[MultiMetricLeaderboardEntry]` |
 | `/api/v1/leaderboard/query` | POST | pubblico | body `LeaderboardQuery` (metriche multiple, filtri model/author/hyperparams) | `list[MultiMetricLeaderboardEntry]` |
-| `/api/v1/leaderboard/best-configuration` | POST | pubblico | body `BestConfigurationQuery` | `BestConfigurationResponse` |
+| `/api/v1/leaderboard/best-configuration` | POST | pubblico | body `BestConfigurationQuery` (`dataset_uuid`, `dataset_version_uuid`, `pipeline_uuid`, `split`, `target_metric`, `direction`, `metrics`) | `BestConfigurationResponse` |
 
 Regola validazione:
 
 - se passi `dataset_version_uuid`, devi passare anche `pipeline_uuid`
+- `best-configuration` richiede sempre `dataset_version_uuid` e `pipeline_uuid`: non confronta risultati tra versioni o pipeline diverse
+- `direction` nel body decide se la metrica target viene massimizzata o minimizzata
 
 ---
 

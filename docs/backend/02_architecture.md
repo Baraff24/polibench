@@ -183,7 +183,9 @@ principale (`api.py`) include i sotto-router:
 │   ├── /{uuid}/metrics        ← POST: batch metriche, GET: metriche per split
 └── /leaderboard/
     ├── /                      ← GET: top-N per (dataset/version/pipeline, metric, split)
-    └── /multi                 ← GET: leaderboard multi-metrica
+    ├── /multi                 ← GET: leaderboard multi-metrica
+    ├── /query                 ← POST: leaderboard multi-metrica avanzata
+    └── /best-configuration    ← POST: best per modello dentro dataset version + pipeline
 ```
 
 Ogni gruppo di endpoint delega al service layer corrispondente:

@@ -22,7 +22,7 @@ services/
 ├── experiments.py      # Experiment create/get/list
 ├── metrics.py          # Metric batch + read per experiment
 ├── metric_imports.py   # CSV import async jobs
-├── leaderboard.py      # leaderboard single/multi con filtri versione/pipeline
+├── leaderboard.py      # leaderboard single/multi/query + best configuration
 └── email.py            # token verifica email + SMTP
 ```
 
@@ -157,11 +157,16 @@ Responsabilita principali:
 
 - leaderboard single metric (`get_leaderboard`)
 - leaderboard multi-metric (`get_multi_metric_leaderboard`)
+- best configuration (`get_best_configuration`)
 - validazione coerenza tra `dataset_uuid`, `dataset_version_uuid` e `pipeline_uuid`
 
 Regola importante:
 
 - se filtri per dataset version, il filtro pipeline deve essere consistente con quella versione
+- `get_best_configuration` filtra sempre per la stessa `dataset_uuid`, `dataset_version_uuid`, `pipeline_uuid`, `split` e `target_metric`
+- la `direction` ricevuta nella request (`max`/`min`) decide la migliore run per gruppo e l'ordinamento finale
+- i gruppi sono per modello; `group_by_hyperparams` aggiunge eventuali chiavi di `training_config`, ma la UI corrente invia `[]` e quindi mostra il migliore di ogni modello
+- la response espone `groups` ordinati e `best_group` come primo gruppo, cioe' il migliore assoluto tra quelli restituiti
 
 Query model:
 
