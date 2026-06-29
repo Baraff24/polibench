@@ -87,6 +87,8 @@ export interface BestConfigurationGroup {
   std: number | null
   best_metrics: Record<string, number>
   directions: Record<string, Direction>
+  best_pipeline_uuid: string | null
+  best_pipeline_code: string | null
   best_experiment_uuid: string | null
   best_run_name: string | null
   best_training_config: Record<string, unknown> | null

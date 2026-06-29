@@ -343,6 +343,66 @@ def _amazon_books_tuning_metrics(ndcg_test: float) -> list[MetricCsvRow]:
     ]
 
 
+def _ranking_custom_metrics(
+    *,
+    ndcg_test: float,
+    recall_test: float,
+    hit_test: float,
+) -> list[MetricCsvRow]:
+    rows: list[MetricCsvRow] = []
+    values = {
+        "ndcg@10": (ndcg_test, 10),
+        "recall@20": (recall_test, 20),
+        "hit@10": (hit_test, 10),
+    }
+    for split in (Split.TEST, Split.VALIDATION):
+        factor = 1.0 if split == Split.TEST else 0.95
+        for metric_name, (value, k) in values.items():
+            rows.append(
+                MetricCsvRow(
+                    split=split,
+                    metric=metric_name,
+                    k=k,
+                    value=round(value * factor, 6),
+                    direction=Direction.MAX,
+                )
+            )
+    return rows
+
+
+def _rating_custom_metrics(
+    *,
+    rmse_test: float,
+    mae_test: float,
+) -> list[MetricCsvRow]:
+    return [
+        MetricCsvRow(
+            split=Split.TEST,
+            metric="rmse",
+            value=round(rmse_test, 6),
+            direction=Direction.MIN,
+        ),
+        MetricCsvRow(
+            split=Split.VALIDATION,
+            metric="rmse",
+            value=round(rmse_test + 0.018, 6),
+            direction=Direction.MIN,
+        ),
+        MetricCsvRow(
+            split=Split.TEST,
+            metric="mae",
+            value=round(mae_test, 6),
+            direction=Direction.MIN,
+        ),
+        MetricCsvRow(
+            split=Split.VALIDATION,
+            metric="mae",
+            value=round(mae_test + 0.012, 6),
+            direction=Direction.MIN,
+        ),
+    ]
+
+
 def _ranking_training_config(
     *,
     embedding_dim: int,
@@ -968,6 +1028,53 @@ EXPERIMENT_FIXTURES_DEMO = [
     ExperimentFixture(
         dataset_key="movielens",
         dataset_version="1m",
+        model_name="SVD",
+        run_name="seed-demo-bestcfg-svd-ml1m-p1-rmse-best",
+        seed=113,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        training_config=_rating_training_config(
+            n_factors=192,
+            learning_rate=0.0035,
+            reg=0.012,
+            epochs=90,
+            seed=113,
+        ),
+        metrics=_rating_custom_metrics(rmse_test=0.889, mae_test=0.706),
+    ),
+    ExperimentFixture(
+        dataset_key="movielens",
+        dataset_version="1m",
+        model_name="UserKNN",
+        run_name="seed-demo-bestcfg-userknn-ml1m-p2-mae-best",
+        seed=114,
+        status=Status.FINISHED,
+        pipeline_code="P002",
+        submitted_by="researcher2",
+        training_config={"k": 140, "sim": "pearson", "shrinkage": 60, "seed": 114},
+        metrics=_rating_custom_metrics(rmse_test=0.905, mae_test=0.690),
+    ),
+    ExperimentFixture(
+        dataset_key="movielens",
+        dataset_version="1m",
+        model_name="SVD",
+        run_name="seed-demo-bestcfg-svd-ml1m-p2-regularized",
+        seed=115,
+        status=Status.FINISHED,
+        pipeline_code="P002",
+        submitted_by="admin",
+        training_config=_rating_training_config(
+            n_factors=160,
+            learning_rate=0.003,
+            reg=0.02,
+            epochs=80,
+            seed=115,
+        ),
+        metrics=_rating_custom_metrics(rmse_test=0.901, mae_test=0.698),
+    ),
+    ExperimentFixture(
+        dataset_key="movielens",
+        dataset_version="1m",
         model_name="UserKNN",
         run_name="seed-demo-userknn-ml1m-running",
         seed=112,
@@ -1073,6 +1180,89 @@ EXPERIMENT_FIXTURES_DEMO = [
             seed=204,
         ),
         metrics=_amazon_books_tuning_metrics(0.115),
+    ),
+    ExperimentFixture(
+        dataset_key="amazon_books",
+        dataset_version="2023",
+        model_name="LightGCN",
+        run_name="seed-demo-bestcfg-lightgcn-amazon-books-2023-p2-ndcg-best",
+        seed=206,
+        status=Status.FINISHED,
+        pipeline_code="P002",
+        submitted_by="researcher2",
+        training_config=_ranking_training_config(
+            embedding_dim=192,
+            learning_rate=0.0008,
+            batch_size=2048,
+            epochs=220,
+            reg=0.00008,
+            seed=206,
+        ),
+        metrics=_ranking_custom_metrics(
+            ndcg_test=0.127,
+            recall_test=0.214,
+            hit_test=0.286,
+        ),
+    ),
+    ExperimentFixture(
+        dataset_key="amazon_books",
+        dataset_version="2023",
+        model_name="BPR-MF",
+        run_name="seed-demo-bestcfg-bpr-amazon-books-2023-p1-balanced",
+        seed=207,
+        status=Status.FINISHED,
+        submitted_by="researcher",
+        training_config=_ranking_training_config(
+            embedding_dim=128,
+            learning_rate=0.001,
+            batch_size=1024,
+            epochs=180,
+            reg=0.0003,
+            seed=207,
+        ),
+        metrics=_ranking_custom_metrics(
+            ndcg_test=0.121,
+            recall_test=0.206,
+            hit_test=0.271,
+        ),
+    ),
+    ExperimentFixture(
+        dataset_key="amazon_books",
+        dataset_version="2023",
+        model_name="BPR-MF",
+        run_name="seed-demo-bestcfg-bpr-amazon-books-2023-p2-recall-best",
+        seed=208,
+        status=Status.FINISHED,
+        pipeline_code="P002",
+        submitted_by="researcher",
+        training_config=_ranking_training_config(
+            embedding_dim=96,
+            learning_rate=0.0007,
+            batch_size=4096,
+            epochs=240,
+            reg=0.0002,
+            seed=208,
+        ),
+        metrics=_ranking_custom_metrics(
+            ndcg_test=0.114,
+            recall_test=0.232,
+            hit_test=0.262,
+        ),
+    ),
+    ExperimentFixture(
+        dataset_key="amazon_books",
+        dataset_version="2023",
+        model_name="PopRank",
+        run_name="seed-demo-bestcfg-poprank-amazon-books-2023-finished",
+        seed=209,
+        status=Status.FINISHED,
+        submitted_by="viewer",
+        training_config={"strategy": "global_popularity", "seed": 209},
+        metrics=_ranking_custom_metrics(
+            ndcg_test=0.071,
+            recall_test=0.153,
+            hit_test=0.181,
+        ),
     ),
     ExperimentFixture(
         dataset_key="amazon_books",

@@ -310,6 +310,67 @@ async def test_best_configuration_endpoint_returns_best_group(
         superuser_token_headers,
     )
 
+    second_pipeline_resp = await client.post(
+        f"{API}/dataset-versions/{dataset_version_uuid}/pipelines",
+        json={
+            "code": "P002",
+            "status": "ready",
+            "yaml_raw": """
+pipeline:
+  - name: parse-alt
+    operation: parse_csv
+""".strip(),
+        },
+        headers=superuser_token_headers,
+    )
+    assert second_pipeline_resp.status_code == 200
+    second_pipeline_uuid = second_pipeline_resp.json()["uuid"]
+
+    model_resp = await client.post(
+        f"{API}/ml-models",
+        json={"name": "LightGCN"},
+        headers=superuser_token_headers,
+    )
+    assert model_resp.status_code == 200
+    model_uuid = model_resp.json()["uuid"]
+
+    exp_resp = await client.post(
+        f"{API}/experiments",
+        json={
+            "pipeline_uuid": second_pipeline_uuid,
+            "model_uuid": model_uuid,
+            "training_config": {"embedding_dim": 512, "batch_size": 1024},
+        },
+        headers=superuser_token_headers,
+    )
+    assert exp_resp.status_code == 200
+    exp_uuid = exp_resp.json()["uuid"]
+
+    metrics_resp = await client.post(
+        f"{API}/experiments/{exp_uuid}/metrics",
+        json={
+            "experiment_uuid": exp_uuid,
+            "metrics": [
+                {
+                    "split": "test",
+                    "metric": "ndcg@10",
+                    "k": 10,
+                    "value": 0.5201,
+                    "direction": "max",
+                },
+                {
+                    "split": "test",
+                    "metric": "recall@20",
+                    "k": 20,
+                    "value": 0.7400,
+                    "direction": "max",
+                },
+            ],
+        },
+        headers=superuser_token_headers,
+    )
+    assert metrics_resp.status_code == 200
+
     resp = await client.post(
         f"{API}/leaderboard/best-configuration",
         json={
@@ -326,15 +387,25 @@ async def test_best_configuration_endpoint_returns_best_group(
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["metrics"] == ["ndcg@10", "recall@20"]
-    assert payload["direction"] == "max"
+    assert payload["direction"] == "min"
     assert payload["group_by_hyperparams"] == []
+    assert payload["pipeline_uuid"] == pipeline_uuid
     assert payload["best_group"] is not None
-    assert payload["best_group"]["model_name"] == "MultiVAE"
+    assert payload["best_group"]["model_name"] == "iALS"
     assert payload["best_group"]["hyperparams"] == {}
-    assert payload["best_group"]["best_training_config"]["embedding_dim"] == 256
+    assert payload["best_group"]["best_pipeline_uuid"] == pipeline_uuid
+    assert payload["best_group"]["best_pipeline_code"] == "P001"
+    assert payload["best_group"]["best_training_config"]["embedding_dim"] == 64
     assert payload["best_group"]["best_metrics"]["ndcg@10"] == pytest.approx(
-        0.4801,
+        0.3990,
         rel=1e-4,
     )
     assert payload["best_group"]["directions"]["ndcg@10"] == "max"
-    assert len(payload["groups"]) >= 3
+    assert {group["model_name"] for group in payload["groups"]} == {
+        "iALS",
+        "EASE",
+        "MultiVAE",
+    }
+    assert all(
+        group["best_pipeline_uuid"] == pipeline_uuid for group in payload["groups"]
+    )

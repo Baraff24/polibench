@@ -523,6 +523,7 @@ async def get_best_configuration(
 ) -> BestConfigurationResponse:
     from app.models.experiments import Experiment
     from app.models.ml_models import MLModel
+    from app.models.pipelines import Pipeline
     from app.models.users import User
 
     dataset = await get_dataset_by_uuid(data.dataset_uuid)
@@ -576,7 +577,7 @@ async def get_best_configuration(
     rows = await Metric.find(*filters).to_list()
     if not rows:
         return empty_response()
-    resolved_direction = rows[0].direction
+    selected_direction = data.direction
 
     exp_ids = list({r.experiment_id for r in rows})
     experiments = await Experiment.find({"_id": {"$in": exp_ids}}).to_list()
@@ -592,7 +593,7 @@ async def get_best_configuration(
         rows_with_exp.append((row, exp))
 
     if not rows_with_exp:
-        return empty_response(resolved_direction)
+        return empty_response(selected_direction)
 
     model_ids = list({exp.model_id for _, exp in rows_with_exp})
     models = await MLModel.find({"_id": {"$in": model_ids}}).to_list()
@@ -633,7 +634,7 @@ async def get_best_configuration(
         group["values"].append(row.value)
 
         current_best_row = group["best_row"]
-        if resolved_direction.value == "max":
+        if selected_direction.value == "max":
             if row.value > current_best_row.value:
                 group["best_row"] = row
                 group["best_exp"] = exp
@@ -643,14 +644,16 @@ async def get_best_configuration(
                 group["best_exp"] = exp
 
     best_exp_ids = list({payload["best_exp"].id for payload in grouped.values()})
-    best_metric_rows = await Metric.find(
+    best_metric_filters: list[Any] = [
         Metric.dataset_id == dataset.id,
         Metric.dataset_version_id == dataset_version_id,
         Metric.pipeline_id == pipeline_id,
         Metric.split == data.split,
         {"experiment_id": {"$in": best_exp_ids}},
         {"metric": {"$in": requested_metrics}},
-    ).to_list()
+    ]
+
+    best_metric_rows = await Metric.find(*best_metric_filters).to_list()
     best_metrics_by_exp: dict[Any, dict[str, float]] = defaultdict(dict)
     directions_by_exp: dict[Any, dict[str, Any]] = defaultdict(dict)
     for metric_row in best_metric_rows:
@@ -660,6 +663,17 @@ async def get_best_configuration(
         directions_by_exp[metric_row.experiment_id][metric_row.metric] = (
             metric_row.direction
         )
+
+    best_pipeline_ids = list(
+        {
+            payload["best_row"].pipeline_id
+            for payload in grouped.values()
+            if payload["best_row"].pipeline_id is not None
+        }
+    )
+    pipelines = await Pipeline.find({"_id": {"$in": best_pipeline_ids}}).to_list()
+    pipeline_uuid_by_id = {pipeline.id: pipeline.uuid for pipeline in pipelines}
+    pipeline_code_by_id = {pipeline.id: pipeline.code for pipeline in pipelines}
 
     groups: list[BestConfigurationGroup] = []
     for payload in grouped.values():
@@ -698,6 +712,16 @@ async def get_best_configuration(
                 std=std_value,
                 best_metrics=dict(best_metrics_by_exp.get(best_exp.id, {})),
                 directions=dict(directions_by_exp.get(best_exp.id, {})),
+                best_pipeline_uuid=(
+                    pipeline_uuid_by_id.get(best_row.pipeline_id)
+                    if best_row.pipeline_id is not None
+                    else None
+                ),
+                best_pipeline_code=(
+                    pipeline_code_by_id.get(best_row.pipeline_id)
+                    if best_row.pipeline_id is not None
+                    else None
+                ),
                 best_experiment_uuid=best_exp.uuid,
                 best_run_name=best_exp.run_name,
                 best_training_config=best_exp.training_config,
@@ -706,7 +730,7 @@ async def get_best_configuration(
 
     groups.sort(
         key=lambda g: g.best_value,
-        reverse=resolved_direction.value == "max",
+        reverse=selected_direction.value == "max",
     )
 
     return BestConfigurationResponse(
@@ -716,7 +740,7 @@ async def get_best_configuration(
         split=data.split,
         metrics=requested_metrics,
         target_metric=data.target_metric,
-        direction=resolved_direction,
+        direction=selected_direction,
         group_by_hyperparams=data.group_by_hyperparams,
         best_group=groups[0] if groups else None,
         groups=groups,

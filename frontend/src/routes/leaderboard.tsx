@@ -71,6 +71,18 @@ function formatHyperparamsLabel(hyperparams: Record<string, unknown>): string {
     .join(', ')
 }
 
+function metricDefaultDirection(metric: string): Direction {
+  const normalizedMetric = metric.toLowerCase()
+  if (
+    normalizedMetric.includes('loss') ||
+    normalizedMetric.includes('rmse') ||
+    normalizedMetric.includes('mae')
+  ) {
+    return 'min'
+  }
+  return 'max'
+}
+
 export default function Leaderboard() {
   const navigate = useNavigate()
   const { showSnackBar } = useSnackBar()
@@ -116,6 +128,9 @@ export default function Leaderboard() {
     }
   })
 
+  const [bestModalOpen, setBestModalOpen] = useState(false)
+  const [bestTargetMetric, setBestTargetMetric] = useState('')
+  const [bestDirection, setBestDirection] = useState<Direction>('max')
   const [bestLoading, setBestLoading] = useState(false)
   const [bestResponse, setBestResponse] = useState<BestConfigurationResponse | null>(null)
 
@@ -151,6 +166,8 @@ export default function Leaderboard() {
     const preset = METRIC_PRESETS[ds.task] || METRIC_PRESETS['ranking']
     setMetricNames(preset.metrics)
     setSortBy(preset.sortBy)
+    setBestTargetMetric(preset.sortBy)
+    setBestDirection(metricDefaultDirection(preset.sortBy))
     setTableSort(null)
   }
 
@@ -175,6 +192,14 @@ export default function Leaderboard() {
         setPipelineUuid('')
       })
   }, [datasetVersionUuid])
+
+  useEffect(() => {
+    setBestTargetMetric((current) => {
+      if (current && metricNames.includes(current)) return current
+      if (sortBy && metricNames.includes(sortBy)) return sortBy
+      return metricNames[0] || ''
+    })
+  }, [metricNames, sortBy])
 
   useEffect(() => {
     setViewMode('raw')
@@ -284,28 +309,33 @@ export default function Leaderboard() {
   }
 
   const bestConfigurationEntries = useMemo<MultiMetricLeaderboardEntry[]>(() => {
-    if (!bestResponse || !bestResponse.best_group) return []
+    if (!bestResponse || bestResponse.groups.length === 0) return []
     const targetMetric = bestResponse.target_metric
-    const pipelineCode = pipelines.find((pipeline) => pipeline.uuid === bestResponse.pipeline_uuid)?.code || null
-    const group = bestResponse.best_group
-    const trainingConfig = group.best_training_config || group.hyperparams
-    const metrics =
-      Object.keys(group.best_metrics).length > 0
-        ? group.best_metrics
-        : { [targetMetric]: group.best_value }
-    const directions =
-      Object.keys(group.directions).length > 0
-        ? group.directions
-        : { [targetMetric]: bestResponse.direction }
+    const fallbackPipelineCode =
+      pipelines.find((pipeline) => pipeline.uuid === bestResponse.pipeline_uuid)?.code ||
+      null
 
-    return [
-      {
-        experiment_uuid: group.best_experiment_uuid || `agg-best-${group.model_uuid}`,
+    return bestResponse.groups.map((group, index) => {
+      const pipelineUuid = group.best_pipeline_uuid || bestResponse.pipeline_uuid
+      const pipelineCode = group.best_pipeline_code || fallbackPipelineCode
+      const trainingConfig = group.best_training_config || group.hyperparams
+      const metrics =
+        Object.keys(group.best_metrics).length > 0
+          ? group.best_metrics
+          : { [targetMetric]: group.best_value }
+      const directions =
+        Object.keys(group.directions).length > 0
+          ? { ...group.directions, [targetMetric]: bestResponse.direction }
+          : { [targetMetric]: bestResponse.direction }
+
+      return {
+        experiment_uuid:
+          group.best_experiment_uuid || `agg-best-${group.model_uuid}-${index}`,
         model_uuid: group.model_uuid,
         model_name: group.model_name,
         dataset_uuid: bestResponse.dataset_uuid,
         dataset_version_uuid: bestResponse.dataset_version_uuid,
-        pipeline_uuid: bestResponse.pipeline_uuid,
+        pipeline_uuid: pipelineUuid,
         pipeline_code: pipelineCode,
         submitted_by_user_uuid: group.submitted_by_user_uuid,
         submitted_by_display_name: group.submitted_by_display_name,
@@ -319,9 +349,9 @@ export default function Leaderboard() {
         metrics,
         directions,
         repo_url: null,
-        rank: 1,
-      },
-    ]
+        rank: index + 1,
+      }
+    })
   }, [bestResponse, pipelines])
 
   const activeMetricNames = useMemo(() => {
@@ -338,22 +368,22 @@ export default function Leaderboard() {
     return entries
   }, [viewMode, bestConfigurationEntries, entries])
 
-  const targetMetricDirection = useMemo<Direction>(() => {
+  const selectedDatasetVersion = datasetVersions.find(
+    (version) => version.uuid === datasetVersionUuid,
+  )
+  const selectedDatasetVersionLabel = selectedDatasetVersion
+    ? `v${selectedDatasetVersion.version}`
+    : '—'
+  const selectedPipelineLabel =
+    pipelines.find((pipeline) => pipeline.uuid === pipelineUuid)?.code || '—'
+
+  function inferDirectionForMetric(metric: string): Direction {
     for (const entry of entries) {
-      const direction = entry.directions[sortBy]
+      const direction = entry.directions[metric]
       if (direction) return direction
     }
-
-    const normalizedMetric = sortBy.toLowerCase()
-    if (
-      normalizedMetric.includes('loss') ||
-      normalizedMetric.includes('rmse') ||
-      normalizedMetric.includes('mae')
-    ) {
-      return 'min'
-    }
-    return 'max'
-  }, [entries, sortBy])
+    return metricDefaultDirection(metric)
+  }
 
   const sortedEntries = useMemo(() => {
     if (!tableSort) return activeEntries
@@ -617,12 +647,32 @@ export default function Leaderboard() {
     URL.revokeObjectURL(url)
   }
 
+  function openBestConfigurationModal() {
+    if (!datasetVersionUuid || !pipelineUuid) {
+      showSnackBar('Select dataset version and pipeline first.', 'error')
+      return
+    }
+    if (metricNames.length === 0) {
+      showSnackBar('Select at least one metric first.', 'error')
+      return
+    }
+    const targetMetric =
+      bestTargetMetric && metricNames.includes(bestTargetMetric)
+        ? bestTargetMetric
+        : sortBy && metricNames.includes(sortBy)
+          ? sortBy
+          : metricNames[0] || ''
+    setBestTargetMetric(targetMetric)
+    setBestDirection(inferDirectionForMetric(targetMetric))
+    setBestModalOpen(true)
+  }
+
   async function showBestConfiguration() {
     if (!datasetVersionUuid || !pipelineUuid) {
       showSnackBar('Select dataset version and pipeline first.', 'error')
       return
     }
-    if (!sortBy) {
+    if (!bestTargetMetric) {
       showSnackBar('Select a target metric first.', 'error')
       return
     }
@@ -635,14 +685,15 @@ export default function Leaderboard() {
         pipeline_uuid: pipelineUuid,
         split,
         metrics: metricNames,
-        target_metric: sortBy,
-        direction: targetMetricDirection,
+        target_metric: bestTargetMetric,
+        direction: bestDirection,
         group_by_hyperparams: [],
         model_uuids: selectedModelUuids.length > 0 ? selectedModelUuids : undefined,
         author_uuids: selectedAuthorUuids.length > 0 ? selectedAuthorUuids : undefined,
       })
       setBestResponse(response)
       setViewMode('best_configuration')
+      setBestModalOpen(false)
     } catch {
       showSnackBar('Unable to compute best configuration.', 'error')
     } finally {
@@ -919,7 +970,7 @@ export default function Leaderboard() {
             type='button'
             className='btn btn--outline'
             disabled={bestLoading}
-            onClick={showBestConfiguration}
+            onClick={openBestConfigurationModal}
           >
             {bestLoading ? 'Computing...' : 'Show best configuration'}
           </button>
@@ -1030,6 +1081,93 @@ export default function Leaderboard() {
             </>
           )}
         </section>
+      )}
+
+      {bestModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(12, 16, 31, 0.58)',
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={() => setBestModalOpen(false)}
+        >
+          <div
+            className='detail-section'
+            style={{ width: 'min(640px, 100%)', maxHeight: '85vh', overflow: 'auto' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 className='detail-section__title'>Best Configuration Settings</h2>
+              <button type='button' className='btn btn--outline btn--sm' onClick={() => setBestModalOpen(false)}>
+                Close
+              </button>
+            </div>
+
+            <div className='leaderboard-filters'>
+              <div className='leaderboard-filters__field'>
+                <label className='leaderboard-filters__label'>Dataset version</label>
+                <div className='detail-field__value'>{selectedDatasetVersionLabel}</div>
+              </div>
+              <div className='leaderboard-filters__field'>
+                <label className='leaderboard-filters__label'>Pipeline</label>
+                <div className='detail-field__value'>{selectedPipelineLabel}</div>
+              </div>
+              <div className='leaderboard-filters__field'>
+                <label className='leaderboard-filters__label'>Metric to optimize</label>
+                <select
+                  className='leaderboard-filters__select'
+                  value={bestTargetMetric}
+                  onChange={(event) => {
+                    const metric = event.target.value
+                    setBestTargetMetric(metric)
+                    setBestDirection(inferDirectionForMetric(metric))
+                  }}
+                >
+                  {metricNames.map((metric) => (
+                    <option key={metric} value={metric}>
+                      {metric.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='leaderboard-filters__field'>
+                <label className='leaderboard-filters__label'>Direction</label>
+                <select
+                  className='leaderboard-filters__select'
+                  value={bestDirection}
+                  onChange={(event) => setBestDirection(event.target.value as Direction)}
+                >
+                  <option value='max'>higher is better</option>
+                  <option value='min'>lower is better</option>
+                </select>
+              </div>
+            </div>
+
+            <div className='form__actions'>
+              <button
+                type='button'
+                className='btn btn--outline'
+                onClick={() => setBestModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type='button'
+                className='btn btn--primary'
+                disabled={bestLoading || !bestTargetMetric}
+                onClick={showBestConfiguration}
+              >
+                {bestLoading ? 'Computing...' : 'Apply'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

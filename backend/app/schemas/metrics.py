@@ -127,6 +127,8 @@ class BestConfigurationGroup(BaseModel):
     std: float | None = None
     best_metrics: dict[str, float] = Field(default_factory=dict)
     directions: dict[str, Direction] = Field(default_factory=dict)
+    best_pipeline_uuid: UUID | None = None
+    best_pipeline_code: str | None = None
     best_experiment_uuid: UUID | None = None
     best_run_name: str | None = None
     best_training_config: dict[str, Any] | None = None

@@ -222,6 +222,9 @@ Note seed:
 
 - fixture YAML registry reali in `backend/scripts/fixtures/datarec_registry/`
 - metriche esperimenti demo importate da CSV separati (non confuse con dataset characteristics YAML)
+- `demo` include fixture per testare `Show best configuration`: `amazon_books` v2023
+  con ranking metric trade-off (`ndcg@10`, `recall@20`, `hit@10`) e `movielens` v1m
+  con metriche rating minimizzate (`rmse`, `mae`)
 
 ---
 
