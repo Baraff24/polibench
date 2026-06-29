@@ -6,7 +6,7 @@ from uuid import UUID
 import pymongo
 from fastapi import HTTPException
 
-from app.models.metrics import Metric, Split
+from app.models.metrics import Direction, Metric, Split
 from app.schemas.metrics import (
     BestConfigurationGroup,
     BestConfigurationQuery,
@@ -538,31 +538,28 @@ async def get_best_configuration(
 
     model_ids = await _resolve_model_ids(data.model_uuids)
     author_ids = await _resolve_author_ids(data.author_uuids)
+    requested_metrics = list(dict.fromkeys([data.target_metric, *data.metrics]))
+
+    def empty_response(
+        direction: Direction = data.direction,
+    ) -> BestConfigurationResponse:
+        return BestConfigurationResponse(
+            dataset_uuid=data.dataset_uuid,
+            dataset_version_uuid=data.dataset_version_uuid,
+            pipeline_uuid=data.pipeline_uuid,
+            split=data.split,
+            metrics=requested_metrics,
+            target_metric=data.target_metric,
+            direction=direction,
+            group_by_hyperparams=data.group_by_hyperparams,
+            best_group=None,
+            groups=[],
+        )
 
     if data.model_uuids is not None and model_ids is not None and len(model_ids) == 0:
-        return BestConfigurationResponse(
-            dataset_uuid=data.dataset_uuid,
-            dataset_version_uuid=data.dataset_version_uuid,
-            pipeline_uuid=data.pipeline_uuid,
-            split=data.split,
-            target_metric=data.target_metric,
-            direction=data.direction,
-            group_by_hyperparams=data.group_by_hyperparams,
-            best_group=None,
-            groups=[],
-        )
+        return empty_response()
     if data.author_uuids is not None and author_ids is not None and len(author_ids) == 0:
-        return BestConfigurationResponse(
-            dataset_uuid=data.dataset_uuid,
-            dataset_version_uuid=data.dataset_version_uuid,
-            pipeline_uuid=data.pipeline_uuid,
-            split=data.split,
-            target_metric=data.target_metric,
-            direction=data.direction,
-            group_by_hyperparams=data.group_by_hyperparams,
-            best_group=None,
-            groups=[],
-        )
+        return empty_response()
 
     filters = [
         Metric.dataset_id == dataset.id,
@@ -578,17 +575,8 @@ async def get_best_configuration(
 
     rows = await Metric.find(*filters).to_list()
     if not rows:
-        return BestConfigurationResponse(
-            dataset_uuid=data.dataset_uuid,
-            dataset_version_uuid=data.dataset_version_uuid,
-            pipeline_uuid=data.pipeline_uuid,
-            split=data.split,
-            target_metric=data.target_metric,
-            direction=data.direction,
-            group_by_hyperparams=data.group_by_hyperparams,
-            best_group=None,
-            groups=[],
-        )
+        return empty_response()
+    resolved_direction = rows[0].direction
 
     exp_ids = list({r.experiment_id for r in rows})
     experiments = await Experiment.find({"_id": {"$in": exp_ids}}).to_list()
@@ -604,17 +592,7 @@ async def get_best_configuration(
         rows_with_exp.append((row, exp))
 
     if not rows_with_exp:
-        return BestConfigurationResponse(
-            dataset_uuid=data.dataset_uuid,
-            dataset_version_uuid=data.dataset_version_uuid,
-            pipeline_uuid=data.pipeline_uuid,
-            split=data.split,
-            target_metric=data.target_metric,
-            direction=data.direction,
-            group_by_hyperparams=data.group_by_hyperparams,
-            best_group=None,
-            groups=[],
-        )
+        return empty_response(resolved_direction)
 
     model_ids = list({exp.model_id for _, exp in rows_with_exp})
     models = await MLModel.find({"_id": {"$in": model_ids}}).to_list()
@@ -655,7 +633,7 @@ async def get_best_configuration(
         group["values"].append(row.value)
 
         current_best_row = group["best_row"]
-        if data.direction.value == "max":
+        if resolved_direction.value == "max":
             if row.value > current_best_row.value:
                 group["best_row"] = row
                 group["best_exp"] = exp
@@ -663,6 +641,25 @@ async def get_best_configuration(
             if row.value < current_best_row.value:
                 group["best_row"] = row
                 group["best_exp"] = exp
+
+    best_exp_ids = list({payload["best_exp"].id for payload in grouped.values()})
+    best_metric_rows = await Metric.find(
+        Metric.dataset_id == dataset.id,
+        Metric.dataset_version_id == dataset_version_id,
+        Metric.pipeline_id == pipeline_id,
+        Metric.split == data.split,
+        {"experiment_id": {"$in": best_exp_ids}},
+        {"metric": {"$in": requested_metrics}},
+    ).to_list()
+    best_metrics_by_exp: dict[Any, dict[str, float]] = defaultdict(dict)
+    directions_by_exp: dict[Any, dict[str, Any]] = defaultdict(dict)
+    for metric_row in best_metric_rows:
+        best_metrics_by_exp[metric_row.experiment_id][metric_row.metric] = (
+            metric_row.value
+        )
+        directions_by_exp[metric_row.experiment_id][metric_row.metric] = (
+            metric_row.direction
+        )
 
     groups: list[BestConfigurationGroup] = []
     for payload in grouped.values():
@@ -699,6 +696,8 @@ async def get_best_configuration(
                 mean_value=mean_value,
                 count=count,
                 std=std_value,
+                best_metrics=dict(best_metrics_by_exp.get(best_exp.id, {})),
+                directions=dict(directions_by_exp.get(best_exp.id, {})),
                 best_experiment_uuid=best_exp.uuid,
                 best_run_name=best_exp.run_name,
                 best_training_config=best_exp.training_config,
@@ -707,7 +706,7 @@ async def get_best_configuration(
 
     groups.sort(
         key=lambda g: g.best_value,
-        reverse=data.direction.value == "max",
+        reverse=resolved_direction.value == "max",
     )
 
     return BestConfigurationResponse(
@@ -715,8 +714,9 @@ async def get_best_configuration(
         dataset_version_uuid=data.dataset_version_uuid,
         pipeline_uuid=data.pipeline_uuid,
         split=data.split,
+        metrics=requested_metrics,
         target_metric=data.target_metric,
-        direction=data.direction,
+        direction=resolved_direction,
         group_by_hyperparams=data.group_by_hyperparams,
         best_group=groups[0] if groups else None,
         groups=groups,

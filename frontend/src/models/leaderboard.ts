@@ -65,6 +65,7 @@ export interface BestConfigurationQueryPayload {
   dataset_version_uuid: string
   pipeline_uuid: string
   split: Split
+  metrics: string[]
   target_metric: string
   direction: Direction
   group_by_hyperparams: string[]
@@ -84,6 +85,8 @@ export interface BestConfigurationGroup {
   mean_value: number
   count: number
   std: number | null
+  best_metrics: Record<string, number>
+  directions: Record<string, Direction>
   best_experiment_uuid: string | null
   best_run_name: string | null
   best_training_config: Record<string, unknown> | null
@@ -94,6 +97,7 @@ export interface BestConfigurationResponse {
   dataset_version_uuid: string
   pipeline_uuid: string
   split: Split
+  metrics: string[]
   target_metric: string
   direction: Direction
   group_by_hyperparams: string[]

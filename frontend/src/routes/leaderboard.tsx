@@ -43,14 +43,6 @@ function latexEscape(value: string): string {
     .replace(/\^/g, '\\textasciicircum{}')
 }
 
-function parseHyperparamFilterValue(raw: string): string | number | boolean {
-  const normalized = raw.trim()
-  if (normalized.toLowerCase() === 'true') return true
-  if (normalized.toLowerCase() === 'false') return false
-  if (normalized !== '' && !Number.isNaN(Number(normalized))) return Number(normalized)
-  return normalized
-}
-
 const METRIC_PRESETS: Record<string, { metrics: string[]; sortBy: string }> = {
   ctr: { metrics: ['auc', 'logloss'], sortBy: 'auc' },
   ranking: { metrics: ['ndcg@10', 'recall@20', 'hit@10'], sortBy: 'ndcg@10' },
@@ -68,6 +60,7 @@ type ColumnDef = {
 
 const STORAGE_VISIBLE_COLUMNS_KEY = 'leaderboard.visibleColumns.v2'
 const QUERY_TOP_N = 5000
+const SHOW_HYPERPARAM_FILTERS = false
 
 function formatHyperparamsLabel(hyperparams: Record<string, unknown>): string {
   const keys = Object.keys(hyperparams)
@@ -123,9 +116,6 @@ export default function Leaderboard() {
     }
   })
 
-  const [bestModalOpen, setBestModalOpen] = useState(false)
-  const [bestDirection, setBestDirection] = useState<Direction>('max')
-  const [bestGroupByHyperparams, setBestGroupByHyperparams] = useState<string[]>([])
   const [bestLoading, setBestLoading] = useState(false)
   const [bestResponse, setBestResponse] = useState<BestConfigurationResponse | null>(null)
 
@@ -186,15 +176,6 @@ export default function Leaderboard() {
       })
   }, [datasetVersionUuid])
 
-  const queryHyperparamFilters = useMemo(() => {
-    const out: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(hyperparamFilters)) {
-      if (!key.trim() || !value.trim()) continue
-      out[key] = parseHyperparamFilterValue(value)
-    }
-    return out
-  }, [hyperparamFilters])
-
   useEffect(() => {
     setViewMode('raw')
     setBestResponse(null)
@@ -207,7 +188,6 @@ export default function Leaderboard() {
     sortBy,
     selectedModelUuids,
     selectedAuthorUuids,
-    queryHyperparamFilters,
   ])
 
   useEffect(() => {
@@ -229,8 +209,6 @@ export default function Leaderboard() {
         top_n: QUERY_TOP_N,
         model_uuids: selectedModelUuids.length > 0 ? selectedModelUuids : undefined,
         author_uuids: selectedAuthorUuids.length > 0 ? selectedAuthorUuids : undefined,
-        hyperparam_filters:
-          Object.keys(queryHyperparamFilters).length > 0 ? queryHyperparamFilters : undefined,
       })
       .then((loadedEntries) => setEntries(loadedEntries))
       .catch(() => setEntries([]))
@@ -244,7 +222,6 @@ export default function Leaderboard() {
     sortBy,
     selectedModelUuids,
     selectedAuthorUuids,
-    queryHyperparamFilters,
   ])
 
   function handleDatasetChange(uuid: string) {
@@ -311,6 +288,15 @@ export default function Leaderboard() {
     const targetMetric = bestResponse.target_metric
     const pipelineCode = pipelines.find((pipeline) => pipeline.uuid === bestResponse.pipeline_uuid)?.code || null
     const group = bestResponse.best_group
+    const trainingConfig = group.best_training_config || group.hyperparams
+    const metrics =
+      Object.keys(group.best_metrics).length > 0
+        ? group.best_metrics
+        : { [targetMetric]: group.best_value }
+    const directions =
+      Object.keys(group.directions).length > 0
+        ? group.directions
+        : { [targetMetric]: bestResponse.direction }
 
     return [
       {
@@ -324,18 +310,14 @@ export default function Leaderboard() {
         submitted_by_user_uuid: group.submitted_by_user_uuid,
         submitted_by_display_name: group.submitted_by_display_name,
         submitted_by_email: group.submitted_by_email,
-        training_config: group.hyperparams,
+        training_config: trainingConfig,
         status: 'aggregated',
-        run_name: group.best_run_name || formatHyperparamsLabel(group.hyperparams),
+        run_name: group.best_run_name || formatHyperparamsLabel(trainingConfig),
         seed: null,
         created_at: null,
         split: bestResponse.split,
-        metrics: {
-          [targetMetric]: group.best_value,
-        },
-        directions: {
-          [targetMetric]: bestResponse.direction,
-        },
+        metrics,
+        directions,
         repo_url: null,
         rank: 1,
       },
@@ -344,7 +326,7 @@ export default function Leaderboard() {
 
   const activeMetricNames = useMemo(() => {
     if (viewMode === 'best_configuration' && bestResponse) {
-      return [bestResponse.target_metric]
+      return bestResponse.metrics.length > 0 ? bestResponse.metrics : [bestResponse.target_metric]
     }
     return metricNames
   }, [viewMode, bestResponse, metricNames])
@@ -355,6 +337,23 @@ export default function Leaderboard() {
     }
     return entries
   }, [viewMode, bestConfigurationEntries, entries])
+
+  const targetMetricDirection = useMemo<Direction>(() => {
+    for (const entry of entries) {
+      const direction = entry.directions[sortBy]
+      if (direction) return direction
+    }
+
+    const normalizedMetric = sortBy.toLowerCase()
+    if (
+      normalizedMetric.includes('loss') ||
+      normalizedMetric.includes('rmse') ||
+      normalizedMetric.includes('mae')
+    ) {
+      return 'min'
+    }
+    return 'max'
+  }, [entries, sortBy])
 
   const sortedEntries = useMemo(() => {
     if (!tableSort) return activeEntries
@@ -635,22 +634,15 @@ export default function Leaderboard() {
         dataset_version_uuid: datasetVersionUuid,
         pipeline_uuid: pipelineUuid,
         split,
+        metrics: metricNames,
         target_metric: sortBy,
-        direction: bestDirection,
-        group_by_hyperparams: bestGroupByHyperparams,
+        direction: targetMetricDirection,
+        group_by_hyperparams: [],
         model_uuids: selectedModelUuids.length > 0 ? selectedModelUuids : undefined,
         author_uuids: selectedAuthorUuids.length > 0 ? selectedAuthorUuids : undefined,
-        hyperparam_filters:
-          Object.keys(queryHyperparamFilters).length > 0 ? queryHyperparamFilters : undefined,
       })
       setBestResponse(response)
       setViewMode('best_configuration')
-      if (response.group_by_hyperparams.length > 0) {
-        setSelectedHyperparamColumns((previous) =>
-          Array.from(new Set([...previous, ...response.group_by_hyperparams])),
-        )
-      }
-      setBestModalOpen(false)
     } catch {
       showSnackBar('Unable to compute best configuration.', 'error')
     } finally {
@@ -861,45 +853,48 @@ export default function Leaderboard() {
           </div>
         </div>
 
-        <div className='leaderboard-filters'>
-          <div className='leaderboard-filters__field'>
-            <label className='leaderboard-filters__label'>Filter by hyperparameters</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                <input
-                  type='checkbox'
-                  checked={Object.keys(hyperparamFilters).length === 0}
-                  onChange={() => setHyperparamFilters({})}
-                />
-                <span>All hyperparams values</span>
-              </label>
-              {availableHyperparamKeys.map((key) => (
-                <label
-                  key={key}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-                >
+        {/* Filter by hyperparameters is intentionally disabled in the leaderboard UI. */}
+        {SHOW_HYPERPARAM_FILTERS && (
+          <div className='leaderboard-filters'>
+            <div className='leaderboard-filters__field'>
+              <label className='leaderboard-filters__label'>Filter by hyperparameters</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                   <input
                     type='checkbox'
-                    checked={key in hyperparamFilters}
-                    onChange={() => toggleHyperparamFilterKey(key)}
+                    checked={Object.keys(hyperparamFilters).length === 0}
+                    onChange={() => setHyperparamFilters({})}
                   />
-                  <span style={{ minWidth: '9rem' }}>{key}</span>
-                  {key in hyperparamFilters && (
-                    <input
-                      className='leaderboard-filters__input'
-                      placeholder='value'
-                      value={hyperparamFilters[key]}
-                      onChange={(event) =>
-                        updateHyperparamFilterValue(key, event.target.value)
-                      }
-                      style={{ maxWidth: '14rem' }}
-                    />
-                  )}
+                  <span>All hyperparams values</span>
                 </label>
-              ))}
+                {availableHyperparamKeys.map((key) => (
+                  <label
+                    key={key}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    <input
+                      type='checkbox'
+                      checked={key in hyperparamFilters}
+                      onChange={() => toggleHyperparamFilterKey(key)}
+                    />
+                    <span style={{ minWidth: '9rem' }}>{key}</span>
+                    {key in hyperparamFilters && (
+                      <input
+                        className='leaderboard-filters__input'
+                        placeholder='value'
+                        value={hyperparamFilters[key]}
+                        onChange={(event) =>
+                          updateHyperparamFilterValue(key, event.target.value)
+                        }
+                        style={{ maxWidth: '14rem' }}
+                      />
+                    )}
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className='leaderboard-filters'>
           <div className='leaderboard-filters__field'>
@@ -923,9 +918,10 @@ export default function Leaderboard() {
           <button
             type='button'
             className='btn btn--outline'
-            onClick={() => setBestModalOpen(true)}
+            disabled={bestLoading}
+            onClick={showBestConfiguration}
           >
-            Show best configuration
+            {bestLoading ? 'Computing...' : 'Show best configuration'}
           </button>
           {viewMode === 'best_configuration' && (
             <button
@@ -962,9 +958,9 @@ export default function Leaderboard() {
                   <div className='detail-field__value'>{bestResponse.direction}</div>
                 </div>
                 <div className='detail-field'>
-                  <div className='detail-field__label'>Grouped by</div>
+                  <div className='detail-field__label'>Aggregated by</div>
                   <div className='detail-field__value'>
-                    {bestResponse.group_by_hyperparams.join(', ') || 'model only'}
+                    model, ranked by {bestResponse.target_metric}
                   </div>
                 </div>
                 <div className='detail-field'>
@@ -1036,106 +1032,6 @@ export default function Leaderboard() {
         </section>
       )}
 
-      {bestModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(12, 16, 31, 0.58)',
-            zIndex: 2000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '1rem',
-          }}
-          onClick={() => setBestModalOpen(false)}
-        >
-          <div
-            className='detail-section'
-            style={{ width: 'min(920px, 100%)', maxHeight: '85vh', overflow: 'auto' }}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 className='detail-section__title'>Best Configuration Settings</h2>
-              <button type='button' className='btn btn--outline btn--sm' onClick={() => setBestModalOpen(false)}>
-                Close
-              </button>
-            </div>
-
-            <p className='text-muted'>
-              Choose direction and group-by hyperparameters, then apply to compute best
-              configuration in the current dataset/version/pipeline/split context.
-            </p>
-
-            <div className='leaderboard-filters'>
-              <div className='leaderboard-filters__field'>
-                <label className='leaderboard-filters__label'>Direction</label>
-                <select
-                  className='leaderboard-filters__select'
-                  value={bestDirection}
-                  onChange={(e) => setBestDirection(e.target.value as Direction)}
-                >
-                  <option value='max'>higher is better</option>
-                  <option value='min'>lower is better</option>
-                </select>
-              </div>
-              <div className='leaderboard-filters__field'>
-                <label className='leaderboard-filters__label'>Group by hyperparams</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <label
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                  >
-                    <input
-                      type='checkbox'
-                      checked={bestGroupByHyperparams.length === 0}
-                      onChange={() => setBestGroupByHyperparams([])}
-                    />
-                    <span>Model only (no hyperparams grouping)</span>
-                  </label>
-                  {availableHyperparamKeys.map((key) => (
-                    <label
-                      key={key}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                    >
-                      <input
-                        type='checkbox'
-                        checked={bestGroupByHyperparams.includes(key)}
-                        onChange={() => {
-                          setBestGroupByHyperparams((prev) => {
-                            if (prev.includes(key)) {
-                              return prev.filter((item) => item !== key)
-                            }
-                            return [...prev, key]
-                          })
-                        }}
-                      />
-                      <span>{key}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className='form__actions'>
-              <button
-                type='button'
-                className='btn btn--outline'
-                onClick={() => setBestModalOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type='button'
-                className='btn btn--primary'
-                disabled={bestLoading}
-                onClick={showBestConfiguration}
-              >
-                {bestLoading ? 'Computing...' : 'Apply'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

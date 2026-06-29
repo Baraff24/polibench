@@ -317,14 +317,24 @@ async def test_best_configuration_endpoint_returns_best_group(
             "dataset_version_uuid": dataset_version_uuid,
             "pipeline_uuid": pipeline_uuid,
             "split": "test",
+            "metrics": ["ndcg@10", "recall@20"],
             "target_metric": "ndcg@10",
-            "direction": "max",
-            "group_by_hyperparams": ["embedding_dim", "batch_size"],
+            "direction": "min",
+            "group_by_hyperparams": [],
         },
     )
     assert resp.status_code == 200
     payload = resp.json()
+    assert payload["metrics"] == ["ndcg@10", "recall@20"]
+    assert payload["direction"] == "max"
+    assert payload["group_by_hyperparams"] == []
     assert payload["best_group"] is not None
     assert payload["best_group"]["model_name"] == "MultiVAE"
-    assert payload["best_group"]["hyperparams"]["embedding_dim"] == 256
+    assert payload["best_group"]["hyperparams"] == {}
+    assert payload["best_group"]["best_training_config"]["embedding_dim"] == 256
+    assert payload["best_group"]["best_metrics"]["ndcg@10"] == pytest.approx(
+        0.4801,
+        rel=1e-4,
+    )
+    assert payload["best_group"]["directions"]["ndcg@10"] == "max"
     assert len(payload["groups"]) >= 3

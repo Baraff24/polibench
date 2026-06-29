@@ -105,6 +105,7 @@ class BestConfigurationQuery(BaseModel):
     dataset_version_uuid: UUID
     pipeline_uuid: UUID
     split: Split
+    metrics: list[str] = Field(default_factory=list)
     target_metric: str
     direction: Direction
     group_by_hyperparams: list[str] = Field(default_factory=list)
@@ -124,6 +125,8 @@ class BestConfigurationGroup(BaseModel):
     mean_value: float
     count: int
     std: float | None = None
+    best_metrics: dict[str, float] = Field(default_factory=dict)
+    directions: dict[str, Direction] = Field(default_factory=dict)
     best_experiment_uuid: UUID | None = None
     best_run_name: str | None = None
     best_training_config: dict[str, Any] | None = None
@@ -134,6 +137,7 @@ class BestConfigurationResponse(BaseModel):
     dataset_version_uuid: UUID
     pipeline_uuid: UUID
     split: Split
+    metrics: list[str] = Field(default_factory=list)
     target_metric: str
     direction: Direction
     group_by_hyperparams: list[str] = Field(default_factory=list)
