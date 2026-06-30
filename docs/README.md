@@ -32,27 +32,6 @@ docs/
     └── 02_architecture.md          ← architettura React, routing, contexts
 ```
 
-## Stato del progetto (aprile 2026)
-
-| Area                                               | Stato        |
-|----------------------------------------------------|--------------|
-| Modelli dati (backend)                             | ✅ Completato |
-| Schemi API (backend)                               | ✅ Completato |
-| Autenticazione JWT + Google SSO                    | ✅ Completato |
-| Router Users e Login                               | ✅ Completato |
-| Router Datasets / MLModels / Experiments / Metrics | ✅ Completato |
-| Router Leaderboard                                 | ✅ Completato |
-| Service layer (datasets, experiments, metrics, lb) | ✅ Completato |
-| Smoke test database (in-memory)                    | ✅ Completato |
-| Test API router end-to-end (in-memory)             | ✅ Completato |
-| Decisioni architetturali (ADR)                     | ✅ Completato |
-| Convenzioni HTTP ed error handling                 | ✅ Completato |
-| Indici, query critiche e performance               | ✅ Completato |
-| Deployment e ambienti                              | ✅ Completato |
-| Limiti attuali e sviluppi futuri                   | ✅ Completato |
-| Frontend — auth, routing, profilo utente           | ✅ Completato |
-| Frontend — leaderboard, benchmark UI               | 🔄 In corso  |
-
 ## Come leggere questa documentazione
 
 Per chi si avvicina al progetto per la prima volta, il percorso consigliato è:
